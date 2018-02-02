@@ -10,6 +10,7 @@ class MlpPolicy(object):
         with tf.variable_scope(name):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
+            U.initialize()
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
               gaussian_fixed_var=True, use_bias=True):
@@ -49,18 +50,43 @@ class MlpPolicy(object):
                                           name='final',
                                           kernel_initializer=U.normc_initializer(0.01))
 
+        #Acting
         self.pd = pdtype.pdfromflat(pdparam)
-
         self.state_in = []
         self.state_out = []
-
         stochastic = tf.placeholder(dtype=tf.bool, shape=())
         ac = U.switch(stochastic, self.pd.sample(), self.pd.mode())
         self._act = U.function([stochastic, ob], [ac, self.vpred])
 
+        #Evaluating
+        self.ob = ob
+        self.ac_in = U.get_placeholder(name="ac_in", dtype=tf.float32,
+                                       shape=[sequence_length] +
+                                       list(ac_space.shape))
+        self.gamma = U.get_placeholder(name="gamma",
+                                        dtype=tf.float32,shape=[])
+        self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
+                                       shape=[sequence_length]+[1])
+        self.logprobs = self.pd.logp(self.ac_in)
+
     def act(self, stochastic, ob):
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
+
+    def evaluate(self,states,actions,rewards,batch_size,behavioral=None,gamma=.99):
+        horizon = len(rewards)//batch_size
+        log_ratios = self.logprobs #- behavioral.pd.logp(self.ac_in)
+        log_ratios_by_episode = tf.stack(tf.split(log_ratios,batch_size))
+        iw = tf.exp(tf.reduce_sum(log_ratios_by_episode,axis=1))
+        rews_by_episode = tf.stack(tf.split(self.rew,batch_size))
+        disc = self.gamma*tf.ones([batch_size,horizon,1])
+        disc = tf.cumprod(disc,axis=1,exclusive=True)
+        disc_rews = rews_by_episode*disc
+        rets = tf.reduce_sum(disc_rews,axis=1)
+        J_hat = tf.reduce_mean(tf.multiply(rets,iw))
+        fun = U.function([self.ob,self.ac_in,self.rew,self.gamma],[J_hat])
+        return fun(states,actions,rewards,gamma)[0]
+
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
     def get_trainable_variables(self):
