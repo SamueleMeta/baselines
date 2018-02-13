@@ -1,4 +1,4 @@
-from baselines.ppo1.mlp_policy import MlpPolicy
+from baselines.policy.mlp_policy import MlpPolicy
 from ifqi.envs.lqg1d import LQG1D
 import numpy as np
 import baselines.common.tf_util as U
