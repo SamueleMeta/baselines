@@ -83,7 +83,7 @@ class MlpPolicy(object):
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
 
-    def evaluate(self,states,actions,rewards,batch_size=1,behavioral=None,per_decision=False,gamma=.99):
+    def evaluate_performance(self,states,actions,rewards,batch_size=1,behavioral=None,per_decision=False,gamma=.99):
         """Performance under the policy
 
             Params:
