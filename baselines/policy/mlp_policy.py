@@ -83,14 +83,14 @@ class MlpPolicy(object):
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
 
-    def eval_performance(self,states,actions,rewards,batch_size=1,behavioral=None,per_decision=False,gamma=.99):
+    def eval_performance(self,states,actions,rewards,lens=1,behavioral=None,per_decision=False,gamma=.99):
         """Performance under the policy
 
             Params:
             states: flat list of states
             actions: flat list of actions
             rewards: flat list of rewards
-            batch_size: number of (equally long) episodes
+            lens: list->episode lengths, number->batch_size
             behavioral: policy w/ which states, actions, rewards were sampled
             per_decision: whether to use pd importance weights instead of
                             regular ones
@@ -110,8 +110,11 @@ class MlpPolicy(object):
             rewards = np.expand_dims(rewards,axis=1)
         assert len(states)==len(actions)==len(rewards)
 
-        horizon = len(rewards)//batch_size
-        rews_by_episode = tf.stack(tf.split(self.rew,batch_size))
+        batch_size = len(lens)
+        rews_by_episode = tf.split(self.rew,lens)
+        rews_by_episode = tf.stack(self._fill(rews_by_episode))
+        horizon = rews_by_episode.shape[1]
+
         disc = self.gamma*tf.ones([batch_size,horizon,1])
         disc = tf.cumprod(disc,axis=1,exclusive=True)
         disc_rews = rews_by_episode*disc
@@ -120,7 +123,8 @@ class MlpPolicy(object):
             weighted_rets = tf.reduce_sum(disc_rews,axis=1)
         else:
             log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
-            log_ratios_by_episode = tf.stack(tf.split(log_ratios,batch_size))
+            log_ratios_by_episode = tf.split(log_ratios,lens)
+            log_ratios_by_episode = tf.stack(self._fill(log_ratios_by_episode))
 
             if per_decision:
                 iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
@@ -133,6 +137,16 @@ class MlpPolicy(object):
         J_hat = tf.reduce_mean(weighted_rets)
         fun = U.function([self.ob,self.ac_in,self.rew,self.gamma],[J_hat])
         return fun(states,actions,rewards,gamma)[0]
+
+    def _fill(self,tensors,filler=0):
+        max_len = max([t.shape[0]] for t in tensors)
+        result = []
+        for t in tensors:
+            padding = filler*tf.ones(shape=[max_len[0] - t.shape[0]] + \
+                                list(t.shape)[1:],dtype=tf.float32)
+            t = tf.concat([t,padding],axis=0)
+            result.append(t)
+        return result
 
     def eval_param(self):
         """"Policy parameters (numeric,flat)"""

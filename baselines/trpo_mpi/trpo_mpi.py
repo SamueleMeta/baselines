@@ -276,15 +276,17 @@ def learn(env, policy_fn, *,
 
         #Use this to print policy params:
         #print(pi.eval_param())
+
+        #J_hat
         J_hat = pi.eval_performance(states,
                                     actions,
                                     rewards,
-                                    batch_size=len(lens),
+                                    lens,
                                     behavioral=oldpi,
                                     per_decision=False,
                                     gamma=gamma)
-        print(J_hat)
-
+        logger.record_tabular("J_hat", J_hat)
+ 
         logger.record_tabular("EpLenMean", np.mean(lenbuffer))
         logger.record_tabular("EpRewMean", np.mean(rewbuffer))
         logger.record_tabular("EpThisIter", len(lens))
