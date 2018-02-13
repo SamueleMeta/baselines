@@ -1,5 +1,5 @@
 from baselines.policy.mlp_policy import MlpPolicy
-from ifqi.envs.lqg1d import LQG1D
+from baselines.envs.lqg1d import LQG1D
 import numpy as np
 import baselines.common.tf_util as U
 

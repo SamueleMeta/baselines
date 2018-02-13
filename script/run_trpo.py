@@ -5,11 +5,10 @@ from mpi4py import MPI
 from baselines.common import set_global_seeds
 import os.path as osp
 import gym
-from ifqi.envs.lqg1d import LQG1D
-from ifqi.envs.continuous_cartpole import CartPoleEnv
+from baselines.envs.lqg1d import LQG1D
 import logging
 from baselines import logger
-from baselines.ppo1.mlp_policy import MlpPolicy
+from baselines.policy.mlp_policy import MlpPolicy
 from baselines.common.mpi_fork import mpi_fork
 from baselines import bench
 from baselines.trpo_mpi import trpo_mpi
@@ -28,13 +27,13 @@ def train(env_id, num_timesteps, seed):
     env = gym.make(env_id)
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-            hid_size=1, num_hid_layers=0,gaussian_fixed_var=True,use_bias=True)
+            hid_size=1, num_hid_layers=0,gaussian_fixed_var=True,use_bias=False)
     env = bench.Monitor(env, logger.get_dir() and
         osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)
     gym.logger.setLevel(logging.WARN)
 
-    trpo_mpi.learn(env, policy_fn, timesteps_per_batch=20*200, max_kl=0.01, cg_iters=10, cg_damping=0.1,
+    trpo_mpi.learn(env, policy_fn, timesteps_per_batch=10*200, max_kl=0.01, cg_iters=10, cg_damping=0.1,
         max_timesteps=num_timesteps, gamma=.99, lam=0.98, vf_iters=5, vf_stepsize=1e-3)
     env.close()
 
@@ -43,7 +42,7 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--env', help='environment ID', default='LQG1D-v0')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--num-timesteps', type=int, default=int(20*200*100))
+    parser.add_argument('--num-timesteps', type=int, default=int(10*200*100))
     args = parser.parse_args()
     logger.configure(dir='.',format_strs=['stdout','csv'])
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)

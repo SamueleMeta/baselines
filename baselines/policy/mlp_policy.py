@@ -83,7 +83,7 @@ class MlpPolicy(object):
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
 
-    def evaluate_performance(self,states,actions,rewards,batch_size=1,behavioral=None,per_decision=False,gamma=.99):
+    def eval_performance(self,states,actions,rewards,batch_size=1,behavioral=None,per_decision=False,gamma=.99):
         """Performance under the policy
 
             Params:
@@ -97,24 +97,39 @@ class MlpPolicy(object):
             gamma: discount factor
         """
 
+        #Prepare s,a,r
+        import numpy as np
+        states = np.array(states)
+        if states.ndim==1:
+            states = np.expand_dims(states,axis=1)
+        actions = np.array(actions)
+        if actions.ndim==1:
+            actions = np.expand_dims(actions,axis=1)
+        rewards = np.array(rewards)
+        if rewards.ndim==1:
+            rewards = np.expand_dims(rewards,axis=1)
+        assert len(states)==len(actions)==len(rewards)
+
         horizon = len(rewards)//batch_size
-        if behavioral is None:
-            log_ratios = self.logprobs
-        else:
-            log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
-        log_ratios_by_episode = tf.stack(tf.split(log_ratios,batch_size))
         rews_by_episode = tf.stack(tf.split(self.rew,batch_size))
         disc = self.gamma*tf.ones([batch_size,horizon,1])
         disc = tf.cumprod(disc,axis=1,exclusive=True)
         disc_rews = rews_by_episode*disc
 
-        if per_decision:
-            iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
-            weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw),axis=1)
+        if behavioral is None:
+            weighted_rets = tf.reduce_sum(disc_rews,axis=1)
         else:
-            iw = tf.exp(tf.reduce_sum(log_ratios_by_episode,axis=1))
-            rets = tf.reduce_sum(disc_rews,axis=1)
-            weighted_rets = tf.multiply(rets,iw)
+            log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
+            log_ratios_by_episode = tf.stack(tf.split(log_ratios,batch_size))
+
+            if per_decision:
+                iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
+                iw = tf.expand_dims(iw,axis=2)
+                weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw),axis=1)
+            else:
+                iw = tf.exp(tf.reduce_sum(log_ratios_by_episode,axis=1))
+                rets = tf.reduce_sum(disc_rews,axis=1)
+                weighted_rets = tf.multiply(rets,iw)
         J_hat = tf.reduce_mean(weighted_rets)
         fun = U.function([self.ob,self.ac_in,self.rew,self.gamma],[J_hat])
         return fun(states,actions,rewards,gamma)[0]

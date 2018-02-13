@@ -267,11 +267,23 @@ def learn(env, policy_fn, *,
 
         logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
 
-        lrlocal = (seg["ep_lens"], seg["ep_rets"]) # local values
+        lrlocal = (seg["ep_lens"], seg["ep_rets"], seg["ob"],
+                   seg["ac"],seg["rew"]) # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
-        lens, rews = map(flatten_lists, zip(*listoflrpairs))
+        lens, rews,states,actions,rewards = map(flatten_lists, zip(*listoflrpairs))
         lenbuffer.extend(lens)
         rewbuffer.extend(rews)
+
+        #Use this to print policy params:
+        #print(pi.eval_param())
+        J_hat = pi.eval_performance(states,
+                                    actions,
+                                    rewards,
+                                    batch_size=len(lens),
+                                    behavioral=oldpi,
+                                    per_decision=False,
+                                    gamma=gamma)
+        print(J_hat)
 
         logger.record_tabular("EpLenMean", np.mean(lenbuffer))
         logger.record_tabular("EpRewMean", np.mean(rewbuffer))
