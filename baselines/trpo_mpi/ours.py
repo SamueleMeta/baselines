@@ -149,6 +149,68 @@ def add_vtarg_and_adv(seg, gamma, iw_method='pdis'):
         else:
             discounter += 1
 
+def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
+    if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
+        return epsilon_old * max_increase
+    else:
+        return epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
+
+
+def line_search(theta_init, alpha, natural_gradient, set_parameter, evaluate_loss, delta_bound_tol=1e-2, max_line_search_ite=100):
+    epsilon = 1. / np.sqrt(alpha)
+    delta_bound_old = -np.inf
+    bound_init = evaluate_loss()
+    theta_old = theta_init
+
+    for i in range(max_line_search_ite):
+        theta = theta_init + epsilon * alpha * natural_gradient
+        set_parameter(theta)
+        bound = evaluate_loss()
+        delta_bound = bound - bound_init
+
+        epsilon_old = epsilon
+        epsilon = update_epsilon(delta_bound, epsilon_old)
+        if delta_bound <= delta_bound_old + delta_bound_tol:
+            return theta_old, epsilon_old, delta_bound_old, i+1
+
+        delta_bound_old = delta_bound
+        theta_old = theta
+
+    return theta_old, epsilon_old, delta_bound_old, i+1
+
+def optimize_offline(theta_init, set_parameter, evaluate_loss, evaluate_gradient, gradient_tol=1e-5, bound_tol=1e-3, fisher_reg=1e-10, max_offline_ite=100):
+    theta = theta_init
+    improvement = 0.
+    set_parameter(theta)
+
+    fmtstr = "%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g"
+    titlestr = "%6s %10s %10s %18s %18s %18s %18s"
+    print(titlestr % ("iter", "epsilon", "step size", "num line search", "gradient norm", "delta bound ite", "delta bound tot"))
+
+    for i in range(max_offline_ite):
+        gradient, bound = evaluate_gradient()
+        #TODO compute fisher
+        #fisher = 0.
+        #natural_gradient = la.solve(fisher + fisher_reg * np.eye(fisher.shape[0]), gradient)
+        natural_gradient = gradient
+        gradient_norm = np.sqrt(np.dot(gradient, natural_gradient))
+        if gradient_norm < gradient_tol:
+            print("stopping - gradient norm < gradient_tol")
+            return theta, improvement
+
+        alpha = 1. / gradient_norm ** 2
+        theta, epsilon, delta_bound, num_line_search = line_search(theta, alpha, natural_gradient, set_parameter, evaluate_loss)
+        set_parameter(theta)
+
+        improvement += delta_bound
+        print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, gradient_norm, delta_bound, improvement))
+
+        if delta_bound < bound_tol:
+            print("stopping - delta bound < bound_tol")
+            print(theta)
+            return theta, improvement
+
+    return theta, improvement
 
 def learn(env, policy_func, *,
         timesteps_per_batch, # what to train on
@@ -161,7 +223,7 @@ def learn(env, policy_func, *,
         ):
     nworkers = MPI.COMM_WORLD.Get_size()
     rank = MPI.COMM_WORLD.Get_rank()
-    np.set_printoptions(precision=3)    
+    np.set_printoptions(precision=3)
     # Setup losses and stuff
     # ----------------------------------------
     ob_space = env.observation_space
@@ -190,7 +252,7 @@ def learn(env, policy_func, *,
     losses = [bound, return_mean, return_std]
     loss_names = ['bound', 'return', 'std']
 
-    compute_lossandgrad = U.function([ob, ac, disc_rew, mask1, mask2], losses + [U.flatgrad(-bound, var_list)])
+    compute_lossandgrad = U.function([ob, ac, disc_rew, mask1, mask2], losses + [U.flatgrad(bound, var_list)])
 
 
     assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
@@ -208,13 +270,26 @@ def learn(env, policy_func, *,
             print(colorize("done in %.3f seconds"%(time.time() - tstart), color='magenta'))
         else:
             yield
-    
+
     def allmean(x):
         assert isinstance(x, np.ndarray)
         out = np.empty_like(x)
         MPI.COMM_WORLD.Allreduce(x, out, op=MPI.SUM)
         out /= nworkers
         return out
+
+    def evaluate_loss():
+        loss = allmean(np.array(compute_losses(*args)))
+        return loss[0]
+
+    def evaluate_gradient():
+        *loss, gradient = compute_lossandgrad(*args)
+        loss = allmean(np.array(loss))
+        gradient = allmean(gradient)
+        return gradient, loss[0]
+
+    set_parameter = U.SetFromFlat(var_list)
+    get_parameter = U.GetFlat(var_list)
 
     U.initialize()
 
@@ -233,6 +308,10 @@ def learn(env, policy_func, *,
     schedule = 'constant'
     optim_stepsize = 1e-2
     ite = 0
+
+    improvement_tol = 1e-2
+    theta = get_parameter()
+
     while True:
         ite+=1
         if callback: callback(locals(), globals())
@@ -242,13 +321,6 @@ def learn(env, policy_func, *,
             break
         elif max_iters and iters_so_far >= max_iters:
             break
-
-        if schedule == 'constant':
-            cur_lrmult = 1.0
-        elif schedule == 'linear':
-            cur_lrmult =  max(1.0 - float(timesteps_so_far) / max_timesteps, 0)
-        else:
-            raise NotImplementedError
 
         logger.log("********** Iteration %i ************"%iters_so_far)
 
@@ -262,38 +334,20 @@ def learn(env, policy_func, *,
 
         args = seg["ob"], seg["ac"], disc_rew, mask1, mask2
         assign_old_eq_new() # set old parameter values to new parameter values
+
+        print(theta)
+
         with timed("computegrad"):
-            *lossbefore, g = compute_lossandgrad(*args)
-        lossbefore = allmean(np.array(lossbefore))
-        g = allmean(g)
-        print(g)
+            gradient = evaluate_gradient()
+        print(gradient)
 
-        if np.allclose(g, 0):
-            logger.log("Got zero gradiefor loopnt. not updating")
-        else:
-            tol = 1e-2
-            i = 0
-            adam = MpiAdam(var_list)
-            adam.sync()
+        theta, improvement = optimize_offline(theta, set_parameter, evaluate_loss, evaluate_gradient)
+        set_parameter(theta)
 
-            while la.norm(g) > tol and i < iters:
-                a = ob, ac, mask1, mask2, disc_rew
+        if improvement < improvement_tol:
+            break
 
-                adam.update(g, cur_lrmult / np.sqrt(ite) * optim_stepsize)
-                i += 1
-
-                *lossbefore, g = compute_lossandgrad(*args)
-                lossbefore = allmean(np.array(lossbefore))
-                g = allmean(g)
-
-                #print(g)
-            ws = pdiw_f(*a)
-            print(ws[2])
-            print(ws[-1])
-
-
-            meanlosses = bound, _, _ = allmean(np.array(compute_losses(*args)))
-
+        meanlosses = bound, _, _ = allmean(np.array(compute_losses(*args)))
         for (lossname, lossval) in zip(loss_names, meanlosses):
             logger.record_tabular(lossname, lossval)
 
