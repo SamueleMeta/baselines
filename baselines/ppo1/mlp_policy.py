@@ -5,6 +5,7 @@ import gym
 from baselines.common.distributions import make_pdtype
 
 class MlpPolicy(object):
+    """Gaussian policy with critic, based on multi-layer perceptron"""
     recurrent = False
     def __init__(self, name, *args, **kwargs):
         with tf.variable_scope(name):
@@ -14,6 +15,14 @@ class MlpPolicy(object):
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
               gaussian_fixed_var=True, use_bias=True):
+        """Params:
+            ob_space: task observation space
+            ac_space : task action space
+            hid_size: width of hidden layers
+            num_hid_layers: depth
+            gaussian_fixed_var: True->separate parameter, False->two heads
+            use_bias: whether to include bias in neurons
+        """
         assert isinstance(ob_space, gym.spaces.Box)
 
         self.pdtype = pdtype = make_pdtype(ac_space)
@@ -74,32 +83,60 @@ class MlpPolicy(object):
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
 
-    def evaluate(self,states,actions,rewards,batch_size,behavioral=None,gamma=.99):
+    def evaluate(self,states,actions,rewards,batch_size=1,behavioral=None,per_decision=False,gamma=.99):
+        """Performance under the policy
+
+            Params:
+            states: flat list of states
+            actions: flat list of actions
+            rewards: flat list of rewards
+            batch_size: number of (equally long) episodes
+            behavioral: policy w/ which states, actions, rewards were sampled
+            per_decision: whether to use pd importance weights instead of
+                            regular ones
+            gamma: discount factor
+        """
+
         horizon = len(rewards)//batch_size
-        log_ratios = self.logprobs #- behavioral.pd.logp(self.ac_in)
+        if behavioral is None:
+            log_ratios = self.logprobs
+        else:
+            log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
         log_ratios_by_episode = tf.stack(tf.split(log_ratios,batch_size))
-        iw = tf.exp(tf.reduce_sum(log_ratios_by_episode,axis=1))
         rews_by_episode = tf.stack(tf.split(self.rew,batch_size))
         disc = self.gamma*tf.ones([batch_size,horizon,1])
         disc = tf.cumprod(disc,axis=1,exclusive=True)
         disc_rews = rews_by_episode*disc
-        rets = tf.reduce_sum(disc_rews,axis=1)
-        J_hat = tf.reduce_mean(tf.multiply(rets,iw))
+
+        if per_decision:
+            iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
+            weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw),axis=1)
+        else:
+            iw = tf.exp(tf.reduce_sum(log_ratios_by_episode,axis=1))
+            rets = tf.reduce_sum(disc_rews,axis=1)
+            weighted_rets = tf.multiply(rets,iw)
+        J_hat = tf.reduce_mean(weighted_rets)
         fun = U.function([self.ob,self.ac_in,self.rew,self.gamma],[J_hat])
         return fun(states,actions,rewards,gamma)[0]
 
     def eval_param(self):
+        """"Policy parameters (numeric,flat)"""
+
         with tf.variable_scope(self.scope+'/pol') as vs:
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
         return U.GetFlat(var_list)()
 
     def get_param(self):
+        """Policy parameters (symbolic, nested)"""
+
         with tf.variable_scope(self.scope+'/pol') as vs:
             return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
 
     def set_param(self,param):
+        """Set policy parameters to (flat) param"""
+
         with tf.variable_scope(self.scope+'/pol') as vs:
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)

@@ -13,3 +13,8 @@ pi = MlpPolicy("pi",env.observation_space,env.action_space,hid_size=1,
 
 be = MlpPolicy("be",env.observation_space,env.action_space,hid_size=1,
                num_hid_layers=0,use_bias=False)
+s = np.array([[1.],[2.],[1.]])
+
+a = np.array([[0.],[1.],[-1.]])
+
+r = np.array([[1.],[0.],[1.]])
