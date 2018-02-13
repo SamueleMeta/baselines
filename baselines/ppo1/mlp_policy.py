@@ -38,11 +38,12 @@ class MlpPolicy(object):
             for i in range(num_hid_layers):
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
                                                       name='fc%i'%(i+1),
-                                                      kernel_initializer=U.normc_initializer(1.0)),bias=use_bias)
+                                                      kernel_initializer=U.normc_initializer(1.0),use_bias=use_bias))
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
                 mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
                                        name='final',
-                                       kernel_initializer=U.normc_initializer(0.01))
+                                       kernel_initializer=U.normc_initializer(0.01),
+                                       use_bias=use_bias)
                 logstd = tf.get_variable(name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=tf.zeros_initializer())
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
@@ -86,6 +87,23 @@ class MlpPolicy(object):
         J_hat = tf.reduce_mean(tf.multiply(rets,iw))
         fun = U.function([self.ob,self.ac_in,self.rew,self.gamma],[J_hat])
         return fun(states,actions,rewards,gamma)[0]
+
+    def eval_param(self):
+        with tf.variable_scope(self.scope+'/pol') as vs:
+            var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=vs.name)
+        return U.GetFlat(var_list)()
+
+    def get_param(self):
+        with tf.variable_scope(self.scope+'/pol') as vs:
+            return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=vs.name)
+
+    def set_param(self,param):
+        with tf.variable_scope(self.scope+'/pol') as vs:
+            var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=vs.name)
+            U.SetFromFlat(var_list)(param)
 
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)

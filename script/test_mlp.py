@@ -7,16 +7,9 @@ sess = U.single_threaded_session()
 sess.__enter__()
 
 env = LQG1D()
+
 pi = MlpPolicy("pi",env.observation_space,env.action_space,hid_size=1,
-               num_hid_layers=0,use_bias=False)
+               num_hid_layers=1,use_bias=False)
 
 be = MlpPolicy("be",env.observation_space,env.action_space,hid_size=1,
                num_hid_layers=0,use_bias=False)
-
-
-s = np.zeros(6).reshape((6,1))
-a = np.zeros(6).reshape((6,1))
-r = np.ones(6).reshape((6,1))
-N = 3
-
-print(pi.evaluate(s,a,r,N,be))

@@ -239,7 +239,8 @@ class SetFromFlat(object):
 
 class GetFlat(object):
     def __init__(self, var_list):
-        self.op = tf.concat(axis=0, values=[tf.reshape(v, [numel(v)]) for v in var_list])
+        self.op = tf.concat(axis=0, values=[tf.cast(tf.reshape(v, \
+                                                               [numel(v)]),tf.float32) for v in var_list])
 
     def __call__(self):
         return tf.get_default_session().run(self.op)
