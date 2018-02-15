@@ -6,12 +6,12 @@ import os.path as osp
 import gym
 import logging
 from baselines import logger
-from baselines.ppo1.mlp_policy import MlpPolicy
+from baselines.policy.mlp_policy import MlpPolicy
 from baselines.common.mpi_fork import mpi_fork
 from baselines import bench
 #from baselines.trpo_mpi import trpo_mpi
 from baselines.trpo_mpi import ours
-from baselines.trpo_mpi.lqg1d import LQG1D
+from baselines.envs.lqg1d import LQG1D
 import sys
 
 def train(num_timesteps, seed):
@@ -28,7 +28,7 @@ def train(num_timesteps, seed):
     env.horizon = 20
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-            hid_size=0, num_hid_layers=0, gaussian_fixed_var=True, use_bias=False)
+            hid_size=0, num_hid_layers=0, gaussian_fixed_var=True, use_bias=True)
     env.seed(workerseed)
     gym.logger.setLevel(logging.WARN)
 
@@ -44,7 +44,6 @@ def main():
     args = parser.parse_args()
     logger.configure(dir='.', format_strs=['stdout', 'csv'])
     train(num_timesteps=args.num_timesteps, seed=args.seed)
-
 
 if __name__ == '__main__':
     main()

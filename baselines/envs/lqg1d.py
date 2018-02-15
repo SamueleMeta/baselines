@@ -24,8 +24,9 @@ References
 from gym.envs.registration import register
 register(
     id='LQG1D-v0',
-    entry_point='baselines.envs.lqg1d:LQG1D'
+    entry_point='ifqi.envs.lqg1d:LQG1D'
 )
+
 
 class LQG1D(gym.Env):
     metadata = {
@@ -74,8 +75,8 @@ class LQG1D(gym.Env):
             np.dot(u, np.dot(self.R, u))
         assert cost>=0
 
-        #normalized_cost = cost / self.max_cost * 2 - 1
-        normalized_cost = cost
+        normalized_cost = cost / self.max_cost * 2 - 1
+        #normalized_cost = cost
         self.state = np.array(xn.ravel())
         if self.discrete_reward:
             if abs(self.state[0]) <= 2 and abs(u) <= 2:
