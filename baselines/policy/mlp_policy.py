@@ -97,7 +97,17 @@ class MlpPolicy(object):
             gamma: discount factor
         """
 
-        #Prepare s,a,r
+        assert len(states)==len(actions)==len(rewards)
+        if type(lens) is not list:
+            assert len(rewards)%lens==0
+            no_of_samples = len(rewards)
+        else:
+            no_of_samples = sum(lens)
+
+        states = states[:no_of_samples]
+        actions = actions[:no_of_samples]
+        rewards = rewards[:no_of_samples]
+
         import numpy as np
         states = np.array(states)
         if states.ndim==1:
@@ -108,14 +118,11 @@ class MlpPolicy(object):
         rewards = np.array(rewards)
         if rewards.ndim==1:
             rewards = np.expand_dims(rewards,axis=1)
-        assert len(states)==len(actions)==len(rewards)
 
-        batch_size = len(lens)
         rews_by_episode = tf.split(self.rew,lens)
         rews_by_episode = tf.stack(self._fill(rews_by_episode))
-        horizon = rews_by_episode.shape[1]
 
-        disc = self.gamma*tf.ones([batch_size,horizon,1])
+        disc = self.gamma + 0*rews_by_episode
         disc = tf.cumprod(disc,axis=1,exclusive=True)
         disc_rews = rews_by_episode*disc
 
@@ -123,6 +130,7 @@ class MlpPolicy(object):
             weighted_rets = tf.reduce_sum(disc_rews,axis=1)
         else:
             log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
+            log_ratios = tf.expand_dims(log_ratios, axis=1)
             log_ratios_by_episode = tf.split(log_ratios,lens)
             log_ratios_by_episode = tf.stack(self._fill(log_ratios_by_episode))
 
@@ -135,15 +143,20 @@ class MlpPolicy(object):
                 rets = tf.reduce_sum(disc_rews,axis=1)
                 weighted_rets = tf.multiply(rets,iw)
         J_hat = tf.reduce_mean(weighted_rets)
-        fun = U.function([self.ob,self.ac_in,self.rew,self.gamma],[J_hat])
-        return fun(states,actions,rewards,gamma)[0]
+        fun = U.function([self.ob,behavioral.ob,self.ac_in,self.rew,self.gamma],[J_hat])
+        return fun(states,states,actions,rewards,gamma)[0]
 
     def _fill(self,tensors,filler=0):
-        max_len = max([t.shape[0]] for t in tensors)
+        max_len = max(t.shape[0].value for t in tensors)
         result = []
         for t in tensors:
-            padding = filler*tf.ones(shape=[max_len[0] - t.shape[0]] + \
-                                list(t.shape)[1:],dtype=tf.float32)
+            padding = filler*tf.ones([max_len - t.shape[0].value] + t.shape[1:].as_list())
+
+            padding = tf.stack([filler + 0 * t[0] for _ in range(max_len - \
+                                                                  t.shape[0].value)],
+                               axis = 0)
+            if len(padding.shape)==1:
+                padding = tf.expand_dims(padding, axis=1)
             t = tf.concat([t,padding],axis=0)
             result.append(t)
         return result

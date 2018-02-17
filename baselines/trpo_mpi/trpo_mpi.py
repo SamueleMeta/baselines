@@ -38,14 +38,22 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         if t > 0 and t % horizon == 0:
-            yield {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
-                    "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
+            n_samples = sum(ep_lens)
+            yield {"ob" : obs[:n_samples], "rew" : rews[:n_samples],
+                   "vpred" : vpreds[:n_samples], "new" : news[:n_samples],
+                    "ac" : acs[:n_samples], "prevac" : prevacs[:n_samples], 
+                    "nextvpred": vpred * (1 - new),
                     "ep_rets" : ep_rets, "ep_lens" : ep_lens}
             _, vpred = pi.act(stochastic, ob)
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
+            if not new:
+                cur_ep_ret = 0
+                cur_ep_len = 0
+                ob = env.reset()
+
         i = t % horizon
         obs[i] = ob
         vpreds[i] = vpred
@@ -80,7 +88,8 @@ def add_vtarg_and_adv(seg, gamma, lam):
     seg["tdlamret"] = seg["adv"] + seg["vpred"]
 
 def learn(env, policy_fn, *,
-        timesteps_per_batch, # what to train on
+        batch_size, # what to train on
+        task_horizon,
         max_kl, cg_iters,
         gamma, lam, # advantage estimation
         entcoeff=0.0,
@@ -93,6 +102,7 @@ def learn(env, policy_fn, *,
     nworkers = MPI.COMM_WORLD.Get_size()
     rank = MPI.COMM_WORLD.Get_rank()
     np.set_printoptions(precision=3)
+    timesteps_per_batch = batch_size * task_horizon
     # Setup losses and stuff
     # ----------------------------------------
     ob_space = env.observation_space
