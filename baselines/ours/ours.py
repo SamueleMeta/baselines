@@ -171,14 +171,17 @@ def line_search(theta_init, alpha, natural_gradient, set_parameter, evaluate_los
         epsilon_old = epsilon
         epsilon = update_epsilon(delta_bound, epsilon_old)
         if delta_bound <= delta_bound_old + delta_bound_tol:
-            return theta_old, epsilon_old, delta_bound_old, i+1
+            if delta_bound_old < 0.:
+                return theta_init, 0., 0., i+1
+            else:
+                return theta_old, epsilon_old, delta_bound_old, i+1
 
         delta_bound_old = delta_bound
         theta_old = theta
 
     return theta_old, epsilon_old, delta_bound_old, i+1
 
-def optimize_offline(theta_init, set_parameter, evaluate_loss, evaluate_gradient, gradient_tol=1e-5, bound_tol=1e-3, fisher_reg=1e-10, max_offline_ite=100):
+def optimize_offline(theta_init, set_parameter, evaluate_loss, evaluate_gradient, gradient_tol=1e-5, bound_tol=1e-3, fisher_reg=1e-10, max_offline_ite=200):
     theta = theta_init
     improvement = 0.
     set_parameter(theta)
@@ -213,17 +216,19 @@ def optimize_offline(theta_init, set_parameter, evaluate_loss, evaluate_gradient
     return theta, improvement
 
 def learn(env, policy_func, *,
-        timesteps_per_batch, # what to train on
-        delta,
-        N,
-        max_timesteps=0, max_episodes=0, max_iters=0,  # time constraint
-        callback=None,
-        gamma,
+          num_episodes,
+          horizon,
+          delta,
+          callback=None,
+          gamma,
           iters,
-        ):
+          bound_name='student',
+         ):
+
     nworkers = MPI.COMM_WORLD.Get_size()
     rank = MPI.COMM_WORLD.Get_rank()
     np.set_printoptions(precision=3)
+
     # Setup losses and stuff
     # ----------------------------------------
     ob_space = env.observation_space
@@ -236,21 +241,35 @@ def learn(env, policy_func, *,
     mask1 = tf.placeholder(dtype=tf.float32, shape=[None,None])
     mask2 = tf.placeholder(dtype=tf.float32, shape=[None,None])
     disc_rew = tf.placeholder(dtype=tf.float32, shape=[None])
+    ep_len = tf.placeholder(dtype=tf.int32, shape=[None])
+    importance_weights = tf.placeholder(dtype=tf.float32, shape=[None])
 
     ob = U.get_placeholder_cached(name="ob")
     ac = pi.pdtype.sample_placeholder([None])
 
     logratio = pi.pd.logp(ac) - oldpi.pd.logp(ac) # pnew / pold
+
+    #condition = lambda i: tf.less(i, tf.shape(ep_len)[0])
+    #def body(i):
+    #    importance_weights[ep_len[i]:ep_len[i+1]] = tf.exp(tf.su)
+    #    tf.add(i, 1)
+
+
     iw = tf.exp(tf.tensordot(logratio, mask1, axes=1))
 
     ep_return = tf.tensordot(iw * disc_rew, mask2, axes=1)
     return_mean = tf.reduce_mean(ep_return)
     return_std = reduce_std(ep_return)
 
-    bound = return_mean - sts.t.ppf(1 - delta, N - 1) / np.sqrt(N) * return_std
+    renyi = tf.reduce_mean(tf.exp(pi.pd.renyi(oldpi.pd)))
+
+    if bound_name == 'student':
+        bound = return_mean - sts.t.ppf(1 - delta, num_episodes - 1) / np.sqrt(num_episodes) * return_std
+    elif bound_name == 'chebyshev':
+        bound = return_mean - np.sqrt((1. / delta - 1.) * 1. / num_episodes) * renyi ** env.horizon / 2
 
     losses = [bound, return_mean, return_std]
-    loss_names = ['bound', 'return', 'std']
+    loss_names = ['Bound', 'EpDiscRewMean', 'EpDiscRewStd']
 
     compute_lossandgrad = U.function([ob, ac, disc_rew, mask1, mask2], losses + [U.flatgrad(bound, var_list)])
 
@@ -278,15 +297,16 @@ def learn(env, policy_func, *,
         out /= nworkers
         return out
 
-    def evaluate_loss():
+    def evaluate_loss(args):
         loss = allmean(np.array(compute_losses(*args)))
         return loss[0]
 
-    def evaluate_gradient():
+    def evaluate_gradient(args):
         *loss, gradient = compute_lossandgrad(*args)
         loss = allmean(np.array(loss))
         gradient = allmean(gradient)
         return gradient, loss[0]
+
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
@@ -295,7 +315,8 @@ def learn(env, policy_func, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_batch, stochastic=True)
+    #TODO change this to work on trajectories
+    seg_gen = traj_segment_generator(pi, env, num_episodes * horizon, stochastic=True)
 
     episodes_so_far = 0
     timesteps_so_far = 0
@@ -303,73 +324,97 @@ def learn(env, policy_func, *,
     tstart = time.time()
     lenbuffer = deque(maxlen=40) # rolling buffer for episode lengths
     rewbuffer = deque(maxlen=40) # rolling buffer for episode rewards
-
-    assert sum([max_iters>0, max_timesteps>0, max_episodes>0])==1
-    schedule = 'constant'
-    optim_stepsize = 1e-2
     ite = 0
 
-    improvement_tol = 1e-2
+
+    def log_info(args, ite, lenbuffer, rewbuffer, lens, episodes_so_far, timesteps_so_far):
+        logger.record_tabular("Itaration", ite)
+        meanlosses = bound, _, _ = allmean(np.array(compute_losses(*args)))
+        for (lossname, lossval) in zip(loss_names, meanlosses):
+            logger.record_tabular(lossname, lossval)
+
+        logger.record_tabular("EpLenMean", np.mean(lenbuffer))
+        logger.record_tabular("EpRewMean", np.mean(rewbuffer))
+        logger.record_tabular("EpThisIter", len(lens))
+
+        logger.record_tabular("EpisodesSoFar", episodes_so_far)
+        logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+        logger.record_tabular("TimeElapsed", time.time() - tstart)
+
+        if rank == 0:
+            logger.dump_tabular()
+
+    improvement_tol =0.
     theta = get_parameter()
 
+    assign_old_eq_new()
+
     while True:
-        ite+=1
+
+        ite += 1
+        print(iters)
+
         if callback: callback(locals(), globals())
-        if max_timesteps and timesteps_so_far >= max_timesteps:
-            break
-        elif max_episodes and episodes_so_far >= max_episodes:
-            break
-        elif max_iters and iters_so_far >= max_iters:
+        if ite >= iters:
             break
 
         logger.log("********** Iteration %i ************"%iters_so_far)
 
         with timed("sampling"):
             seg = seg_gen.__next__()
+
         add_vtarg_and_adv(seg, gamma)
-
         ob, ac, disc_rew, mask1, mask2 = seg["ob"], seg["ac"], seg["disc_rew"], seg['mask1'], seg['mask2']
-
-        if hasattr(pi, "ob_rms"): pi.ob_rms.update(ob) # update running mean/std for policy
-
         args = seg["ob"], seg["ac"], disc_rew, mask1, mask2
-        assign_old_eq_new() # set old parameter values to new parameter values
 
-        print(theta)
-
-        with timed("computegrad"):
-            gradient = evaluate_gradient()
-        print(gradient)
-
-        theta, improvement = optimize_offline(theta, set_parameter, evaluate_loss, evaluate_gradient)
-        set_parameter(theta)
-
-        if improvement < improvement_tol:
-            break
-
-        meanlosses = bound, _, _ = allmean(np.array(compute_losses(*args)))
-        for (lossname, lossval) in zip(loss_names, meanlosses):
-            logger.record_tabular(lossname, lossval)
-
-        lrlocal = (seg["ep_lens"], seg["ep_rets"]) # local values
-        listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
+        lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
+        listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
         lens, rews = map(flatten_lists, zip(*listoflrpairs))
         lenbuffer.extend(lens)
         rewbuffer.extend(rews)
 
-        logger.record_tabular("EpLenMean", np.mean(lenbuffer))
-        logger.record_tabular("EpRewMean", np.mean(rewbuffer))
-        logger.record_tabular("EpThisIter", len(lens))
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
         iters_so_far += 1
 
-        logger.record_tabular("EpisodesSoFar", episodes_so_far)
-        logger.record_tabular("TimestepsSoFar", timesteps_so_far)
-        logger.record_tabular("TimeElapsed", time.time() - tstart)
+        log_info(args, ite, lenbuffer, rewbuffer, lens, episodes_so_far, timesteps_so_far)
 
-        if rank==0:
-            logger.dump_tabular()
+        with timed("computegrad"):
+            gradient = evaluate_gradient(args)
+
+        theta, improvement = optimize_offline(theta, set_parameter, lambda: evaluate_loss(args), lambda: evaluate_gradient(args))
+        set_parameter(theta)
+
+        assign_old_eq_new()
+
+        assert(improvement >= 0.)
+
+        if improvement < improvement_tol:
+            print("Stopping!")
+            break
+
+    logger.log("********** Final evaluation ************")
+
+    with timed("sampling"):
+        seg = seg_gen.__next__()
+
+    add_vtarg_and_adv(seg, gamma)
+    ob, ac, disc_rew, mask1, mask2 = seg["ob"], seg["ac"], seg["disc_rew"], seg['mask1'], seg['mask2']
+    args = seg["ob"], seg["ac"], disc_rew, mask1, mask2
+
+    lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
+    listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
+    lens, rews = map(flatten_lists, zip(*listoflrpairs))
+    lenbuffer.extend(lens)
+    rewbuffer.extend(rews)
+
+    episodes_so_far += len(lens)
+    timesteps_so_far += sum(lens)
+    iters_so_far += 1
+
+    log_info(args, ite, lenbuffer, rewbuffer, lens, episodes_so_far, timesteps_so_far)
+
+
 
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]
