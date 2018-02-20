@@ -13,6 +13,13 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+#classic_control
+from gym.envs.registration import register
+register(
+    id='ContCartPole-v0',
+    entry_point='baselines.envs.continuous_cartpole:CartPoleEnv'
+)
+
 class CartPoleEnv(gym.Env):
     metadata = {
         'render.modes': ['human', 'rgb_array'],
@@ -41,7 +48,7 @@ class CartPoleEnv(gym.Env):
             np.finfo(np.float32).max])
         max_action = np.array([1.])
 
-        self.horizon = int(100)
+        self.horizon = 100
         self.gamma = 0.99
 
         self.action_space = spaces.Box(-max_action, max_action)
@@ -64,6 +71,7 @@ class CartPoleEnv(gym.Env):
         return self._step(action)
 
     def _step(self, action):
+        self.steps += 1
         #assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
         #action = action + self.np_random.rand() * .1
         action = np.clip(action, -1., 1.)
@@ -84,7 +92,8 @@ class CartPoleEnv(gym.Env):
         done =  x < -self.x_threshold \
                 or x > self.x_threshold \
                 or theta < -self.theta_threshold_radians \
-                or theta > self.theta_threshold_radians
+                or theta > self.theta_threshold_radians \
+                or self.steps >= self.horizon
         done = bool(done)
 
         if not done:
@@ -106,9 +115,10 @@ class CartPoleEnv(gym.Env):
         #reward = (reward - ucost - xcost + 1e-5 + 1) / (10 + 1 + 1e-5) *2 - 1
         #assert(reward >= -1 and reward <=1)
 
-        return np.array(self.state).ravel(), reward, done, {}
+        return np.array(self.state).ravel(), np.asscalar(reward), done, {}
 
     def reset(self):
+        self.steps = 0
         return self._reset()
 
     def _reset(self):

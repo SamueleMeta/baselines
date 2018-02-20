@@ -281,24 +281,26 @@ def learn(env, policy_fn, *,
                    seg["ac"],seg["rew"]) # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
         lens, rews,states,actions,rewards = map(flatten_lists, zip(*listoflrpairs))
-        lenbuffer.extend(lens)
-        rewbuffer.extend(rews)
+        #lenbuffer.extend(lens)
+        #rewbuffer.extend(rews)
 
         #Use this to print policy params:
         #print(pi.eval_param())
 
         #J_hat
-        J_hat = pi.eval_performance(states,
+        J_hat, var_J = pi.eval_performance(states,
                                     actions,
                                     rewards,
                                     lens,
                                     behavioral=oldpi,
                                     per_decision=False,
-                                    gamma=gamma)
+                                    gamma=gamma,
+                                    get_var=True)
         logger.record_tabular("J_hat", J_hat)
- 
-        logger.record_tabular("EpLenMean", np.mean(lenbuffer))
-        logger.record_tabular("EpRewMean", np.mean(rewbuffer))
+        logger.record_tabular("var_J", var_J)
+    
+        logger.record_tabular("EpLenMean", np.mean(lens))
+        logger.record_tabular("EpRewMean", np.mean(rews))
         logger.record_tabular("EpThisIter", len(lens))
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)

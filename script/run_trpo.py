@@ -15,8 +15,8 @@ from baselines import bench
 from baselines.trpo_mpi import trpo_mpi
 import sys
 
-BATCH_SIZE = 2
-HORIZON = 100
+BATCH_SIZE = 20 # MINIMUM batch size (actual batch size in case of fixed horizon)
+HORIZON = 100 # MAXIMUM horizon
 ITERATIONS = 100
 
 def train(env_id, num_timesteps, seed):
@@ -45,8 +45,10 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     import argparse
+    task_id = 'ContCartPole-v0'
+    #task_id = 'LQG1D-v0'
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--env', help='environment ID', default='ContCartPole-v0')
+    parser.add_argument('--env', help='environment ID', default=task_id)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()

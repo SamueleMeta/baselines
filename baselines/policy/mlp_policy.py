@@ -3,6 +3,7 @@ import baselines.common.tf_util as U
 import tensorflow as tf
 import gym
 from baselines.common.distributions import make_pdtype
+import numpy as np
 
 class MlpPolicy(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""
@@ -79,47 +80,57 @@ class MlpPolicy(object):
                                        shape=[sequence_length]+[1])
         self.logprobs = self.pd.logp(self.ac_in)
 
+
+    #Acting
     def act(self, stochastic, ob):
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
 
-    def eval_performance(self,states,actions,rewards,lens=1,behavioral=None,per_decision=False,gamma=.99):
-        """Performance under the policy
 
-            Params:
-            states: flat list of states
-            actions: flat list of actions
-            rewards: flat list of rewards
-            lens: list->episode lengths, number->batch_size
-            behavioral: policy w/ which states, actions, rewards were sampled
-            per_decision: whether to use pd importance weights instead of
-                            regular ones
-            gamma: discount factor
-        """
+    #Performance evaluation
+    def get_performance(self, lens=1, behavioral=None, per_decision=False, gamma=.99):
+        assert sum(lens) > 0
+        
+        weighted_rets = self._get_weighted_returns(lens, behavioral, per_decision, gamma)
+        mean, var = tf.nn.moments(weighted_rets, axes=[0])
+        return mean, var
 
+    def eval_performance(self, states, actions, rewards, lens=1, behavioral=None, per_decision=False, gamma=.99, get_var=False):        
         assert len(states)==len(actions)==len(rewards)
+        assert len(rewards) > 0
+        
+        _states, _actions, _rewards = self._prepare(states, actions, rewards, lens)
+        J_hat, J_var = self.get_performance(lens, behavioral, per_decision, gamma)
+        if behavioral is not None:
+            fun = U.function([self.ob, behavioral.ob, self.ac_in, self.rew, self.gamma], [J_hat, J_var])
+            return fun(_states,_states,_actions,_rewards,gamma) if get_var else fun(_states,_states,_actions,_rewards,gamma)[0]
+        else:
+            fun = U.function([self.ob, self.ac_in, self.rew, self.gamma], [J_hat, J_var])
+            return fun(_states,_actions,_rewards,gamma) if get_var else fun(_states,_actions,_rewards,gamma)[0]
+
+    def _prepare(self, states, actions, rewards, lens):
         if type(lens) is not list:
             assert len(rewards)%lens==0
             no_of_samples = len(rewards)
         else:
             no_of_samples = sum(lens)
 
-        states = states[:no_of_samples]
-        actions = actions[:no_of_samples]
-        rewards = rewards[:no_of_samples]
+        _states = np.array(states[:no_of_samples]) 
+        _actions = np.array(actions[:no_of_samples])
+        _rewards = np.array(rewards[:no_of_samples])
+            
+        if _states.ndim==1:
+            _states = np.expand_dims(_states, axis=1)
+        if _actions.ndim==1:
+            _actions = np.expand_dims(_actions, axis=1)
+        if _rewards.ndim==1:
+            _rewards = np.expand_dims(_rewards, axis=1)
+        
+        return _states, _actions, _rewards
 
-        import numpy as np
-        states = np.array(states)
-        if states.ndim==1:
-            states = np.expand_dims(states,axis=1)
-        actions = np.array(actions)
-        if actions.ndim==1:
-            actions = np.expand_dims(actions,axis=1)
-        rewards = np.array(rewards)
-        if rewards.ndim==1:
-            rewards = np.expand_dims(rewards,axis=1)
 
-        rews_by_episode = tf.split(self.rew,lens)
+    def _get_weighted_returns(self, lens, behavioral, per_decision, gamma):
+        rews_by_episode = tf.split(self.rew, lens)
         rews_by_episode = tf.stack(self._fill(rews_by_episode))
 
         disc = self.gamma + 0*rews_by_episode
@@ -142,10 +153,9 @@ class MlpPolicy(object):
                 iw = tf.exp(tf.reduce_sum(log_ratios_by_episode,axis=1))
                 rets = tf.reduce_sum(disc_rews,axis=1)
                 weighted_rets = tf.multiply(rets,iw)
-        J_hat = tf.reduce_mean(weighted_rets)
-        fun = U.function([self.ob,behavioral.ob,self.ac_in,self.rew,self.gamma],[J_hat])
-        return fun(states,states,actions,rewards,gamma)[0]
-
+        
+        return weighted_rets
+    
     def _fill(self,tensors,filler=0):
         max_len = max(t.shape[0].value for t in tensors)
         result = []
@@ -161,6 +171,8 @@ class MlpPolicy(object):
             result.append(t)
         return result
 
+
+    #Weight manipulation
     def eval_param(self):
         """"Policy parameters (numeric,flat)"""
 
@@ -184,6 +196,8 @@ class MlpPolicy(object):
                                          scope=vs.name)
             U.SetFromFlat(var_list)(param)
 
+
+    #Not used
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
     def get_trainable_variables(self):
