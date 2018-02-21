@@ -290,23 +290,28 @@ def learn(env, policy_fn, *,
         #J_hat
         #"""
         per_decision = False
-        J_old = oldpi.eval_performance(states,
+        J_old, var_old = oldpi.eval_performance(states,
                                     actions,
                                     rewards,
                                     lens,
                                     behavioral=None,
                                     per_decision=per_decision,
-                                    gamma=gamma)
+                                    gamma=gamma,
+                                    get_var=True)
         
-        J_new = pi.eval_performance(states,
+        J_new, var_new = pi.eval_performance(states,
                                     actions,
                                     rewards,
                                     lens,
                                     behavioral=oldpi,
                                     per_decision=per_decision,
-                                    gamma=gamma)
+                                    gamma=gamma,
+                                    get_var=True)
+        import math
         logger.record_tabular("J_old", J_old)
+        logger.record_tabular("Std_old", math.sqrt(var_old))
         logger.record_tabular("J_new", J_new)
+        logger.record_tabular("Std_new", math.sqrt(var_new))
         #"""
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("EpRewMean", np.mean(rews))

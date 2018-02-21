@@ -16,7 +16,7 @@ class MlpPolicy(object):
             U.initialize()
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
-              gaussian_fixed_var=True, use_bias=True):
+              max_horizon, gaussian_fixed_var=True, use_bias=True):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -29,6 +29,7 @@ class MlpPolicy(object):
 
         self.pdtype = pdtype = make_pdtype(ac_space)
         sequence_length = None
+        self.horizon = max_horizon
 
         ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[sequence_length] + list(ob_space.shape))
 
@@ -80,7 +81,8 @@ class MlpPolicy(object):
         self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
                                        shape=[sequence_length]+[1])
         self.logprobs = self.pd.logp(self.ac_in)
-
+        
+        self.batch_size = -1 #triggers performance evaluation graph construction
 
     #Acting
     def act(self, stochastic, ob):
@@ -89,29 +91,30 @@ class MlpPolicy(object):
 
 
     #Performance evaluation
-    def get_performance(self, lens=1, behavioral=None, per_decision=False, gamma=.99):
-        assert sum(lens) > 0
-        
-        weighted_rets = self._get_weighted_returns(lens, behavioral, per_decision, gamma)
-        mean, var = tf.nn.moments(weighted_rets, axes=[0])
-        return mean, var
+    def get_performance(self, batch_size=1, behavioral=None, per_decision=False, gamma=.99):
+        assert batch_size>0
+        if batch_size!=self.batch_size:
+            self.batch_size = batch_size
+            self.meanJ, self.varJ = self._get_mean_var(behavioral, per_decision, gamma)
+        return self.meanJ, self.varJ
 
     def eval_performance(self, states, actions, rewards, lens=1, behavioral=None, per_decision=False, gamma=.99, get_var=False):        
         assert len(states)==len(actions)==len(rewards)
-        assert len(rewards) > 0
-        
-        _states, _actions, _rewards = self._prepare(states, actions, rewards, lens)
-        
+        assert(len(rewards)>0)
+        assert sum(lens)>0
+        batch_size = len(lens)
+        _states, _actions, _rewards, _mask = self._prepare(states, actions, rewards, lens)
         start = time.time()
-        J_hat, var_J = self.get_performance(lens, behavioral, per_decision, gamma)
+        
+        J_hat, var_J = self.get_performance(batch_size, behavioral, per_decision, gamma)
         print('Compile:', time.time() - start)
         start = time.time()
         if behavioral is not None:
-            feed = (_states, _states, _actions, _rewards, gamma)
-            symb_in = [self.ob, behavioral.ob, self.ac_in, self.rew, self.gamma]
+            feed = (_states, _states, _actions, _rewards, gamma, _mask)
+            symb_in = [self.ob, behavioral.ob, self.ac_in, self.rew, self.gamma, self.mask]
         else:
-            feed = (_states, _actions, _rewards, gamma)
-            symb_in = [self.ob, self.ac_in, self.rew, self.gamma]
+            feed = (_states, _actions, _rewards, gamma, _mask)
+            symb_in = [self.ob, self.ac_in, self.rew, self.gamma, self.mask]
         J_fun = U.function(symb_in, [J_hat])
         var_fun = U.function(symb_in, [var_J])
         print('Run:', time.time() -start)
@@ -124,52 +127,59 @@ class MlpPolicy(object):
 
     def _prepare(self, states, actions, rewards, lens):
         if type(lens) is not list:
-            assert len(rewards)%lens==0
-            no_of_samples = len(rewards)
-        else:
-            no_of_samples = sum(lens)
-
-        _states = np.array(states[:no_of_samples]) 
-        _actions = np.array(actions[:no_of_samples])
-        _rewards = np.array(rewards[:no_of_samples])
-            
-        if _states.ndim==1:
-            _states = np.expand_dims(_states, axis=1)
-        if _actions.ndim==1:
-            _actions = np.expand_dims(_actions, axis=1)
-        if _rewards.ndim==1:
-            _rewards = np.expand_dims(_rewards, axis=1)
+            lens = [self.horizon]*lens
+        no_of_samples = sum(lens)       
+        states = np.array(states[:no_of_samples])
+        actions = np.array(actions[:no_of_samples])
+        rewards = np.array(rewards[:no_of_samples])
+        rewards = np.expand_dims(rewards, axis=1)
+        mask = np.ones(no_of_samples)
         
-        return _states, _actions, _rewards
+        indexes = np.cumsum(lens)
+        to_resize = [states, actions, rewards, mask]
+        resized = []
+        for v in to_resize:
+            if v.ndim == 1:
+                v = np.expand_dims(v, axis=1)
+            v = np.split(v, indexes, axis=0)
+            padding_shapes = [tuple([self.horizon - m.shape[0]] + list(m.shape[1:])) for m in v if m.shape[0]>0]
+            paddings = [np.zeros(shape, dtype=np.float32) for shape in padding_shapes]
+            v = [np.concatenate((m, pad)) for (m, pad) in zip(v, paddings)]
+            v = np.concatenate(v, axis=0)
+            resized.append(v)
+        return tuple(resized)
 
-
-    def _get_weighted_returns(self, lens, behavioral, per_decision, gamma):
-        rews_by_episode = tf.split(self.rew, lens)
-        rews_by_episode = tf.stack(self._fill(rews_by_episode))
+    def _get_mean_var(self, behavioral, per_decision, gamma):
+        batch_size = self.batch_size
+        self.mask = tf.placeholder(name="mask", dtype=tf.float32, shape=[self.batch_size*self.horizon, 1])
+        rews_by_episode = tf.split(self.rew, batch_size)
+        rews_by_episode = tf.stack(rews_by_episode)
 
         disc = self.gamma + 0*rews_by_episode
-        disc = tf.cumprod(disc,axis=1,exclusive=True)
-        disc_rews = rews_by_episode*disc
+        disc = tf.cumprod(disc, axis=1, exclusive=True)
+        disc_rews = rews_by_episode * disc
 
         if behavioral is None:
-            weighted_rets = tf.reduce_sum(disc_rews,axis=1)
+            weighted_rets = tf.reduce_sum(disc_rews, axis=1)
         else:
             log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
             log_ratios = tf.expand_dims(log_ratios, axis=1)
-            log_ratios_by_episode = tf.split(log_ratios,lens)
-            log_ratios_by_episode = tf.stack(self._fill(log_ratios_by_episode))
+            log_ratios = tf.multiply(log_ratios, self.mask)
+            log_ratios_by_episode = tf.split(log_ratios, batch_size)
+            log_ratios_by_episode = tf.stack(log_ratios_by_episode)
 
             if per_decision:
                 iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
                 iw = tf.expand_dims(iw,axis=2)
-                weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw),axis=1)
+                self.weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw), axis=1)
             else:
-                iw = tf.exp(tf.reduce_sum(log_ratios_by_episode,axis=1))
-                rets = tf.reduce_sum(disc_rews,axis=1)
-                weighted_rets = tf.multiply(rets,iw)
+                iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
+                rets = tf.reduce_sum(disc_rews, axis=1)
+                weighted_rets = tf.multiply(rets, iw)
         
-        return weighted_rets
+        return tf.nn.moments(weighted_rets, axes=[0])
     
+    """
     def _fill(self,tensors,filler=0):
         max_len = max(t.shape[0].value for t in tensors)
         result = []
@@ -184,7 +194,8 @@ class MlpPolicy(object):
             t = tf.concat([t,padding],axis=0)
             result.append(t)
         return result
-
+        """
+        
 
     #Weight manipulation
     def eval_param(self):
