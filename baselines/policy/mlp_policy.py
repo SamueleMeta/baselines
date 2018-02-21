@@ -4,6 +4,7 @@ import tensorflow as tf
 import gym
 from baselines.common.distributions import make_pdtype
 import numpy as np
+import time
 
 class MlpPolicy(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""
@@ -100,13 +101,26 @@ class MlpPolicy(object):
         assert len(rewards) > 0
         
         _states, _actions, _rewards = self._prepare(states, actions, rewards, lens)
-        J_hat, J_var = self.get_performance(lens, behavioral, per_decision, gamma)
+        
+        start = time.time()
+        J_hat, var_J = self.get_performance(lens, behavioral, per_decision, gamma)
+        print('Compile:', time.time() - start)
+        start = time.time()
         if behavioral is not None:
-            fun = U.function([self.ob, behavioral.ob, self.ac_in, self.rew, self.gamma], [J_hat, J_var])
-            return fun(_states,_states,_actions,_rewards,gamma) if get_var else fun(_states,_states,_actions,_rewards,gamma)[0]
+            feed = (_states, _states, _actions, _rewards, gamma)
+            symb_in = [self.ob, behavioral.ob, self.ac_in, self.rew, self.gamma]
         else:
-            fun = U.function([self.ob, self.ac_in, self.rew, self.gamma], [J_hat, J_var])
-            return fun(_states,_actions,_rewards,gamma) if get_var else fun(_states,_actions,_rewards,gamma)[0]
+            feed = (_states, _actions, _rewards, gamma)
+            symb_in = [self.ob, self.ac_in, self.rew, self.gamma]
+        J_fun = U.function(symb_in, [J_hat])
+        var_fun = U.function(symb_in, [var_J])
+        print('Run:', time.time() -start)
+        if get_var:
+            return np.asscalar(J_fun(*feed)[0]), np.asscalar(var_fun(*feed)[0])
+        else:
+            return np.asscalar(J_fun(*feed)[0])
+        
+    
 
     def _prepare(self, states, actions, rewards, lens):
         if type(lens) is not list:

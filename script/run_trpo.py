@@ -15,7 +15,7 @@ from baselines import bench
 from baselines.trpo_mpi import trpo_mpi
 import sys
 
-BATCH_SIZE = 20 # MINIMUM batch size (actual batch size in case of fixed horizon)
+BATCH_SIZE = 10 # MINIMUM batch size (actual batch size in case of fixed horizon)
 HORIZON = 100 # MAXIMUM horizon
 ITERATIONS = 100
 
