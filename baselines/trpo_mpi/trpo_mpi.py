@@ -285,10 +285,13 @@ def learn(env, policy_fn, *,
         #rewbuffer.extend(rews)
 
         #Use this to print policy params:
-        #print(pi.eval_param())
+        """
+        print(pi.eval_param())
 
-        #J_hat
+        J_hat
         #"""
+        
+        """
         per_decision = False
         J_old, var_old = oldpi.eval_performance(states,
                                     actions,
@@ -313,6 +316,24 @@ def learn(env, policy_fn, *,
         logger.record_tabular("J_new", J_new)
         logger.record_tabular("Std_new", math.sqrt(var_new))
         #"""
+        
+        perf_old = oldpi.eval_performance(states,
+                                             actions,
+                                             rewards,
+                                             lens)
+        perf_new = pi.eval_performance(states,
+                                       actions,
+                                       rewards,
+                                       lens,
+                                       behavioral=oldpi,
+                                       per_decision=False)
+        
+        fisher = oldpi.eval_fisher(states, actions, lens)
+        print(fisher)
+        
+        print('OLD:', perf_old)
+        print('NEW:', perf_new)
+        
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("EpRewMean", np.mean(rews))
         logger.record_tabular("EpThisIter", len(lens))

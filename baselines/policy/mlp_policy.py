@@ -15,8 +15,7 @@ class MlpPolicy(object):
             self.scope = tf.get_variable_scope().name
             U.initialize()
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
-              max_horizon, gaussian_fixed_var=True, use_bias=True):
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -29,8 +28,6 @@ class MlpPolicy(object):
 
         self.pdtype = pdtype = make_pdtype(ac_space)
         sequence_length = None
-        self.horizon = max_horizon
-
         ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[sequence_length] + list(ob_space.shape))
 
         with tf.variable_scope("obfilter"):
@@ -80,10 +77,9 @@ class MlpPolicy(object):
                                         dtype=tf.float32,shape=[])
         self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
                                        shape=[sequence_length]+[1])
-        self.logprobs = self.pd.logp(self.ac_in)
+        self.logprobs = self.pd.logp(self.ac_in) #  [\log\pi(a|s)]
+      
         
-        self.batch_size = -1 #triggers performance evaluation graph construction
-
     #Acting
     def act(self, stochastic, ob):
         ac1, vpred1 =  self._act(stochastic, ob[None])
@@ -91,64 +87,141 @@ class MlpPolicy(object):
 
 
     #Performance evaluation
+    """
     def get_performance(self, batch_size=1, behavioral=None, per_decision=False, gamma=.99):
         assert batch_size>0
         if batch_size!=self.batch_size:
             self.batch_size = batch_size
             self.meanJ, self.varJ = self._get_mean_var(behavioral, per_decision, gamma)
         return self.meanJ, self.varJ
+    #"""
 
-    def eval_performance(self, states, actions, rewards, lens=1, behavioral=None, per_decision=False, gamma=.99, get_var=False):        
+    def eval_performance(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):        
+        #Prepare data
+        checkpoint = time.time()
+        assert len(rewards) > 0
         assert len(states)==len(actions)==len(rewards)
-        assert(len(rewards)>0)
-        assert sum(lens)>0
-        batch_size = len(lens)
-        _states, _actions, _rewards, _mask = self._prepare(states, actions, rewards, lens)
-        start = time.time()
-        
-        J_hat, var_J = self.get_performance(batch_size, behavioral, per_decision, gamma)
-        print('Compile:', time.time() - start)
-        start = time.time()
-        if behavioral is not None:
-            feed = (_states, _states, _actions, _rewards, gamma, _mask)
-            symb_in = [self.ob, behavioral.ob, self.ac_in, self.rew, self.gamma, self.mask]
+        if type(lens_or_batch_size) is list:
+            lens = lens_or_batch_size
+            assert sum(lens) > 0
+            batch_size = len(lens)
+            if horizon is None:
+                horizon = max(lens)
+            assert all(np.array(lens) <= horizon)
         else:
-            feed = (_states, _actions, _rewards, gamma, _mask)
-            symb_in = [self.ob, self.ac_in, self.rew, self.gamma, self.mask]
-        J_fun = U.function(symb_in, [J_hat])
-        var_fun = U.function(symb_in, [var_J])
-        print('Run:', time.time() -start)
-        if get_var:
-            return np.asscalar(J_fun(*feed)[0]), np.asscalar(var_fun(*feed)[0])
-        else:
-            return np.asscalar(J_fun(*feed)[0])
+            assert type(lens_or_batch_size) is int
+            batch_size = lens_or_batch_size
+            assert len(rewards)%batch_size == 0
+            if horizon is None:
+                horizon = len(rewards)/batch_size
+            lens = [horizon] * batch_size
+        _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens, horizon)
+        print('Prepare time:', time.time() - checkpoint)
         
+        #Build performance evaluation graph
+        checkpoint = time.time()        
+        fun = self._build_performance(batch_size, horizon, behavioral, per_decision)
+        print('Compile time:', time.time() - checkpoint)
+        
+        #Evaluate performance
+        checkpoint = time.time()
+        result = fun(_states, _actions, _rewards, gamma, _mask)
+        print('Run time:', time.time() - checkpoint)
+        
+        result = list(map(np.asscalar, result[:2])) + result[2:]
+        return tuple(result)
     
-
-    def _prepare(self, states, actions, rewards, lens):
-        if type(lens) is not list:
-            lens = [self.horizon]*lens
+    def _prepare_data(self, states, actions, rewards, lens, horizon, do_pad=True, do_concat=True):
         no_of_samples = sum(lens)       
-        states = np.array(states[:no_of_samples])
-        actions = np.array(actions[:no_of_samples])
-        rewards = np.array(rewards[:no_of_samples])
-        rewards = np.expand_dims(rewards, axis=1)
-        mask = np.ones(no_of_samples)
+        mask = np.ones(no_of_samples) if do_pad else None
         
         indexes = np.cumsum(lens)
         to_resize = [states, actions, rewards, mask]
+        to_resize = [x for x in to_resize if x is not None]
         resized = []
         for v in to_resize:
+            v = np.array(v[:no_of_samples])
             if v.ndim == 1:
                 v = np.expand_dims(v, axis=1)
             v = np.split(v, indexes, axis=0)
-            padding_shapes = [tuple([self.horizon - m.shape[0]] + list(m.shape[1:])) for m in v if m.shape[0]>0]
-            paddings = [np.zeros(shape, dtype=np.float32) for shape in padding_shapes]
-            v = [np.concatenate((m, pad)) for (m, pad) in zip(v, paddings)]
-            v = np.concatenate(v, axis=0)
+            if do_pad:
+                padding_shapes = [tuple([horizon - m.shape[0]] + list(m.shape[1:])) for m in v if m.shape[0]>0]
+                paddings = [np.zeros(shape, dtype=np.float32) for shape in padding_shapes]
+                v = [np.concatenate((m, pad)) for (m, pad) in zip(v, paddings)]
+            if do_concat:
+                v = np.concatenate(v, axis=0)
             resized.append(v)
         return tuple(resized)
 
+    def _build_performance(self, batch_size, horizon, behavioral, per_decision):
+        self.mask = tf.placeholder(name="mask", dtype=tf.float32, shape=[batch_size*horizon, 1])
+        rews_by_episode = tf.split(self.rew, batch_size)
+        rews_by_episode = tf.stack(rews_by_episode)
+        disc = self.gamma + 0*rews_by_episode
+        disc = tf.cumprod(disc, axis=1, exclusive=True)
+        disc_rews = rews_by_episode * disc
+        
+        if behavioral is None:
+            avg_J, var_J = tf.nn.moments(tf.reduce_sum(disc_rews, axis=1), axes=[0])
+            grad_avg_J = tf.constant(0)
+            grad_var_J = tf.constant(0)
+        else:
+            #tf.assign(behavioral.ob, self.ob)
+            log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
+            log_ratios = tf.expand_dims(log_ratios, axis=1)
+            log_ratios = tf.multiply(log_ratios, self.mask)
+            log_ratios_by_episode = tf.split(log_ratios, batch_size)
+            log_ratios_by_episode = tf.stack(log_ratios_by_episode)
+            if per_decision:
+                iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
+                iw = tf.expand_dims(iw,axis=2)
+                weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw), axis=1)
+            else:
+                iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
+                rets = tf.reduce_sum(disc_rews, axis=1)
+                weighted_rets = tf.multiply(rets, iw)
+            avg_J, var_J = tf.nn.moments(weighted_rets, axes=[0])
+            grad_avg_J = U.flatgrad(avg_J, self.get_param())
+            grad_var_J = U.flatgrad(var_J, self.get_param())
+        
+        return U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J, var_J, grad_avg_J, grad_var_J])
+        
+    def eval_fisher(self, states, actions, lens_or_batch_size, horizon=None):
+        assert len(states) > 0
+        assert len(states)==len(actions)
+        if type(lens_or_batch_size) is list:
+            lens = lens_or_batch_size
+            assert sum(lens) > 0
+            batch_size = len(lens)
+            if horizon is None:
+                horizon = max(lens)
+            assert all(np.array(lens) <= horizon)
+        else:
+            assert type(lens_or_batch_size) is int
+            batch_size = lens_or_batch_size
+            assert len(states)%batch_size == 0
+            if horizon is None:
+                horizon = len(states)/batch_size
+            lens = [horizon] * batch_size
+        _states, _actions = self._prepare_data(states, 
+                                                      actions, 
+                                                      None, 
+                                                      lens, 
+                                                      horizon,
+                                                      do_pad=False,
+                                                      do_concat=False)
+        
+        fun = self._build_fisher()
+        fisher_samples = np.array([fun(s, a)[0] for (s,a) in zip(_states, _actions)]) #one call per EPISODE
+        return np.mean(fisher_samples, axis=0)
+
+    def _build_fisher(self):
+        score = U.flatgrad(self.logprobs, self.get_param()) # \nabla\log p(\tau)
+        fisher = tf.einsum('i,j->ij', score, score)
+        return U.function([self.ob, self.ac_in], [fisher])
+      
+    
+    """
     def _get_mean_var(self, behavioral, per_decision, gamma):
         batch_size = self.batch_size
         self.mask = tf.placeholder(name="mask", dtype=tf.float32, shape=[self.batch_size*self.horizon, 1])
@@ -180,6 +253,7 @@ class MlpPolicy(object):
         return tf.nn.moments(weighted_rets, axes=[0])
     
     """
+    """
     def _fill(self,tensors,filler=0):
         max_len = max(t.shape[0].value for t in tensors)
         result = []
@@ -194,7 +268,7 @@ class MlpPolicy(object):
             t = tf.concat([t,padding],axis=0)
             result.append(t)
         return result
-        """
+    """
         
 
     #Weight manipulation
@@ -221,8 +295,7 @@ class MlpPolicy(object):
                                          scope=vs.name)
             U.SetFromFlat(var_list)(param)
 
-
-    #Not used
+    #Used by original implementation
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
     def get_trainable_variables(self):
