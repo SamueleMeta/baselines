@@ -116,17 +116,18 @@ class MlpPolicy(object):
                 horizon = len(rewards)/batch_size
             lens = [horizon] * batch_size
         _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens, horizon)
-        print('Prepare time:', time.time() - checkpoint)
+        #print('Prepare time:', time.time() - checkpoint)
         
         #Build performance evaluation graph
-        checkpoint = time.time()        
+        #checkpoint = time.time()        
         fun = self._build_performance(batch_size, horizon, behavioral, per_decision)
-        print('Compile time:', time.time() - checkpoint)
+        #print('Compile time:', time.time() - checkpoint)
         
         #Evaluate performance
-        checkpoint = time.time()
+        #checkpoint = time.time()
         result = fun(_states, _actions, _rewards, gamma, _mask)
-        print('Run time:', time.time() - checkpoint)
+        #print('Run time:', time.time() - checkpoint)
+        print('Performance eval time:', time.time() - checkpoint)
         
         result = list(map(np.asscalar, result[:2])) + result[2:]
         return tuple(result)
@@ -187,6 +188,7 @@ class MlpPolicy(object):
         return U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J, var_J, grad_avg_J, grad_var_J])
         
     def eval_fisher(self, states, actions, lens_or_batch_size, horizon=None):
+        checkpoint = time.time()
         assert len(states) > 0
         assert len(states)==len(actions)
         if type(lens_or_batch_size) is list:
@@ -213,6 +215,7 @@ class MlpPolicy(object):
         
         fun = self._build_fisher()
         fisher_samples = np.array([fun(s, a)[0] for (s,a) in zip(_states, _actions)]) #one call per EPISODE
+        print('Fisher eval time:', time.time() - checkpoint)
         return np.mean(fisher_samples, axis=0)
 
     def _build_fisher(self):

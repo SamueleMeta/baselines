@@ -9,7 +9,8 @@ from collections import deque
 from baselines.common.mpi_adam import MpiAdam
 from baselines.common.cg import cg
 from contextlib import contextmanager
-
+import numpy as np
+        
 def traj_segment_generator(pi, env, horizon, stochastic):
     # Initialize state variables
     t = 0
@@ -330,6 +331,12 @@ def learn(env, policy_fn, *,
         
         fisher = oldpi.eval_fisher(states, actions, lens)
         print(fisher)
+        
+        fake = np.random.rand(fisher.shape[0], 1)
+        checkpoint = time.time()
+        natural_fake = np.linalg.solve(fisher, fake)
+        print(np.ravel(natural_fake))
+        print('Fisher vector product time:', time.time() - checkpoint)
         
         print('OLD:', perf_old)
         print('NEW:', perf_new)
