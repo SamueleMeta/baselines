@@ -142,16 +142,19 @@ class MlpPolicy(object):
         
         #Build performance evaluation graph
         #checkpoint = time.time()        
-        fun = self._build_performance(batch_size, horizon, behavioral, per_decision)
+        fun_0, fun_1 = self._build_performance(batch_size, horizon, behavioral, per_decision)
         #print('Compile time:', time.time() - checkpoint)
         
         #Evaluate performance
         #checkpoint = time.time()
-        result = fun(_states, _actions, _rewards, gamma, _mask)
+        result_0 = fun_0(_states, _actions, _rewards, gamma, _mask)
         #print('Run time:', time.time() - checkpoint)
         print('Performance eval time:', time.time() - checkpoint)
         
-        result = list(map(np.asscalar, result[:2])) + result[2:]
+        result_0 = list(map(np.asscalar, result_0))
+        def result_1():
+            return fun_1(_states, _actions, _rewards, gamma, _mask)
+        result = result_0 + [result_1] #list concat
         return tuple(result)
     
     def _prepare_data(self, states, actions, rewards, lens, horizon, do_pad=True, do_concat=True):
@@ -206,8 +209,9 @@ class MlpPolicy(object):
             grad_avg_J = U.flatgrad(avg_J, self.get_param())
             grad_var_J = U.flatgrad(var_J, self.get_param())
         
-        return U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J, var_J, grad_avg_J, grad_var_J])
-        
+        return (U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J, var_J]), 
+                    U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [grad_avg_J, grad_var_J])) 
+    
     def eval_fisher(self, states, actions, lens_or_batch_size, horizon=None, behavioral=None):
         """
         Fisher information matrix of actor parameters, possibly off-policy
@@ -253,12 +257,14 @@ class MlpPolicy(object):
         fisher_samples = np.array([fun(s, a)[0] for (s,a) in zip(_states, _actions)]) #one call per EPISODE
         print('Fisher eval time:', time.time() - checkpoint)
         return np.mean(fisher_samples, axis=0)
+    
+    def performance_bound(self, states, actions, rewards, bound_name='student_t'):
+        pass
 
 
     #Weight manipulation
     def eval_param(self):
         """"Policy parameters (numeric,flat)"""
-
         with tf.variable_scope(self.scope+'/pol') as vs:
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)

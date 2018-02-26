@@ -318,27 +318,31 @@ def learn(env, policy_fn, *,
         logger.record_tabular("Std_new", math.sqrt(var_new))
         #"""
         
-        perf_old = oldpi.eval_performance(states,
+        J_old, var_old, foo = oldpi.eval_performance(states,
                                              actions,
                                              rewards,
                                              lens)
-        perf_new = pi.eval_performance(states,
+        grad_J_old, grad_var_old = foo()
+        
+        J_new, var_new, foo = pi.eval_performance(states,
                                        actions,
                                        rewards,
                                        lens,
                                        behavioral=oldpi,
                                        per_decision=False)
+        grad_J_new, grad_var_new = foo()
         
+        print('OLD:', J_old, var_old, grad_J_old, grad_var_old)    
+        print('NEW:', J_new, var_new, grad_J_new, grad_var_new)
+    
+    
         fisher = pi.eval_fisher(states, actions, lens, behavioral=oldpi)
         assert np.array_equal(fisher, fisher.T)
         fake = np.random.rand(fisher.shape[0], 1)
         checkpoint = time.time()
         natural_fake = np.linalg.solve(fisher, fake)
-        
         print('Fisher vector product time:', time.time() - checkpoint)
-        print('OLD:', perf_old)
-        print('NEW:', perf_new)
-        
+    
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("EpRewMean", np.mean(rews))
         logger.record_tabular("EpThisIter", len(lens))
