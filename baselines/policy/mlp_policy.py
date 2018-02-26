@@ -78,6 +78,13 @@ class MlpPolicy(object):
         self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
                                        shape=[sequence_length]+[1])
         self.logprobs = self.pd.logp(self.ac_in) #  [\log\pi(a|s)]
+        
+        #Actor Derivatives
+        with tf.variable_scope('pol') as vs:
+            weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=vs.name)
+        score = U.flatgrad(self.logprobs, weights) # \nabla\log p(\tau)
+        self.fisher = tf.einsum('i,j->ij', score, score)        
       
         
     #Acting
@@ -167,7 +174,6 @@ class MlpPolicy(object):
             grad_avg_J = tf.constant(0)
             grad_var_J = tf.constant(0)
         else:
-            #tf.assign(behavioral.ob, self.ob)
             log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
             log_ratios = tf.expand_dims(log_ratios, axis=1)
             log_ratios = tf.multiply(log_ratios, self.mask)
@@ -187,7 +193,7 @@ class MlpPolicy(object):
         
         return U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J, var_J, grad_avg_J, grad_var_J])
         
-    def eval_fisher(self, states, actions, lens_or_batch_size, horizon=None):
+    def eval_fisher(self, states, actions, lens_or_batch_size, horizon=None, behavioral=None):
         checkpoint = time.time()
         assert len(states) > 0
         assert len(states)==len(actions)
@@ -213,17 +219,17 @@ class MlpPolicy(object):
                                                       do_pad=False,
                                                       do_concat=False)
         
-        fun = self._build_fisher()
+        fisher = self.fisher
+        if behavioral is not None:
+            log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
+            iw = tf.exp(tf.reduce_sum(log_ratios))
+            fisher = tf.multiply(iw, fisher)
+        
+        fun =  U.function([self.ob, self.ac_in], [fisher])
         fisher_samples = np.array([fun(s, a)[0] for (s,a) in zip(_states, _actions)]) #one call per EPISODE
         print('Fisher eval time:', time.time() - checkpoint)
         return np.mean(fisher_samples, axis=0)
 
-    def _build_fisher(self):
-        score = U.flatgrad(self.logprobs, self.get_param()) # \nabla\log p(\tau)
-        fisher = tf.einsum('i,j->ij', score, score)
-        return U.function([self.ob, self.ac_in], [fisher])
-      
-    
     """
     def _get_mean_var(self, behavioral, per_decision, gamma):
         batch_size = self.batch_size
@@ -285,7 +291,6 @@ class MlpPolicy(object):
 
     def get_param(self):
         """Policy parameters (symbolic, nested)"""
-
         with tf.variable_scope(self.scope+'/pol') as vs:
             return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)

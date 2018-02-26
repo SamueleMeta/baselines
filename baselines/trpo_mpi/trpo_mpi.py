@@ -329,15 +329,13 @@ def learn(env, policy_fn, *,
                                        behavioral=oldpi,
                                        per_decision=False)
         
-        fisher = oldpi.eval_fisher(states, actions, lens)
-        print(fisher)
-        
+        fisher = pi.eval_fisher(states, actions, lens, behavioral=oldpi)
+        assert np.array_equal(fisher, fisher.T)
         fake = np.random.rand(fisher.shape[0], 1)
         checkpoint = time.time()
         natural_fake = np.linalg.solve(fisher, fake)
-        print(np.ravel(natural_fake))
-        print('Fisher vector product time:', time.time() - checkpoint)
         
+        print('Fisher vector product time:', time.time() - checkpoint)
         print('OLD:', perf_old)
         print('NEW:', perf_new)
         
