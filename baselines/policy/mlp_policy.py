@@ -5,6 +5,8 @@ import gym
 from baselines.common.distributions import make_pdtype
 import numpy as np
 import time
+import scipy.stats as sts
+
 
 class MlpPolicy(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""
@@ -199,7 +201,7 @@ class MlpPolicy(object):
             log_ratios_by_episode = tf.stack(log_ratios_by_episode)
             if per_decision:
                 iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
-                iw = tf.expand_dims(iw,axis=2)
+                #iw = tf.expand_dims(iw,axis=2)
                 weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw), axis=1)
             else:
                 iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
@@ -258,8 +260,16 @@ class MlpPolicy(object):
         print('Fisher eval time:', time.time() - checkpoint)
         return np.mean(fisher_samples, axis=0)
     
-    def performance_bound(self, states, actions, rewards, bound_name='student_t'):
-        pass
+    def student_t_bound(self, states, actions, rewards, lens_or_batch_size=1, delta=.2, horizon=None, behavioral=None, per_decision=False, gamma=.99):
+        if type(lens_or_batch_size) is list:
+            batch_size = len(lens_or_batch_size)
+        else:
+            assert type(lens_or_batch_size) is int
+            batch_size = lens_or_batch_size
+            
+        J_hat, var_J, _ = self.eval_performance(states, actions, rewards, lens_or_batch_size, horizon, behavioral, per_decision, gamma)
+        bound = J_hat - sts.t.ppf(1 - delta, batch_size - 1) / np.sqrt(batch_size) * np.sqrt(var_J)
+        return bound
 
 
     #Weight manipulation

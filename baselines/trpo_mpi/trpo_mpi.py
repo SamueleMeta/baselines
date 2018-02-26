@@ -292,32 +292,8 @@ def learn(env, policy_fn, *,
         J_hat
         #"""
         
+        #Performance
         """
-        per_decision = False
-        J_old, var_old = oldpi.eval_performance(states,
-                                    actions,
-                                    rewards,
-                                    lens,
-                                    behavioral=None,
-                                    per_decision=per_decision,
-                                    gamma=gamma,
-                                    get_var=True)
-        
-        J_new, var_new = pi.eval_performance(states,
-                                    actions,
-                                    rewards,
-                                    lens,
-                                    behavioral=oldpi,
-                                    per_decision=per_decision,
-                                    gamma=gamma,
-                                    get_var=True)
-        import math
-        logger.record_tabular("J_old", J_old)
-        logger.record_tabular("Std_old", math.sqrt(var_old))
-        logger.record_tabular("J_new", J_new)
-        logger.record_tabular("Std_new", math.sqrt(var_new))
-        #"""
-        
         J_old, var_old, foo = oldpi.eval_performance(states,
                                              actions,
                                              rewards,
@@ -334,14 +310,28 @@ def learn(env, policy_fn, *,
         
         print('OLD:', J_old, var_old, grad_J_old, grad_var_old)    
         print('NEW:', J_new, var_new, grad_J_new, grad_var_new)
+        #"""
     
+        #Student-t bound
+        #"""
+        bound = pi.student_t_bound(states,
+                                 actions,
+                                 rewards,
+                                 lens,
+                                 behavioral=oldpi,
+                                 per_decision=True)
+        logger.record_tabular("StudentTBound", bound)
+        #"""
     
+        #Fisher
+        """
         fisher = pi.eval_fisher(states, actions, lens, behavioral=oldpi)
         assert np.array_equal(fisher, fisher.T)
         fake = np.random.rand(fisher.shape[0], 1)
         checkpoint = time.time()
         natural_fake = np.linalg.solve(fisher, fake)
         print('Fisher vector product time:', time.time() - checkpoint)
+        #"""
     
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("EpRewMean", np.mean(rews))
