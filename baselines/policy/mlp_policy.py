@@ -21,7 +21,7 @@ class MlpPolicy(object):
             ac_space : task action space
             hid_size: width of hidden layers
             num_hid_layers: depth
-            gaussian_fixed_var: True->separate parameter, False->two heads
+            gaussian_fixed_var: True->separate parameter for logstd, False->two-headed mlp
             use_bias: whether to include bias in neurons
         """
         assert isinstance(ob_space, gym.spaces.Box)
@@ -79,7 +79,7 @@ class MlpPolicy(object):
                                        shape=[sequence_length]+[1])
         self.logprobs = self.pd.logp(self.ac_in) #  [\log\pi(a|s)]
         
-        #Actor Derivatives
+        #Fisher
         with tf.variable_scope('pol') as vs:
             weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
@@ -87,23 +87,38 @@ class MlpPolicy(object):
         self.fisher = tf.einsum('i,j->ij', score, score)        
       
         
-    #Acting
+    #Acting    
     def act(self, stochastic, ob):
+        """
+        Actions sampled from the policy
+           
+        Params:
+               stochastic: use noise
+               ob: current state
+        """
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
 
 
     #Performance evaluation
-    """
-    def get_performance(self, batch_size=1, behavioral=None, per_decision=False, gamma=.99):
-        assert batch_size>0
-        if batch_size!=self.batch_size:
-            self.batch_size = batch_size
-            self.meanJ, self.varJ = self._get_mean_var(behavioral, per_decision, gamma)
-        return self.meanJ, self.varJ
-    #"""
-
     def eval_performance(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):        
+        """
+        Performance evaluation, possibly off-policy
+        
+        Params:
+            states, actions, rewards as lists, flat wrt time
+            lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
+            horizon: max task horizon
+            behavioral: policy used to collect (s, a, r) tuples
+            per_decision: whether to use Per-Decision IS in place of regular episodic IS
+            gamma: discount factor
+        
+        Returns:
+            average episodic performance J_hat, 
+            variance of episodic performance Var_J, 
+            gradient of J_hat wrt actor parameters,
+            gradient of Var_J wrt actor parameters
+        """
         #Prepare data
         checkpoint = time.time()
         assert len(rewards) > 0
@@ -194,6 +209,15 @@ class MlpPolicy(object):
         return U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J, var_J, grad_avg_J, grad_var_J])
         
     def eval_fisher(self, states, actions, lens_or_batch_size, horizon=None, behavioral=None):
+        """
+        Fisher information matrix of actor parameters, possibly off-policy
+        
+        Params:
+            states, actions as lists, flat wrt time
+            lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
+            horizon: max task horizon
+            behavioral: policy used to collect (s, a) pairs
+        """
         checkpoint = time.time()
         assert len(states) > 0
         assert len(states)==len(actions)
@@ -230,55 +254,6 @@ class MlpPolicy(object):
         print('Fisher eval time:', time.time() - checkpoint)
         return np.mean(fisher_samples, axis=0)
 
-    """
-    def _get_mean_var(self, behavioral, per_decision, gamma):
-        batch_size = self.batch_size
-        self.mask = tf.placeholder(name="mask", dtype=tf.float32, shape=[self.batch_size*self.horizon, 1])
-        rews_by_episode = tf.split(self.rew, batch_size)
-        rews_by_episode = tf.stack(rews_by_episode)
-
-        disc = self.gamma + 0*rews_by_episode
-        disc = tf.cumprod(disc, axis=1, exclusive=True)
-        disc_rews = rews_by_episode * disc
-
-        if behavioral is None:
-            weighted_rets = tf.reduce_sum(disc_rews, axis=1)
-        else:
-            log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
-            log_ratios = tf.expand_dims(log_ratios, axis=1)
-            log_ratios = tf.multiply(log_ratios, self.mask)
-            log_ratios_by_episode = tf.split(log_ratios, batch_size)
-            log_ratios_by_episode = tf.stack(log_ratios_by_episode)
-
-            if per_decision:
-                iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
-                iw = tf.expand_dims(iw,axis=2)
-                self.weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw), axis=1)
-            else:
-                iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
-                rets = tf.reduce_sum(disc_rews, axis=1)
-                weighted_rets = tf.multiply(rets, iw)
-        
-        return tf.nn.moments(weighted_rets, axes=[0])
-    
-    """
-    """
-    def _fill(self,tensors,filler=0):
-        max_len = max(t.shape[0].value for t in tensors)
-        result = []
-        for t in tensors:
-            padding = filler*tf.ones([max_len - t.shape[0].value] + t.shape[1:].as_list())
-
-            padding = tf.stack([filler + 0 * t[0] for _ in range(max_len - \
-                                                                  t.shape[0].value)],
-                               axis = 0)
-            if len(padding.shape)==1:
-                padding = tf.expand_dims(padding, axis=1)
-            t = tf.concat([t,padding],axis=0)
-            result.append(t)
-        return result
-    """
-        
 
     #Weight manipulation
     def eval_param(self):
