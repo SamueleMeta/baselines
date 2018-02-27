@@ -15,7 +15,7 @@ from baselines import bench
 from baselines.trpo_mpi import trpo_mpi
 import sys
 
-BATCH_SIZE = 200 # MINIMUM batch size (actual batch size in case of fixed horizon)
+BATCH_SIZE = 50 # MINIMUM batch size (actual batch size in case of fixed horizon)
 HORIZON = 100 # MAXIMUM horizon
 ITERATIONS = 100
 TASK = 'ContCartPole-v0'
@@ -34,7 +34,7 @@ def train(env_id, num_timesteps, seed):
     env = gym.make(env_id)
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-            hid_size=8, num_hid_layers=0,gaussian_fixed_var=True,use_bias=False)
+            hid_size=2, num_hid_layers=2,gaussian_fixed_var=True,use_bias=False)
     env = bench.Monitor(env, logger.get_dir() and
         osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)

@@ -210,8 +210,8 @@ def numel(x):
 def intprod(x):
     return int(np.prod(x))
 
-def flatgrad(loss, var_list, clip_norm=None):
-    grads = tf.gradients(loss, var_list)
+def flatgrad(loss, var_list, clip_norm=None, grad_ys=None):
+    grads = tf.gradients(loss, var_list, grad_ys=grad_ys)
     if clip_norm is not None:
         grads = [tf.clip_by_norm(grad, clip_norm=clip_norm) for grad in grads]
     return tf.concat(axis=0, values=[

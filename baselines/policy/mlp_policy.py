@@ -85,9 +85,16 @@ class MlpPolicy(object):
         with tf.variable_scope('pol') as vs:
             weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
+        flat_weights = tf.concat([tf.reshape(w, [-1]) for w in weights], axis=0)
+        n_weights = flat_weights.shape[0].value
         score = U.flatgrad(self.logprobs, weights) # \nabla\log p(\tau)
         self.fisher = tf.einsum('i,j->ij', score, score)        
       
+        #Fisher2
+        hessian_mask = tf.eye(n_weights)
+        hessian_rows = [U.flatgrad(score, weights, grad_ys=hessian_mask[i, :]) for i in range(n_weights)]
+        self.hesslog = tf.stack(hessian_rows, axis=0)
+        
         
     #Acting    
     def act(self, stochastic, ob):
@@ -248,7 +255,8 @@ class MlpPolicy(object):
                                                       horizon,
                                                       do_pad=False,
                                                       do_concat=False)
-        
+        print('Fisher prep time:', time.time() - checkpoint)
+        checkpoint = time.time()
         fisher = self.fisher
         if behavioral is not None:
             log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
@@ -259,6 +267,48 @@ class MlpPolicy(object):
         fisher_samples = np.array([fun(s, a)[0] for (s,a) in zip(_states, _actions)]) #one call per EPISODE
         print('Fisher eval time:', time.time() - checkpoint)
         return np.mean(fisher_samples, axis=0)
+
+    def eval_fisher2(self, states, actions, lens_or_batch_size, horizon=None, behavioral=None):
+        """
+        Fisher information matrix of actor parameters, possibly off-policy
+        
+        Params:
+            states, actions as lists, flat wrt time
+            lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
+            horizon: max task horizon
+            behavioral: policy used to collect (s, a) pairs
+        """
+        checkpoint = time.time()
+        assert len(states) > 0
+        assert len(states)==len(actions)
+        if type(lens_or_batch_size) is list:
+            lens = lens_or_batch_size
+            assert sum(lens) > 0
+            batch_size = len(lens)
+            if horizon is None:
+                horizon = max(lens)
+            assert all(np.array(lens) <= horizon)
+        else:
+            assert type(lens_or_batch_size) is int
+            batch_size = lens_or_batch_size
+            assert len(states)%batch_size == 0
+            if horizon is None:
+                horizon = len(states)/batch_size
+            lens = [horizon] * batch_size
+        _states, _actions = self._prepare_data(states, 
+                                                      actions, 
+                                                      None, 
+                                                      lens, 
+                                                      horizon,
+                                                      do_pad=False,
+                                                      do_concat=True)
+        print('Fisher prep time:', time.time() - checkpoint)
+        checkpoint = time.time()
+        fisher = - self.hesslog / batch_size
+        
+        fun =  U.function([self.ob, self.ac_in], [fisher])
+        print('Fisher eval time:', time.time() - checkpoint)
+        return fun(_states, _actions)[0]
     
     def student_t_bound(self, states, actions, rewards, lens_or_batch_size=1, delta=.2, horizon=None, behavioral=None, per_decision=False, gamma=.99):
         if type(lens_or_batch_size) is list:
