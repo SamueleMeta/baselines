@@ -10,12 +10,11 @@ from baselines.common.mpi_adam import MpiAdam
 from baselines.common.cg import cg
 from contextlib import contextmanager
 
-def traj_segment_generator(pi, env, horizon, stochastic):
+def traj_segment_generator(pi, env, n_episodes, horizon, stochastic):
     # Initialize state variables
     t = 0
     ac = env.action_space.sample()
     new = True
-    rew = 0.0
     ob = env.reset()
 
     cur_ep_ret = 0
@@ -24,54 +23,55 @@ def traj_segment_generator(pi, env, horizon, stochastic):
     ep_lens = []
 
     # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon)])
-    rews = np.zeros(horizon, 'float32')
-    vpreds = np.zeros(horizon, 'float32')
-    news = np.zeros(horizon, 'int32')
-    acs = np.array([ac for _ in range(horizon)])
+    obs = np.array([ob for _ in range(horizon * n_episodes)])
+    rews = np.zeros(horizon * n_episodes, 'float32')
+    vpreds = np.zeros(horizon * n_episodes, 'float32')
+    news = np.zeros(horizon * n_episodes, 'int32')
+    acs = np.array([ac for _ in range(horizon * n_episodes)])
     prevacs = acs.copy()
+    mask = np.ones(horizon * n_episodes, 'float32')
 
+    i = 0
     while True:
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
-        if t > 0 and t % horizon == 0:
-            n_samples = sum(ep_lens)
-            yield {"ob" : obs[:n_samples], "rew" : rews[:n_samples],
-                   "vpred" : vpreds[:n_samples], "new" : news[:n_samples],
-                    "ac" : acs[:n_samples], "prevac" : prevacs[:n_samples], 
-                    "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens}
+        #if t > 0 and t % horizon == 0:
+        if i == n_episodes:
+            yield {"ob" : obs[:t], "rew" : rews[:t], "vpred" : vpreds[:t], "new" : news[:t],
+                    "ac" : acs[:t], "prevac" : prevacs[:t], "nextvpred": vpred * (1 - new),
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
             _, vpred = pi.act(stochastic, ob)
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
-            if not new:
-                cur_ep_ret = 0
-                cur_ep_len = 0
-                ob = env.reset()
+            mask = np.ones(horizon * n_episodes, 'float32')
+            i = 0
+            t = 0
 
-        i = t % horizon
-        obs[i] = ob
-        vpreds[i] = vpred
-        news[i] = new
-        acs[i] = ac
-        prevacs[i] = prevac
+        obs[t] = ob
+        vpreds[t] = vpred
+        news[t] = new
+        acs[t] = ac
+        prevacs[t] = prevac
 
         ob, rew, new, _ = env.step(ac)
-        rews[i] = rew
+        rews[t] = rew
 
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
+
             cur_ep_ret = 0
             cur_ep_len = 0
             ob = env.reset()
+
+            i += 1
         t += 1
 
 def add_vtarg_and_adv(seg, gamma, lam):
@@ -184,7 +184,7 @@ def learn(env, policy_fn, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_batch, stochastic=True)
+    seg_gen = traj_segment_generator(pi, env, batch_size, task_horizon, stochastic=True)
 
     episodes_so_far = 0
     timesteps_so_far = 0
@@ -289,6 +289,7 @@ def learn(env, policy_fn, *,
         #print(pi.eval_param())
 
         #J_hat
+        '''
         J_hat, var_J = pi.eval_performance(states,
                                     actions,
                                     rewards,
@@ -299,7 +300,7 @@ def learn(env, policy_fn, *,
                                     get_var=True)
         logger.record_tabular("J_hat", J_hat)
         logger.record_tabular("var_J", var_J)
-    
+        '''
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("EpRewMean", np.mean(rews))
         logger.record_tabular("EpThisIter", len(lens))

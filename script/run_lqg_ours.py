@@ -9,6 +9,7 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.ours import ours
 from baselines.envs.lqg1d import LQG1D
 import baselines.common.tf_util as U
+import tensorflow as tf
 
 
 def train(num_episodes, horizon, seed):
@@ -31,7 +32,7 @@ def train(num_episodes, horizon, seed):
     gym.logger.setLevel(logging.WARN)
 
     ours.learn(env, policy_fn, num_episodes=num_episodes, iters=50,
-               horizon=horizon, gamma=0.99, delta=0.15, bound_name='student')
+               horizon=horizon, gamma=0.99, delta=0.05, bound_name='student')
 
     env.close()
 
@@ -39,10 +40,10 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--num-episodes', type=int, default=100)
+    parser.add_argument('--num-episodes', type=int, default=200)
     parser.add_argument('--horizon', type=int, default=20)
     args = parser.parse_args()
-    logger.configure(dir='.', format_strs=['stdout', 'csv'])
+    #logger.configure(dir='.', format_strs=['stdout', 'csv'])
     train(num_episodes=args.num_episodes, horizon=args.horizon, seed=args.seed)
 
 if __name__ == '__main__':

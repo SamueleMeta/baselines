@@ -26,7 +26,7 @@ def train(num_episodes, horizon, seed):
     env.horizon = horizon
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-            hid_size=0, num_hid_layers=0, gaussian_fixed_var=True, use_bias=False)
+            hid_size=64, num_hid_layers=2, gaussian_fixed_var=True, use_bias=False)
     env.seed(workerseed)
     gym.logger.setLevel(logging.WARN)
 
