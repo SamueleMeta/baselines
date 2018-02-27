@@ -9,7 +9,8 @@ from collections import deque
 from baselines.common.mpi_adam import MpiAdam
 from baselines.common.cg import cg
 from contextlib import contextmanager
-
+import numpy as np
+        
 def traj_segment_generator(pi, env, horizon, stochastic):
     # Initialize state variables
     t = 0
@@ -286,19 +287,65 @@ def learn(env, policy_fn, *,
         #rewbuffer.extend(rews)
 
         #Use this to print policy params:
-        #print(pi.eval_param())
+        """
+        print(pi.eval_param())
 
-        #J_hat
-        J_hat, var_J = pi.eval_performance(states,
-                                    actions,
-                                    rewards,
-                                    lens,
-                                    behavioral=oldpi,
-                                    per_decision=False,
-                                    gamma=gamma,
-                                    get_var=True)
-        logger.record_tabular("J_hat", J_hat)
-        logger.record_tabular("var_J", var_J)
+        J_hat
+        #"""
+        
+        #Performance
+        """
+        J_old, var_old, foo = oldpi.eval_performance(states,
+                                             actions,
+                                             rewards,
+                                             lens)
+        grad_J_old, grad_var_old = foo()
+        
+        J_new, var_new, foo = pi.eval_performance(states,
+                                       actions,
+                                       rewards,
+                                       lens,
+                                       behavioral=oldpi,
+                                       per_decision=False)
+        grad_J_new, grad_var_new = foo()
+        
+        print('OLD:', J_old, var_old, grad_J_old, grad_var_old)    
+        print('NEW:', J_new, var_new, grad_J_new, grad_var_new)
+        #"""
+    
+        #Student-t bound
+        #"""
+        bound = pi.student_t_bound(states,
+                                 actions,
+                                 rewards,
+                                 lens,
+                                 behavioral=oldpi,
+                                 per_decision=True)
+        logger.record_tabular("StudentTBound", bound)
+        #"""
+    
+        #Fisher
+        #"""
+        fisher = oldpi.eval_fisher(states, actions, lens, behavioral=None)
+        print(fisher)
+        assert np.array_equal(fisher, fisher.T)
+        fake = np.random.rand(fisher.shape[0], 1)
+        checkpoint = time.time()
+        natural_fake = np.linalg.solve(fisher, fake)
+        print('Fisher vector product time:', time.time() - checkpoint)
+        #"""
+    
+        
+        #Fisher2
+        #"""
+        fisher = oldpi.eval_fisher2(states, actions, lens, behavioral=None)
+        print(fisher)
+        assert np.allclose(fisher, fisher.T, rtol=1e-4, atol=1e-4)
+        fake = np.random.rand(fisher.shape[0], 1)
+        checkpoint = time.time()
+        natural_fake = np.linalg.solve(fisher, fake)
+        print('Fisher vector product time:', time.time() - checkpoint)
+        #
     
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("EpRewMean", np.mean(rews))

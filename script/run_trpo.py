@@ -15,9 +15,11 @@ from baselines import bench
 from baselines.trpo_mpi import trpo_mpi
 import sys
 
-BATCH_SIZE = 20 # MINIMUM batch size (actual batch size in case of fixed horizon)
+BATCH_SIZE = 50 # MINIMUM batch size (actual batch size in case of fixed horizon)
 HORIZON = 100 # MAXIMUM horizon
 ITERATIONS = 100
+TASK = 'ContCartPole-v0'
+#TASK = 'LQG1D-v0'
 
 def train(env_id, num_timesteps, seed):
     import baselines.common.tf_util as U
@@ -32,7 +34,7 @@ def train(env_id, num_timesteps, seed):
     env = gym.make(env_id)
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-            hid_size=1, num_hid_layers=0,gaussian_fixed_var=True,use_bias=False)
+            hid_size=2, num_hid_layers=2,gaussian_fixed_var=True,use_bias=False)
     env = bench.Monitor(env, logger.get_dir() and
         osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)
@@ -45,10 +47,8 @@ def train(env_id, num_timesteps, seed):
 
 def main():
     import argparse
-    task_id = 'ContCartPole-v0'
-    #task_id = 'LQG1D-v0'
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--env', help='environment ID', default=task_id)
+    parser.add_argument('--env', help='environment ID', default=TASK)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()
