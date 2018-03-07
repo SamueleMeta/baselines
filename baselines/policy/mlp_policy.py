@@ -12,6 +12,7 @@ class MlpPolicy(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""
     recurrent = False
     def __init__(self, name, *args, **kwargs):
+        #with tf.device('/cpu:0'):
         with tf.variable_scope(name):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
@@ -83,18 +84,35 @@ class MlpPolicy(object):
         
         #Fisher
         with tf.variable_scope('pol') as vs:
-            weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+            self.weights = weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
         flat_weights = tf.concat([tf.reshape(w, [-1]) for w in weights], axis=0)
-        n_weights = flat_weights.shape[0].value
-        score = U.flatgrad(self.logprobs, weights) # \nabla\log p(\tau)
+        self.n_weights = flat_weights.shape[0].value
+        self.score = score = U.flatgrad(self.logprobs, weights) # \nabla\log p(\tau)
         self.fisher = tf.einsum('i,j->ij', score, score)        
       
         #Fisher2
-        hessian_mask = tf.eye(n_weights)
+        self.built_hesslog = False
+        """
         hessian_rows = [U.flatgrad(score, weights, grad_ys=hessian_mask[i, :]) for i in range(n_weights)]
         self.hesslog = tf.stack(hessian_rows, axis=0)
+        #"""
+      
         
+    def build_hesslog(self):
+        checkpoint = time.time()
+        hessian_mask = tf.eye(self.n_weights)
+        self.hesslog = U.flatgrad(self.score, self.weights, grad_ys=hessian_mask[0, :])
+        self.hesslog = tf.expand_dims(self.hesslog, axis=1)
+        #"""
+        for i in range(1,self.n_weights):
+            print('Hessian row', i, '/', self.n_weights)
+            new_row = U.flatgrad(self.score, self.weights, grad_ys=hessian_mask[i])
+            new_row = tf.expand_dims(new_row, axis=1)
+            self.hesslog = tf.concat([self.hesslog, new_row], axis=1)
+        #"""
+        print('fisher2 compile time:', time.time() - checkpoint)
+        self.built_hesslog = True
         
     #Acting    
     def act(self, stochastic, ob):
@@ -258,6 +276,7 @@ class MlpPolicy(object):
         print('Fisher prep time:', time.time() - checkpoint)
         checkpoint = time.time()
         fisher = self.fisher
+        #with tf.device('/cpu:0'):
         if behavioral is not None:
             log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
             iw = tf.exp(tf.reduce_sum(log_ratios))
@@ -304,6 +323,8 @@ class MlpPolicy(object):
                                                       do_concat=True)
         print('Fisher prep time:', time.time() - checkpoint)
         checkpoint = time.time()
+        if not self.built_hesslog:
+            self.build_hesslog()
         fisher = - self.hesslog / batch_size
         
         fun =  U.function([self.ob, self.ac_in], [fisher])

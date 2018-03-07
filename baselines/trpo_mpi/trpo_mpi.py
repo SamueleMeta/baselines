@@ -336,7 +336,7 @@ def learn(env, policy_fn, *,
     
         
         #Fisher2
-        #"""
+        """
         fisher = oldpi.eval_fisher2(states, actions, lens, behavioral=None)
         print(fisher)
         assert np.allclose(fisher, fisher.T, rtol=1e-4, atol=1e-4)
@@ -344,7 +344,7 @@ def learn(env, policy_fn, *,
         checkpoint = time.time()
         natural_fake = np.linalg.solve(fisher, fake)
         print('Fisher vector product time:', time.time() - checkpoint)
-        #
+        #"""
     
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("EpRewMean", np.mean(rews))

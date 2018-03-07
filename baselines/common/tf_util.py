@@ -54,7 +54,8 @@ def make_session(num_cpu=None, make_default=False):
         num_cpu = int(os.getenv('RCALL_NUM_CPU', multiprocessing.cpu_count()))
     tf_config = tf.ConfigProto(
         inter_op_parallelism_threads=num_cpu,
-        intra_op_parallelism_threads=num_cpu)
+        intra_op_parallelism_threads=num_cpu,
+        )
     tf_config.gpu_options.allocator_type = 'BFC'
     if make_default:
         return tf.InteractiveSession(config=tf_config)
@@ -210,8 +211,8 @@ def numel(x):
 def intprod(x):
     return int(np.prod(x))
 
-def flatgrad(loss, var_list, clip_norm=None, grad_ys=None):
-    grads = tf.gradients(loss, var_list, grad_ys=grad_ys)
+def flatgrad(loss, var_list, clip_norm=None, grad_ys=None, aggregation_method=None, colocate_gradients_with_ops=False):
+    grads = tf.gradients(loss, var_list, grad_ys=grad_ys, aggregation_method=aggregation_method, colocate_gradients_with_ops=colocate_gradients_with_ops)
     if clip_norm is not None:
         grads = [tf.clip_by_norm(grad, clip_norm=clip_norm) for grad in grads]
     return tf.concat(axis=0, values=[
