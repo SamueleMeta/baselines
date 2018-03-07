@@ -31,7 +31,7 @@ def train(env_id, num_timesteps, seed):
     env = wrap_deepmind(env)
     env.seed(workerseed)
 
-    trpo_mpi.learn(env, policy_fn, timesteps_per_batch=512, max_kl=0.001, cg_iters=10, cg_damping=1e-3,
+    trpo_mpi.learn(env, policy_fn, batch_size=10, task_horizon=1000, max_kl=0.001, cg_iters=10, cg_damping=1e-3,
         max_timesteps=int(num_timesteps * 1.1), gamma=0.98, lam=1.0, vf_iters=3, vf_stepsize=1e-4, entcoeff=0.00)
     env.close()
 

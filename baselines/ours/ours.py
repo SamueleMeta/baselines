@@ -11,6 +11,7 @@ from baselines.common.cg import cg
 from contextlib import contextmanager
 import scipy.stats as sts
 import numpy.linalg as la
+import scipy.sparse.linalg as scila
 
 def reduce_var(x, axis=None, keepdims=False):
     """Variance of a tensor, alongside the specified axis.
@@ -28,7 +29,7 @@ def reduce_var(x, axis=None, keepdims=False):
     """
     m = tf.reduce_mean(x, axis=axis, keep_dims=True)
     devs_squared = tf.square(x - m)
-    return tf.reduce_mean(devs_squared, axis=axis, keep_dims=keepdims)
+    return tf.reduce_mean(devs_squared, axis=axis, keepdims=keepdims)
 
 def reduce_std(x, axis=None, keepdims=False):
     """Standard deviation of a tensor, alongside the specified axis.
@@ -46,12 +47,11 @@ def reduce_std(x, axis=None, keepdims=False):
     """
     return tf.sqrt(reduce_var(x, axis=axis, keepdims=keepdims))
 
-def traj_segment_generator(pi, env, horizon, stochastic):
+def traj_segment_generator(pi, env, n_episodes, horizon, stochastic):
     # Initialize state variables
     t = 0
     ac = env.action_space.sample()
     new = True
-    rew = 0.0
     ob = env.reset()
 
     cur_ep_ret = 0
@@ -60,46 +60,62 @@ def traj_segment_generator(pi, env, horizon, stochastic):
     ep_lens = []
 
     # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon)])
-    rews = np.zeros(horizon, 'float32')
-    vpreds = np.zeros(horizon, 'float32')
-    news = np.zeros(horizon, 'int32')
-    acs = np.array([ac for _ in range(horizon)])
+    obs = np.array([ob for _ in range(horizon * n_episodes)])
+    rews = np.zeros(horizon * n_episodes, 'float32')
+    vpreds = np.zeros(horizon * n_episodes, 'float32')
+    news = np.zeros(horizon * n_episodes, 'int32')
+    acs = np.array([ac for _ in range(horizon * n_episodes)])
     prevacs = acs.copy()
+    mask = np.ones(horizon * n_episodes, 'float32')
 
+    i = 0
     while True:
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
-        if t > 0 and t % horizon == 0:
+        #if t > 0 and t % horizon == 0:
+        if i == n_episodes:
             yield {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens}
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
             _, vpred = pi.act(stochastic, ob)            
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
-        i = t % horizon
-        obs[i] = ob
-        vpreds[i] = vpred
-        news[i] = new
-        acs[i] = ac
-        prevacs[i] = prevac
+            mask = np.ones(horizon * n_episodes, 'float32')
+            i = 0
+            t = 0
+
+        obs[t] = ob
+        vpreds[t] = vpred
+        news[t] = new
+        acs[t] = ac
+        prevacs[t] = prevac
 
         ob, rew, new, _ = env.step(ac)
-        rews[i] = rew
+        rews[t] = rew
 
         cur_ep_ret += rew
         cur_ep_len += 1
         if new:
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
+
             cur_ep_ret = 0
             cur_ep_len = 0
             ob = env.reset()
+
+            next_t = (i+1) * horizon
+
+            mask[t+1:next_t] = 0.
+            acs[t+1:next_t] = acs[t]
+            obs[t+1:next_t] = obs[t]
+
+            t = next_t - 1
+            i += 1
         t += 1
 
 def add_vtarg_and_adv(seg, gamma, iw_method='pdis'):
@@ -112,12 +128,8 @@ def add_vtarg_and_adv(seg, gamma, iw_method='pdis'):
     seg['ep_disc_ret'] = ep_disc_ret = np.empty(n_ep, 'float32')
     seg['disc_rew'] = disc_rew = np.empty(n_samp, 'float32')
 
-    rows1, cols1 = [], []
-    rows2, cols2 = [], []
-
-
-    seg['mask1'] = mask1 = np.zeros((n_samp, n_samp), 'float32')
-    seg['mask2'] = mask2 = np.zeros((n_samp, n_ep), 'float32')
+    #seg['mask1'] = mask1 = np.zeros((n_samp, n_samp), 'float32')
+    #seg['mask2'] = mask2 = np.zeros((n_samp, n_ep), 'float32')
 
     discounter = 0
     ret = 0.
@@ -126,11 +138,12 @@ def add_vtarg_and_adv(seg, gamma, iw_method='pdis'):
         disc_rew[t] = rew[t] * gamma ** discounter
         ret += disc_rew[t]
 
-        mask1[t-discounter:t+1, t] = 1
+        #mask1[t-discounter:t+1, t] = 1
 
-        rows1 = np.concatenate((rows1, np.arange(t - discounter, t + 1)))
-        cols1 = np.concatenate((cols1, np.repeat([t], discounter)))
+        #rows1 = np.concatenate((rows1, np.arange(t - discounter, t + 1)))
+        #cols1 = np.concatenate((cols1, np.repeat([t], discounter)))
 
+        '''
         if iw_method == 'is':
             mask1[t, t - discounter:t + 1] = 1
 
@@ -140,7 +153,7 @@ def add_vtarg_and_adv(seg, gamma, iw_method='pdis'):
         mask2[t, i] = 1
         rows2.append(t)
         cols2.append(i)
-
+        '''
         if new[t + 1]:
             discounter = 0
             ep_disc_ret[i] = ret
@@ -181,7 +194,7 @@ def line_search(theta_init, alpha, natural_gradient, set_parameter, evaluate_los
 
     return theta_old, epsilon_old, delta_bound_old, i+1
 
-def optimize_offline(theta_init, set_parameter, evaluate_loss, evaluate_gradient, gradient_tol=1e-5, bound_tol=1e-3, fisher_reg=1e-10, max_offline_ite=200):
+def optimize_offline(theta_init, set_parameter, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-5, bound_tol=1e-3, fisher_reg=1e-10, max_offline_ite=200):
     theta = theta_init
     improvement = 0.
     set_parameter(theta)
@@ -195,7 +208,13 @@ def optimize_offline(theta_init, set_parameter, evaluate_loss, evaluate_gradient
         #TODO compute fisher
         #fisher = 0.
         #natural_gradient = la.solve(fisher + fisher_reg * np.eye(fisher.shape[0]), gradient)
-        natural_gradient = gradient
+        if evaluate_natural_gradient is not None:
+            natural_gradient = evaluate_natural_gradient(gradient)
+        else:
+            natural_gradient = gradient
+        #print('Gradient %s' % gradient)
+        #print('Natural gradient %s' % natural_gradient)
+        #print('Dot %s' % np.dot(natural_gradient, gradient))
         gradient_norm = np.sqrt(np.dot(gradient, natural_gradient))
         if gradient_norm < gradient_tol:
             print("stopping - gradient norm < gradient_tol")
@@ -229,17 +248,24 @@ def learn(env, policy_func, *,
     rank = MPI.COMM_WORLD.Get_rank()
     np.set_printoptions(precision=3)
 
+    train_writer = tf.summary.FileWriter('log' + '/train')
+
     # Setup losses and stuff
     # ----------------------------------------
     ob_space = env.observation_space
     ac_space = env.action_space
     pi = policy_func("pi", ob_space, ac_space)
 
+    train_writer.add_graph(tf.get_default_graph())
+    train_writer.flush()
+
     var_list = pi.get_trainable_variables()
 
     oldpi = policy_func("oldpi", ob_space, ac_space)
     mask1 = tf.placeholder(dtype=tf.float32, shape=[None,None])
     mask2 = tf.placeholder(dtype=tf.float32, shape=[None,None])
+
+    mask = tf.placeholder(dtype=tf.float32, shape=[None])
     disc_rew = tf.placeholder(dtype=tf.float32, shape=[None])
     ep_len = tf.placeholder(dtype=tf.int32, shape=[None])
     importance_weights = tf.placeholder(dtype=tf.float32, shape=[None])
@@ -247,19 +273,62 @@ def learn(env, policy_func, *,
     ob = U.get_placeholder_cached(name="ob")
     ac = pi.pdtype.sample_placeholder([None])
 
-    logratio = pi.pd.logp(ac) - oldpi.pd.logp(ac) # pnew / pold
+    target_logpdf = pi.pd.logp(ac)
+    behavioral_logpdf = oldpi.pd.logp(ac)
+    logratio = target_logpdf - behavioral_logpdf # pnew / pold
 
-    #condition = lambda i: tf.less(i, tf.shape(ep_len)[0])
-    #def body(i):
-    #    importance_weights[ep_len[i]:ep_len[i+1]] = tf.exp(tf.su)
-    #    tf.add(i, 1)
+    disc_rew_split = tf.split(disc_rew, num_episodes)
+    logratio_split = tf.split(logratio * mask, num_episodes) #BE CAREFUL! Already masked
+    mask_split = tf.split(mask, num_episodes)
 
+    iw_method = 'pdis'
+    if iw_method == 'pdis':
+        iw_split = tf.exp(tf.cumsum(logratio_split, axis=1))
+    elif iw_method == 'is':
+        iw_split = tf.tile(tf.expand_dims(tf.exp(tf.reduce_sum(logratio_split, axis=1)), -1), (1,horizon))
+    else:
+        raise NotImplementedError()
 
-    iw = tf.exp(tf.tensordot(logratio, mask1, axes=1))
-
-    ep_return = tf.tensordot(iw * disc_rew, mask2, axes=1)
+    ep_return = tf.reduce_sum(iw_split * mask_split * disc_rew_split, axis=1)
     return_mean = tf.reduce_mean(ep_return)
     return_std = reduce_std(ep_return)
+
+    #p = tf.placeholder(dtype=tf.float32, shape=[None])
+    #grad_logprob = U.flatgrad(tf.stop_gradient(tf.reshape(iw_split, [horizon*num_episodes,])) * target_logpdf * mask, var_list)
+    #dot_product = tf.reduce_sum(grad_logprob * p)
+    #hess_logprob = U.flatgrad(dot_product, var_list) / num_episodes
+
+    #compute_linear_operator = U.function([p, ob, ac, disc_rew, mask], [-hess_logprob])
+
+    '''
+    grad_return = U.flatgrad(return_mean, var_list)
+    dot_product = tf.reduce_sum(grad_return * p)
+    hess_return = U.flatgrad(dot_product, var_list)
+    compute_linear_operator = U.function([p, ob, ac, disc_rew, mask], [-hess_return])
+    '''
+
+
+    #target_logpdf_split = tf.split(target_logpdf * mask, num_episodes)
+    #loggrads = tf.stack([U.flatgrad(target_logpdf_split[i], var_list) for i in range(num_episodes)], axis=0)
+
+    '''
+    loggrads = [
+        tf.concat(axis=0, values=[
+            tf.reshape(grad if grad is not None else tf.zeros_like(v), [U.numel(v)])
+            for (v, grad) in zip(var_list, tf.gradients(x, var_list)) ])
+         for x in target_logpdf_split]
+    
+    loghess = [tf.gradients(x, var_list) for x in loggrads]
+    fisher = tf.stack(loghess, axis=1)
+    '''
+    #iw_col = tf.expand_dims(iw_split[:, -1], -1)
+    #fisher = 1. / num_episodes * tf.tensordot(iw_col * loggrads, loggrads, axes=[[0], [0]])
+
+    #iw = tf.exp(tf.tensordot(logratio, mask1, axes=1))
+
+    #ep_return = tf.tensordot(iw * disc_rew, mask2, axes=1)
+    #return_mean = tf.reduce_mean(ep_return)
+    #return_std = reduce_std(ep_return)
 
     renyi = tf.reduce_mean(tf.exp(pi.pd.renyi(oldpi.pd)))
 
@@ -271,14 +340,21 @@ def learn(env, policy_func, *,
     losses = [bound, return_mean, return_std]
     loss_names = ['Bound', 'EpDiscRewMean', 'EpDiscRewStd']
 
-    compute_lossandgrad = U.function([ob, ac, disc_rew, mask1, mask2], losses + [U.flatgrad(bound, var_list)])
+    for (lossname, lossval) in zip(loss_names, losses):
+        tf.summary.scalar(lossname, lossval)
+    merged = tf.summary.merge_all()
+    compute_summary = U.function([ob, ac, disc_rew, mask], [merged])
 
+    #compute_lossandgrad = U.function([ob, ac, disc_rew, mask1, mask2], losses + [U.flatgrad(bound, var_list)])
+    gradient_ = U.flatgrad(bound, var_list)
+    compute_lossandgrad = U.function([ob, ac, disc_rew, mask], losses + [gradient_])
 
     assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
         for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
-    compute_losses = U.function([ob, ac, disc_rew, mask1, mask2], losses)
-
-    pdiw_f = U.function([ob, ac, mask1, mask2, disc_rew], [iw, ep_return, var_list])
+    #compute_losses = U.function([ob, ac, disc_rew, mask1, mask2], losses)
+    compute_losses = U.function([ob, ac, disc_rew, mask], losses)
+    #pdiw_f = U.function([ob, ac, disc_rew, mask], [iw_split, disc_rew_split])
+    #compute_natural_gradient = U.function([ob, ac, disc_rew, mask], [hessians])
 
     @contextmanager
     def timed(msg):
@@ -307,6 +383,11 @@ def learn(env, policy_func, *,
         gradient = allmean(gradient)
         return gradient, loss[0]
 
+    #def evaluate_natural_gradient(args):
+        #natural_gradient = compute_natural_gradient(*args)
+        #natural_gradient = allmean(np.array(natural_gradient))
+        #return natural_gradient
+
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
@@ -316,7 +397,7 @@ def learn(env, policy_func, *,
     # Prepare for rollouts
     # ----------------------------------------
     #TODO change this to work on trajectories
-    seg_gen = traj_segment_generator(pi, env, num_episodes * horizon, stochastic=True)
+    seg_gen = traj_segment_generator(pi, env, num_episodes, horizon, stochastic=True)
 
     episodes_so_far = 0
     timesteps_so_far = 0
@@ -328,21 +409,26 @@ def learn(env, policy_func, *,
 
 
     def log_info(args, ite, lenbuffer, rewbuffer, lens, episodes_so_far, timesteps_so_far):
-        logger.record_tabular("Itaration", ite)
-        meanlosses = bound, _, _ = allmean(np.array(compute_losses(*args)))
-        for (lossname, lossval) in zip(loss_names, meanlosses):
-            logger.record_tabular(lossname, lossval)
+        with tf.name_scope('summaries'):
+            logger.record_tabular("Itaration", ite)
+            meanlosses = allmean(np.array(compute_losses(*args)))
+            for (lossname, lossval) in zip(loss_names, meanlosses):
+                logger.record_tabular(lossname, lossval)
 
-        logger.record_tabular("EpLenMean", np.mean(lenbuffer))
-        logger.record_tabular("EpRewMean", np.mean(rewbuffer))
-        logger.record_tabular("EpThisIter", len(lens))
+            logger.record_tabular("EpLenMean", np.mean(lenbuffer))
+            logger.record_tabular("EpRewMean", np.mean(rewbuffer))
+            logger.record_tabular("EpThisIter", len(lens))
 
-        logger.record_tabular("EpisodesSoFar", episodes_so_far)
-        logger.record_tabular("TimestepsSoFar", timesteps_so_far)
-        logger.record_tabular("TimeElapsed", time.time() - tstart)
+            logger.record_tabular("EpisodesSoFar", episodes_so_far)
+            logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+            logger.record_tabular("TimeElapsed", time.time() - tstart)
 
-        if rank == 0:
-            logger.dump_tabular()
+            summary = compute_summary(*args)[0]
+            train_writer.add_summary(summary, ite)
+            train_writer.flush()
+
+            if rank == 0:
+                logger.dump_tabular()
 
     improvement_tol =0.
     theta = get_parameter()
@@ -364,8 +450,7 @@ def learn(env, policy_func, *,
             seg = seg_gen.__next__()
 
         add_vtarg_and_adv(seg, gamma)
-        ob, ac, disc_rew, mask1, mask2 = seg["ob"], seg["ac"], seg["disc_rew"], seg['mask1'], seg['mask2']
-        args = seg["ob"], seg["ac"], disc_rew, mask1, mask2
+        args = seg["ob"], seg["ac"], seg["disc_rew"], seg['mask']
 
         lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
@@ -379,10 +464,28 @@ def learn(env, policy_func, *,
 
         log_info(args, ite, lenbuffer, rewbuffer, lens, episodes_so_far, timesteps_so_far)
 
-        with timed("computegrad"):
-            gradient = evaluate_gradient(args)
 
-        theta, improvement = optimize_offline(theta, set_parameter, lambda: evaluate_loss(args), lambda: evaluate_gradient(args))
+
+        with timed("computegrad"):
+            gradient, _ = evaluate_gradient(args)
+
+        '''
+        def evaluate_fisher_vector_prod(x):
+            return allmean(compute_linear_operator(x, *args)[0]) + x
+
+        A = scila.LinearOperator((34, 34), matvec=evaluate_fisher_vector_prod)
+
+        from baselines.common.cg import cg
+        def evaluate_natural_gradient(gradient):
+            #return cg(evaluate_fisher_vector_prod, gradient, cg_iters=1, verbose=False)
+            x = scila.cgs(A, gradient, x0=gradient, maxiter=1)
+            return x[0]
+
+        '''
+
+        theta, improvement = optimize_offline(theta, set_parameter, lambda: evaluate_loss(args),
+                                                                    lambda: evaluate_gradient(args))
+                                                                    #evaluate_natural_gradient)
         set_parameter(theta)
 
         assign_old_eq_new()
@@ -399,8 +502,7 @@ def learn(env, policy_func, *,
         seg = seg_gen.__next__()
 
     add_vtarg_and_adv(seg, gamma)
-    ob, ac, disc_rew, mask1, mask2 = seg["ob"], seg["ac"], seg["disc_rew"], seg['mask1'], seg['mask2']
-    args = seg["ob"], seg["ac"], disc_rew, mask1, mask2
+    args = seg["ob"], seg["ac"], seg["disc_rew"], seg['mask']
 
     lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
     listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
