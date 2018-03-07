@@ -294,7 +294,8 @@ def learn(env, policy_fn, *,
         #"""
         
         #Performance
-        """
+        #"""
+        checkpoint = time.time()
         J_old, var_old, foo = oldpi.eval_performance(states,
                                              actions,
                                              rewards,
@@ -308,40 +309,32 @@ def learn(env, policy_fn, *,
                                        behavioral=oldpi,
                                        per_decision=False)
         grad_J_new, grad_var_new = foo()
-        
+        print('Performance comp. time:', time.time() - checkpoint)
         print('OLD:', J_old, var_old, grad_J_old, grad_var_old)    
         print('NEW:', J_new, var_new, grad_J_new, grad_var_new)
         #"""
     
         #Student-t bound
         #"""
+        checkpoint = time.time()
         bound = pi.student_t_bound(states,
                                  actions,
                                  rewards,
                                  lens,
                                  behavioral=oldpi,
                                  per_decision=True)
+        print('Bound comp. time', time.time() - checkpoint)
         logger.record_tabular("StudentTBound", bound)
         #"""
     
         #Fisher
         #"""
+        checkpoint = time.time()
         fisher = oldpi.eval_fisher(states, actions, lens, behavioral=None)
         print(fisher)
         assert np.array_equal(fisher, fisher.T)
         fake = np.random.rand(fisher.shape[0], 1)
-        checkpoint = time.time()
-        natural_fake = np.linalg.solve(fisher, fake)
-        print('Fisher vector product time:', time.time() - checkpoint)
-        #"""
-    
-        
-        #Fisher2
-        """
-        fisher = oldpi.eval_fisher2(states, actions, lens, behavioral=None)
-        print(fisher)
-        assert np.allclose(fisher, fisher.T, rtol=1e-4, atol=1e-4)
-        fake = np.random.rand(fisher.shape[0], 1)
+        print('Fisher comp. time', time.time() - checkpoint)
         checkpoint = time.time()
         natural_fake = np.linalg.solve(fisher, fake)
         print('Fisher vector product time:', time.time() - checkpoint)
