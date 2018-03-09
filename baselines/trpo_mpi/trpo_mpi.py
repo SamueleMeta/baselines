@@ -295,49 +295,74 @@ def learn(env, policy_fn, *,
         
         #Performance
         #"""
-        checkpoint = time.time()
-        J_old, var_old, foo = oldpi.eval_performance(states,
-                                             actions,
-                                             rewards,
-                                             lens)
-        grad_J_old, grad_var_old = foo()
+        J = pi.eval_J(states,
+                      actions,
+                      rewards,
+                      lens,
+                      behavioral=oldpi,
+                      per_decision=True)
         
-        J_new, var_new, foo = pi.eval_performance(states,
+        var_J = pi.eval_var_J(states,
+                      actions,
+                      rewards,
+                      lens,
+                      behavioral=oldpi,
+                      per_decision=True)
+        print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))    
+        #"""
+        
+        #Gradients
+        #"""
+        grad_J = pi.eval_grad_J(states,
                                        actions,
                                        rewards,
                                        lens,
                                        behavioral=oldpi,
-                                       per_decision=False)
-        grad_J_new, grad_var_new = foo()
-        print('Performance comp. time:', time.time() - checkpoint)
-        print('OLD:', J_old, var_old, grad_J_old, grad_var_old)    
-        print('NEW:', J_new, var_new, grad_J_new, grad_var_new)
+                                       per_decision=True)
+        grad_var_J = pi.eval_grad_var_J(states,
+                                       actions,
+                                       rewards,
+                                       lens,
+                                       behavioral=oldpi,
+                                       per_decision=True)
+        print('Target performance grads', grad_J, grad_var_J)    
         #"""
     
         #Student-t bound
         #"""
-        checkpoint = time.time()
-        bound = pi.student_t_bound(states,
+        bound = pi.eval_bound(states,
                                  actions,
                                  rewards,
                                  lens,
                                  behavioral=oldpi,
                                  per_decision=True)
-        print('Bound comp. time', time.time() - checkpoint)
-        logger.record_tabular("StudentTBound", bound)
+        #print('Bound comp. time', time.time() - checkpoint)
+        print("StudentTBound", bound)
         #"""
+    
+        
+        #Student-t bound grad
+        #"""
+        bound_grad = pi.eval_bound_grad(states,
+                                 actions,
+                                 rewards,
+                                 lens,
+                                 behavioral=oldpi,
+                                 per_decision=True)
+        print("StudentTBound grad", bound_grad)
+        #
     
         #Fisher
         #"""
         checkpoint = time.time()
         fisher = oldpi.eval_fisher(states, actions, lens, behavioral=None)
-        print(fisher)
+        #print(fisher)
         assert np.array_equal(fisher, fisher.T)
-        fake = np.random.rand(fisher.shape[0], 1)
         print('Fisher comp. time', time.time() - checkpoint)
         checkpoint = time.time()
-        natural_fake = np.linalg.solve(fisher, fake)
-        print('Fisher vector product time:', time.time() - checkpoint)
+        natural = np.linalg.solve(fisher + 1e-12*np.eye(fisher.shape[0]), grad_J)
+        print(natural)
+        #print('Fisher vector product time:', time.time() - checkpoint)
         #"""
     
         logger.record_tabular("EpLenMean", np.mean(lens))
