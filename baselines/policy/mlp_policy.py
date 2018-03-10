@@ -46,7 +46,7 @@ class MlpPolicy(object):
 
         #Actor
         with tf.variable_scope('pol'):
-            last_out = obz
+            last_out = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
             for i in range(num_hid_layers):
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
                                                       name='fc%i'%(i+1),
@@ -69,7 +69,10 @@ class MlpPolicy(object):
         self.state_out = []
         stochastic = tf.placeholder(dtype=tf.bool, shape=())
         ac = U.switch(stochastic, self.pd.sample(), self.pd.mode())
-        self._act = U.function([stochastic, ob], [ac, self.vpred])
+        if use_critic:
+            self._act = U.function([stochastic, ob], [ac, self.vpred])
+        else:
+            self._act = U.function([stochastic, ob], [ac, tf.zeros(1)])
 
         #Evaluating
         self.ob = ob
@@ -230,7 +233,7 @@ class MlpPolicy(object):
         
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision)
+        self._build(batch_size, horizon, behavioral, per_decision, delta)
         
         #Evaluate bound
         return np.asscalar(self._get_bound(_states, _actions, _rewards, gamma, _mask)[0])
@@ -253,7 +256,7 @@ class MlpPolicy(object):
         
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision)
+        self._build(batch_size, horizon, behavioral, per_decision, delta)
         
         #Evaluate gradient
         return np.ravel(self._get_bound_grad(_states, _actions, _rewards, gamma, _mask)[0])

@@ -71,7 +71,6 @@ class CartPoleEnv(gym.Env):
         return self._step(action)
 
     def _step(self, action):
-        self.steps += 1
         #assert self.action_space.contains(action), "%r (%s) invalid"%(action, type(action))
         #action = action + self.np_random.rand() * .1
         action = np.clip(action, -1., 1.)
@@ -92,8 +91,7 @@ class CartPoleEnv(gym.Env):
         done =  x < -self.x_threshold \
                 or x > self.x_threshold \
                 or theta < -self.theta_threshold_radians \
-                or theta > self.theta_threshold_radians \
-                or self.steps >= self.horizon
+                or theta > self.theta_threshold_radians
         done = bool(done)
 
         if not done:

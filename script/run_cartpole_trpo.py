@@ -6,7 +6,7 @@ import gym
 import logging
 from baselines import logger
 from baselines.policy.mlp_policy import MlpPolicy
-from baselines.trpo_mpi import trpo_mpi_per_episode
+from baselines.trpo_mpi import trpo_mpi
 from baselines.envs.continuous_cartpole import CartPoleEnv
 import baselines.common.tf_util as U
 
@@ -26,12 +26,12 @@ def train(num_episodes, horizon, seed):
 
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-                         hid_size=64, num_hid_layers=2, gaussian_fixed_var=True, use_bias=False)
+                         hid_size=0, num_hid_layers=0, gaussian_fixed_var=True, use_bias=False)
 
     env.seed(workerseed)
     gym.logger.setLevel(logging.WARN)
 
-    trpo_mpi_per_episode.learn(env, policy_fn, task_horizon=horizon, batch_size=num_episodes, max_kl=0.01, cg_iters=10, cg_damping=0.1,
+    trpo_mpi.learn(env, policy_fn, task_horizon=horizon, batch_size=num_episodes, max_kl=0.01, cg_iters=10, cg_damping=0.1,
                    max_iters=20, gamma=.99, lam=0.98, vf_iters=5, vf_stepsize=1e-3)
 
     env.close()

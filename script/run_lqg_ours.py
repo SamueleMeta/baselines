@@ -23,8 +23,7 @@ def train(num_episodes, horizon, seed):
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
 
-    env = LQG1D()
-    env.horizon = horizon
+    env = gym.make('LQG1D-v0')
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
             hid_size=0, num_hid_layers=0, gaussian_fixed_var=True, use_bias=False)
@@ -32,7 +31,7 @@ def train(num_episodes, horizon, seed):
     gym.logger.setLevel(logging.WARN)
 
     ours.learn(env, policy_fn, num_episodes=num_episodes, iters=50,
-               horizon=horizon, gamma=0.99, delta=0.05, bound_name='student')
+               horizon=horizon, gamma=0.99, delta=0.2, bound_name='student', natural_gradient=False)
 
     env.close()
 

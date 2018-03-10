@@ -22,16 +22,15 @@ def train(num_episodes, horizon, seed):
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
 
-    env = CartPoleEnv()
-    env.horizon = horizon
+    env = gym.make('ContCartPole-v0')
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-            hid_size=64, num_hid_layers=2, gaussian_fixed_var=True, use_bias=False)
+            hid_size=0, num_hid_layers=0, gaussian_fixed_var=True, use_bias=False, use_critic=False)
     env.seed(workerseed)
     gym.logger.setLevel(logging.WARN)
 
     ours.learn(env, policy_fn, num_episodes=num_episodes, iters=20,
-               horizon=horizon, gamma=0.99, delta=0.2, bound_name='student')
+               horizon=horizon, gamma=0.99, delta=0.2, bound_name='student', natural_gradient=True)
 
     env.close()
 
