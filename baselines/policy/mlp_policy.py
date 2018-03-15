@@ -17,7 +17,7 @@ class MlpPolicy(object):
             self.scope = tf.get_variable_scope().name
             U.initialize()
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True, use_critic=True):
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True, use_critic=True, seed=None):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -27,6 +27,9 @@ class MlpPolicy(object):
             use_bias: whether to include bias in neurons
         """
         assert isinstance(ob_space, gym.spaces.Box)
+
+        if seed is not None:
+            tf.set_random_seed(seed)
 
         self.pdtype = pdtype = make_pdtype(ac_space)
         sequence_length = None

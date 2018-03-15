@@ -308,11 +308,11 @@ def learn(env, policy_fn, *,
                       lens,
                       behavioral=oldpi,
                       per_decision=True)
-        print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))    
+        #print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))    
         #"""
         
         #Gradients
-        #"""
+        """
         grad_J = pi.eval_grad_J(states,
                                        actions,
                                        rewards,
@@ -329,7 +329,7 @@ def learn(env, policy_fn, *,
         #"""
     
         #Student-t bound
-        #"""
+        """
         bound = pi.eval_bound(states,
                                  actions,
                                  rewards,
@@ -342,7 +342,7 @@ def learn(env, policy_fn, *,
     
         
         #Student-t bound grad
-        #"""
+        """
         bound_grad = pi.eval_bound_grad(states,
                                  actions,
                                  rewards,
@@ -350,10 +350,10 @@ def learn(env, policy_fn, *,
                                  behavioral=oldpi,
                                  per_decision=True)
         print("StudentTBound grad", bound_grad)
-        #
+        #"""
     
         #Fisher
-        #"""
+        """
         checkpoint = time.time()
         fisher = oldpi.eval_fisher(states, actions, lens, behavioral=None)
         #print(fisher)
@@ -368,6 +368,8 @@ def learn(env, policy_fn, *,
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("EpRewMean", np.mean(rews))
         logger.record_tabular("EpThisIter", len(lens))
+        logger.record_tabular("J_hat", J)
+        logger.record_tabular("Var_J", var_J)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
         iters_so_far += 1
