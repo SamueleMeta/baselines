@@ -300,14 +300,16 @@ def learn(env, policy_fn, *,
                       rewards,
                       lens,
                       behavioral=oldpi,
-                      per_decision=True)
+                      per_decision=True,
+                      gamma=1)
         
         var_J = pi.eval_var_J(states,
                       actions,
                       rewards,
                       lens,
                       behavioral=oldpi,
-                      per_decision=True)
+                      per_decision=True,
+                      gamma=1)
         #print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))    
         #"""
         
