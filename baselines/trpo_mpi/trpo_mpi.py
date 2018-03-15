@@ -11,7 +11,7 @@ from baselines.common.cg import cg
 from contextlib import contextmanager
 import numpy as np
         
-def traj_segment_generator(pi, env, horizon, stochastic):
+def traj_segment_generator(pi, env, horizon, steps_per_batch, stochastic):
     # Initialize state variables
     t = 0
     ac = env.action_space.sample()
@@ -25,11 +25,11 @@ def traj_segment_generator(pi, env, horizon, stochastic):
     ep_lens = []
 
     # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon)])
-    rews = np.zeros(horizon, 'float32')
-    vpreds = np.zeros(horizon, 'float32')
-    news = np.zeros(horizon, 'int32')
-    acs = np.array([ac for _ in range(horizon)])
+    obs = np.array([ob for _ in range(steps_per_batch)])
+    rews = np.zeros(steps_per_batch, 'float32')
+    vpreds = np.zeros(steps_per_batch, 'float32')
+    news = np.zeros(steps_per_batch, 'int32')
+    acs = np.array([ac for _ in range(steps_per_batch)])
     prevacs = acs.copy()
 
     while True:
@@ -38,7 +38,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
-        if t > 0 and t % horizon == 0:
+        if t > 0 and t % steps_per_batch == 0:
             n_samples = sum(ep_lens)
             yield {"ob" : obs[:n_samples], "rew" : rews[:n_samples],
                    "vpred" : vpreds[:n_samples], "new" : news[:n_samples],
@@ -55,7 +55,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
                 cur_ep_len = 0
                 ob = env.reset()
 
-        i = t % horizon
+        i = t % steps_per_batch
         obs[i] = ob
         vpreds[i] = vpred
         news[i] = new
@@ -67,7 +67,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
 
         cur_ep_ret += rew
         cur_ep_len += 1
-        if new:
+        if new or i%horizon==horizon-1:
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             cur_ep_ret = 0
@@ -185,7 +185,7 @@ def learn(env, policy_fn, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_batch, stochastic=True)
+    seg_gen = traj_segment_generator(pi, env, task_horizon, timesteps_per_batch, stochastic=True)
 
     episodes_so_far = 0
     timesteps_so_far = 0
