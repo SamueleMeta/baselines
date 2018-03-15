@@ -282,7 +282,19 @@ def learn(env, policy_fn, *,
         lrlocal = (seg["ep_lens"], seg["ep_rets"], seg["ob"],
                    seg["ac"],seg["rew"]) # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
-        lens, rews,states,actions,rewards = map(flatten_lists, zip(*listoflrpairs))
+        lens, rews, states, actions, rewards = map(flatten_lists, zip(*listoflrpairs))
+        
+        disc_rews = []
+        start = 0
+        for ep_len in lens:
+            end = start + ep_len
+            disc = gamma + np.zeros(ep_len)
+            disc[0] = 1
+            disc = np.cumprod(disc)
+            disc_rewards = np.array(rewards[start:end]) * disc
+            disc_rews.append(np.sum(disc_rewards))
+            start = end
+        
         #lenbuffer.extend(lens)
         #rewbuffer.extend(rews)
 
@@ -301,7 +313,7 @@ def learn(env, policy_fn, *,
                       lens,
                       behavioral=oldpi,
                       per_decision=True,
-                      gamma=1)
+                      gamma=gamma)
         
         var_J = pi.eval_var_J(states,
                       actions,
@@ -309,7 +321,7 @@ def learn(env, policy_fn, *,
                       lens,
                       behavioral=oldpi,
                       per_decision=True,
-                      gamma=1)
+                      gamma=gamma)
         #print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))    
         #"""
         
@@ -366,8 +378,10 @@ def learn(env, policy_fn, *,
         print(natural)
         #print('Fisher vector product time:', time.time() - checkpoint)
         #"""
-    
+        
+        #Logging
         logger.record_tabular("EpLenMean", np.mean(lens))
+        logger.record_tabular("DiscEpRewMean", np.mean(disc_rews))
         logger.record_tabular("EpRewMean", np.mean(rews))
         logger.record_tabular("EpThisIter", len(lens))
         logger.record_tabular("J_hat", J)
