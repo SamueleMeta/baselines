@@ -136,6 +136,7 @@ def line_search(theta_init,
                 natural_gradient,
                 set_param,
                 evaluate_loss,
+                compute_max_weight,
                 delta_bound_tol=1e-2,
                 max_line_search_ite=100):
 
@@ -147,10 +148,13 @@ def line_search(theta_init,
     for i in range(max_line_search_ite):
         theta = theta_init + epsilon * alpha * natural_gradient
         set_param(theta)
+        max_weight = compute_max_weight()
+
+        if max_weight > 10.:
+            epsilon /= 2
+            continue
+
         bound = evaluate_loss()
-        #print("bound %s - step %s" % (bound, epsilon * alpha))
-        #print(theta)
-        #print(natural_gradient)
         delta_bound = bound - bound_init
 
         epsilon_old = epsilon
@@ -171,9 +175,10 @@ def optimize_offline(eval_param,
                      eval_bound,
                      eval_grad,
                      eval_fisher=None,
+                     compute_max_weight=None,
                      gradient_tol=1e-5,
                      bound_tol=1e-3,
-                     fisher_reg=1e-10,
+                     fisher_reg=1e-2,
                      max_offline_ite=200):
 
     theta_init = eval_param()
@@ -184,6 +189,8 @@ def optimize_offline(eval_param,
     titlestr = "%6s %10s %10s %18s %18s %18s %18s"
     print(titlestr % ("iter", "epsilon", "step size", "num line search", "gradient norm", "delta bound ite", "delta bound tot"))
 
+    assert compute_max_weight() == 1.
+
     for i in range(max_offline_ite):
 
         gradient = eval_grad()
@@ -191,9 +198,15 @@ def optimize_offline(eval_param,
 
         if eval_fisher is not None:
             fisher = eval_fisher()
+            assert np.allclose(fisher, fisher.T)
+            assert la.eigh(fisher)[0][-1] >= 0
+            print(fisher.max())
             natural_gradient = la.solve(fisher + fisher_reg * np.eye(fisher.shape[0]), gradient)
         else:
             natural_gradient = gradient
+
+        print(gradient)
+        print(natural_gradient)
 
         assert np.dot(gradient, natural_gradient) >= 0
 
@@ -204,7 +217,7 @@ def optimize_offline(eval_param,
             return theta, improvement
 
         alpha = 1. / gradient_norm ** 2
-        theta, epsilon, delta_bound, num_line_search = line_search(theta, alpha, natural_gradient, set_param, eval_bound)
+        theta, epsilon, delta_bound, num_line_search = line_search(theta, alpha, natural_gradient, set_param, eval_bound, compute_max_weight)
         set_param(theta)
 
         improvement += delta_bound
@@ -239,6 +252,27 @@ def learn(env, policy_func, *,
     assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
         for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
 
+    all_var_list = pi.get_trainable_variables()
+    var_list = [v for v in all_var_list if v.name.split("/")[1].startswith("pol")]
+    old_all_var_list = oldpi.get_trainable_variables()
+    old_var_list = [v for v in old_all_var_list if v.name.split("/")[1].startswith("pol")]
+
+    var_list_logstd = [v for v in var_list if v.name.count("logstd")]
+    var_list_mean = [v for v in var_list if not v.name.count("logstd")]
+    old_var_list_logstd = [v for v in old_var_list if v.name.count("logstd")]
+    old_var_list_mean = [v for v in old_var_list if not v.name.count("logstd")]
+
+    mean_var = U.GetFlat(var_list_mean).op
+    logstd_var = U.GetFlat(var_list_logstd).op
+    old_mean_var = U.GetFlat(old_var_list_mean).op
+    old_logstd_var = U.GetFlat(old_var_list_logstd).op
+
+    max_weight = tf.exp(tf.reduce_sum(old_logstd_var - logstd_var)) * \
+                   tf.exp(tf.reduce_sum((mean_var - old_mean_var) ** 2) / \
+                    (tf.exp(old_logstd_var) ** 2 - tf.exp(logstd_var) ** 2 + 1e-24))
+
+    compute_max_weight = U.function([], max_weight)
+
     @contextmanager
     def timed(msg):
         if rank == 0:
@@ -265,6 +299,8 @@ def learn(env, policy_func, *,
 
     eval_param = lambda: pi.eval_param()
     set_param = lambda x: pi.set_param(x)
+
+    assign_old_eq_new()
 
     while True:
 
@@ -298,7 +334,7 @@ def learn(env, policy_func, *,
         else:
             eval_fisher = None
 
-        theta, improvement = optimize_offline(eval_param, set_param, eval_bound, eval_grad, eval_fisher)
+        theta, improvement = optimize_offline(eval_param, set_param, eval_bound, eval_grad, eval_fisher, compute_max_weight)
         set_param(theta)
         assign_old_eq_new()
 
