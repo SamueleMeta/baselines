@@ -298,6 +298,12 @@ def learn(env, policy_fn, *,
         #lenbuffer.extend(lens)
         #rewbuffer.extend(rews)
 
+        #Renyi
+        """
+        renyi = pi.eval_renyi(states, oldpi, 4)
+        print('Renyi:', renyi)
+        #"""
+
         #Use this to print policy params:
         """
         print(pi.eval_param())

@@ -55,11 +55,11 @@ class MlpPolicy(object):
                                                       name='fc%i'%(i+1),
                                                       kernel_initializer=U.normc_initializer(1.0),use_bias=use_bias))
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
-                mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
+                self.mean = mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
                                        name='final',
                                        kernel_initializer=U.normc_initializer(0.01),
                                        use_bias=use_bias)
-                logstd = tf.get_variable(name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=tf.zeros_initializer())
+                self.logstd = logstd = tf.get_variable(name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=tf.zeros_initializer())
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
                 pdparam = tf.layers.dense(last_out, pdtype.param_shape()[0],
@@ -99,7 +99,9 @@ class MlpPolicy(object):
       
         #Performance graph initializations
         self._batch_size = -1
-    
+        
+        
+
     #Acting    
     def act(self, stochastic, ob):
         """
@@ -112,6 +114,31 @@ class MlpPolicy(object):
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
 
+
+    #Divergence
+    def eval_renyi(self, states, other, order=2):
+        """Exponentiated Renyi divergence exp(Renyi(self, other)) for each state
+        
+        Params:
+            states: flat list of states
+            other: other policy
+            order: order \alpha of the divergence
+        """
+        if order<2:
+            raise NotImplementedError('Only order>=2 is currently supported')
+        to_check = order/tf.exp(self.logstd) + (1 - order)/tf.exp(other.logstd)
+        if not all(U.function([self.ob],[to_check])(states)[0] > 0):
+            raise ValueError('Conditions on standard deviations are not met')
+        detSigma = tf.exp(tf.reduce_sum(self.logstd))
+        detOtherSigma = tf.exp(tf.reduce_sum(other.logstd))
+        mixSigma = order*tf.exp(self.logstd) + (1 - order) * tf.exp(other.logstd)
+        detMixSigma = tf.reduce_prod(mixSigma)
+        renyi = order/2 * (self.mean - other.mean)/mixSigma*(self.mean - other.mean) - \
+            1./(2*(order - 1))*(tf.log(detMixSigma) - (1-order)*tf.log(detSigma) - order*tf.log(detOtherSigma))
+        e_renyi = tf.exp(renyi)
+        fun = U.function([self.ob],[e_renyi])
+        return fun(states)[0]
+        
     
     #Performance evaluation
     def eval_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):        
