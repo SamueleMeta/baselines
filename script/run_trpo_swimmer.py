@@ -10,13 +10,12 @@ from baselines import logger
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines import bench
 from baselines.trpo_mpi import trpo_mpi
-import baselines.envs.continuous_cartpole
 
-BATCH_SIZE = 20 # MINIMUM batch size (actual batch size in case of fixed horizon)
-HORIZON = 100 # MAXIMUM horizon
-ITERATIONS = 100
-TASK = 'ContCartPole-v0'
-SEEDS = [0, 1, 2, 3, 4]
+BATCH_SIZE = 100 # MINIMUM batch size (actual batch size in case of fixed horizon)
+HORIZON = 500 # MAXIMUM horizon
+ITERATIONS = 500
+TASK = 'Swimmer-v2'
+SEED = 0
 
 def train(env_id, num_timesteps, seed):
     import baselines.common.tf_util as U
@@ -31,7 +30,7 @@ def train(env_id, num_timesteps, seed):
     env = gym.make(env_id)
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-            hid_size=2, num_hid_layers=2,gaussian_fixed_var=True,use_bias=True)
+            hid_size=64, num_hid_layers=2,gaussian_fixed_var=True,use_bias=True)
     env = bench.Monitor(env, logger.get_dir() and
         osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)
@@ -42,17 +41,16 @@ def train(env_id, num_timesteps, seed):
         max_timesteps=num_timesteps, gamma=.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3)
     env.close()
 
-def main(index=0):
+def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--env', help='environment ID', default=TASK)
-    parser.add_argument('--seed', help='RNG seed', type=int,
-                        default=SEEDS[index])
+    parser.add_argument('--seed', help='RNG seed', type=int, default=SEED)
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()
-    logger.configure(dir='./run_'+str(index),format_strs=['stdout','csv'])
+    logger.configure(dir='.',format_strs=['stdout','csv'])
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
 if __name__ == '__main__':
-    [main(i) for i in range(1)]
+    main()

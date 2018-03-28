@@ -7,7 +7,7 @@ import numpy as np
 import scipy.stats as sts
 #import time
 
-class MlpPolicy(object):
+class PeMlpPolicy(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""
     recurrent = False
     def __init__(self, name, *args, **kwargs):
@@ -17,30 +17,34 @@ class MlpPolicy(object):
             self.scope = tf.get_variable_scope().name
             U.initialize()
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True, use_critic=True, seed=None):
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
+              deterministic=True, diagonal=True,
+              use_bias=True, use_critic=False, seed=None):
         """Params:
             ob_space: task observation space
             ac_space : task action space
-            hid_size: width of hidden layers
-            num_hid_layers: depth
-            gaussian_fixed_var: True->separate parameter for logstd, False->two-headed mlp
+            hid_size: width of hidden layers of action policy networks
+            num_hid_layers: depth of action policy networks
+            deterministic: whether the actor is deterministic
+            diagonal: whether the higher order policy has a diagonal covariance
+            matrix
             use_bias: whether to include bias in neurons
+            use_critic: whether to include a critic network
+            seed: optional random seed
         """
         assert isinstance(ob_space, gym.spaces.Box)
 
         if seed is not None:
             tf.set_random_seed(seed)
 
-        self.pdtype = pdtype = make_pdtype(ac_space)
-        sequence_length = None
-        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[sequence_length] + list(ob_space.shape))
+        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=list(ob_space.shape))
 
         with tf.variable_scope("obfilter"):
             self.ob_rms = RunningMeanStd(shape=ob_space.shape)
 
         #Critic
         if use_critic:
-            with tf.variable_scope('vf'):
+            with tf.variable_scope('critic'):
                 obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
                 last_out = obz
                 for i in range(num_hid_layers):
@@ -48,61 +52,38 @@ class MlpPolicy(object):
                 self.vpred = tf.layers.dense(last_out, 1, name='final', kernel_initializer=U.normc_initializer(1.0))[:,0]
 
         #Actor
-        with tf.variable_scope('pol'):
+        with tf.variable_scope('actor'):
             last_out = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
             for i in range(num_hid_layers):
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
                                                       name='fc%i'%(i+1),
                                                       kernel_initializer=U.normc_initializer(1.0),use_bias=use_bias))
-            if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
+            if deterministic and isinstance(ac_space, gym.spaces.Box):
                 self.mean = mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
                                        name='final',
                                        kernel_initializer=U.normc_initializer(0.01),
                                        use_bias=use_bias)
-                self.logstd = logstd = tf.get_variable(name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=tf.zeros_initializer())
-                pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
-            else:
-                pdparam = tf.layers.dense(last_out, pdtype.param_shape()[0],
-                                          name='final',
-                                          kernel_initializer=U.normc_initializer(0.01))
+            else: 
+                raise NotImplementedError #Currently supports only deterministic action policies
 
-        #Acting
-        self.pd = pdtype.pdfromflat(pdparam)
-        self.state_in = []
-        self.state_out = []
-        stochastic = tf.placeholder(dtype=tf.bool, shape=())
-        ac = U.switch(stochastic, self.pd.sample(), self.pd.mode())
-        if use_critic:
-            self._act = U.function([stochastic, ob], [ac, self.vpred])
-        else:
-            self._act = U.function([stochastic, ob], [ac, tf.zeros(1)])
-
-        #Evaluating
-        self.ob = ob
-        self.ac_in = U.get_placeholder(name="ac_in", dtype=tf.float32,
-                                       shape=[sequence_length] +
-                                       list(ac_space.shape))
-        self.gamma = U.get_placeholder(name="gamma",
-                                        dtype=tf.float32,shape=[])
-        self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
-                                       shape=[sequence_length]+[1])
-        self.logprobs = self.pd.logp(self.ac_in) #  [\log\pi(a|s)]
-        
-        #Fisher
-        with tf.variable_scope('pol') as vs:
-            self.weights = weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+        #Higher order policy
+        with tf.variable_scope('actor'):
+            self.actor_weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
-        self.flat_weights = flat_weights = tf.concat([tf.reshape(w, [-1]) for w in weights], axis=0)
-        self.n_weights = flat_weights.shape[0].value
-        self.score = score = U.flatgrad(self.logprobs, weights) # \nabla\log p(\tau)
-        self.fisher = tf.einsum('i,j->ij', score, score)        
-      
-        #Performance graph initializations
-        self._batch_size = None
-        self._horizon = None
-        self._behavioral = None
-        self._per_decision = None
-        self._delta = None
+            self.flat_actor_weights = tf.concat([tf.reshape(w, [-1]) for w in \
+                                            self.actor_weights], axis=0) #flatten
+            self.n_actor_weights = len(self.flat_actor_weights)
+
+        with tf.variable_scope('higher'):
+            self.higher_mean = tf.get_variable(name='higher_mean',
+                                               shape=[self.n_actor_weights],
+                                               initializer=U.normc_initializer(1.0))
+            if diagonal:
+                self.higher_var = tf.get_variable(name='higher_var',
+                                               shape=[self.n_actor_weights],
+                                               initializer=U.normc_initializer(1.0))
+            else: 
+                raise NotImplementedError #Currently supports only diagonal higher order policies
         
 
     #Acting    
@@ -194,12 +175,6 @@ class MlpPolicy(object):
         
         #Evaluate performance stats
         result = self._get_var_J(_states, _actions, _rewards, gamma, _mask)[0]
-        return np.asscalar(result)
-
-    def eval_max_iw(self, states, actions, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):
-        batch_size, horizon, _states, _actions, _mask = self._prepare_data(states, actions, None, lens_or_batch_size, horizon)
-        self._build(batch_size, horizon, behavioral, per_decision)
-        result = self._get_max_iw(_states, _actions, gamma, _mask)[0]
         return np.asscalar(result)
 
     def eval_grad_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):
@@ -343,15 +318,10 @@ class MlpPolicy(object):
         return tuple(resized)
 
     def _build(self, batch_size, horizon, behavioral, per_decision, delta=.2):
-        if batch_size!=self._batch_size or horizon!=self._horizon or behavioral is not self._behavioral or \
-                per_decision!=self._per_decision or delta!=self._delta:
+        if batch_size!=self._batch_size or horizon!=self._horizon:
             #checkpoint = time.time()
             self._batch_size = batch_size
             self._horizon = horizon
-            self._behavioral = behavioral
-            self._per_decision = per_decision
-            self._delta = delta
-            
             self.mask = tf.placeholder(name="mask", dtype=tf.float32, shape=[batch_size*horizon, 1])
             rews_by_episode = tf.split(self.rew, batch_size)
             rews_by_episode = tf.stack(rews_by_episode)
@@ -365,7 +335,6 @@ class MlpPolicy(object):
                 grad_var_J = tf.constant(0)    
                 bound = avg_J - sts.t.ppf(1 - delta, batch_size - 1) / np.sqrt(batch_size) * tf.sqrt(var_J)
                 grad_bound = tf.constant(0)
-                max_iw = tf.constant(1)
             else:
                 log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
                 log_ratios = tf.expand_dims(log_ratios, axis=1)
@@ -380,7 +349,6 @@ class MlpPolicy(object):
                     iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
                     rets = tf.reduce_sum(disc_rews, axis=1)
                     weighted_rets = tf.multiply(rets, iw)
-                max_iw = tf.reduce_max(iw)
                 
                 avg_J, var_J = tf.nn.moments(weighted_rets, axes=[0])
                 grad_avg_J = U.flatgrad(avg_J, self.get_param())
@@ -397,7 +365,6 @@ class MlpPolicy(object):
             self._get_bound = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [bound])
             self._get_bound_grad = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [grad_bound])
             self._get_all = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J, var_J, grad_avg_J, grad_var_J])
-            self._get_max_iw = U.function([self.ob, self.ac_in, self.gamma, self.mask], [max_iw])
             #print('Recompile time:', time.time() - checkpoint)
 
 

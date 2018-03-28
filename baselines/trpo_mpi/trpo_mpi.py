@@ -299,10 +299,18 @@ def learn(env, policy_fn, *,
         #rewbuffer.extend(rews)
 
         #Renyi
-        """
-        renyi = pi.eval_renyi(states, oldpi, 4)
-        print('Renyi:', renyi)
         #"""
+        renyi_4 = np.max(pi.eval_renyi(states, oldpi, 4))
+        #print('Renyi:', renyi)
+        #"""
+        
+        #Max importance weight
+        max_iw = pi.eval_max_iw(states, 
+                               actions,
+                               lens,
+                               behavioral=oldpi,
+                               per_decision=True,
+                               gamma=gamma)
 
         #Use this to print policy params:
         """
@@ -313,6 +321,8 @@ def learn(env, policy_fn, *,
         
         #Performance
         #"""
+        bound_delta = .2
+        batch_size = len(lens)
         J = pi.eval_J(states,
                       actions,
                       rewards,
@@ -328,6 +338,7 @@ def learn(env, policy_fn, *,
                       behavioral=oldpi,
                       per_decision=True,
                       gamma=gamma)
+        bound = J - np.sqrt((2./bound_delta-1)/batch_size * var_J)
         #print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))    
         #"""
         
@@ -386,6 +397,10 @@ def learn(env, policy_fn, *,
         #"""
         
         #Logging
+        logger.record_tabular("Step_size", stepsize)
+        logger.record_tabular("Our_bound", bound)
+        logger.record_tabular("Reny_4", renyi_4)
+        logger.record_tabular("Max_iw", max_iw)
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("DiscEpRewMean", np.mean(disc_rews))
         logger.record_tabular("EpRewMean", np.mean(rews))
