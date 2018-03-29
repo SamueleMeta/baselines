@@ -8,22 +8,25 @@ delta = .05
 avg_return = []
 bound = []
 var = []
-with open('../results/trpo/cheetah/progress.csv') as fp:
+max_iw = []
+d_4 = []
+kl = []
+with open('../results/trpo/mlp/progress.csv') as fp:
     reader = csv.DictReader(fp)
     for row in  reader:
-        avg_return.append(float(row['EpRewMean']))
-        J_hat = float(row['J_hat'])
-        var_J = float(row['Var_J'])
-        batch_size = int(float(row['EpLenMean']))
-        b = J_hat - sts.t.ppf(1-delta, batch_size -1) * \
-                     np.sqrt(var_J/batch_size)
-        bound.append(min(b, 4000))
+        kl.append(min(np.infty, float(row['meankl'])))
+        avg_return.append(min(100,float(row['J_hat'])))
+        bound.append(float(row['Our_bound']))
+        var.append(min(1e6,float(row['Var_J'])))
+        max_iw.append(min(np.infty, float(row['Max_iw'])))
+        d_4.append(min(np.infty, float(row['Reny_4'])))
+iterations = len(avg_return)
 
-"""
-for x in range(len(avg_return)):
-    plt.axvline(x, color='y')
-"""
-plt.plot(range(len(avg_return)),avg_return)
-plt.plot(range(len(bound)), bound)
+plt.plot(range(iterations), kl)
+#plt.plot(range(iterations), avg_return)
+#plt.plot(range(len(bound)), np.clip(bound, -100, np.infty))
+#plt.plot(range(iterations), var)
+#plt.plot(range(iterations), max_iw)
+#plt.plot(range(iterations), d_4)
 plt.show()
 

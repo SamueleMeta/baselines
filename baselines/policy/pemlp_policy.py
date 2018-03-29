@@ -2,13 +2,13 @@ from baselines.common.mpi_running_mean_std import RunningMeanStd
 import baselines.common.tf_util as U
 import tensorflow as tf
 import gym
-from baselines.common.distributions import make_pdtype
+from baselines.common.distributions import DiagGaussianPdType
 import numpy as np
 import scipy.stats as sts
 #import time
 
 class PeMlpPolicy(object):
-    """Gaussian policy with critic, based on multi-layer perceptron"""
+    """Multi-layer-perceptron policy with Gaussian parameter-based exploration"""
     recurrent = False
     def __init__(self, name, *args, **kwargs):
         #with tf.device('/cpu:0'):
@@ -16,6 +16,7 @@ class PeMlpPolicy(object):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
             U.initialize()
+            tf.get_default_session().run(self._use_sampled_actor_params)
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
               deterministic=True, diagonal=True,
@@ -33,11 +34,12 @@ class PeMlpPolicy(object):
             seed: optional random seed
         """
         assert isinstance(ob_space, gym.spaces.Box)
+        assert len(ac_space.shape)==1
 
         if seed is not None:
             tf.set_random_seed(seed)
 
-        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=list(ob_space.shape))
+        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[None] + list(ob_space.shape))
 
         with tf.variable_scope("obfilter"):
             self.ob_rms = RunningMeanStd(shape=ob_space.shape)
@@ -59,7 +61,7 @@ class PeMlpPolicy(object):
                                                       name='fc%i'%(i+1),
                                                       kernel_initializer=U.normc_initializer(1.0),use_bias=use_bias))
             if deterministic and isinstance(ac_space, gym.spaces.Box):
-                self.mean = mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
+                self.actor_mean = actor_mean = tf.layers.dense(last_out, ac_space.shape[0],
                                        name='final',
                                        kernel_initializer=U.normc_initializer(0.01),
                                        use_bias=use_bias)
@@ -67,43 +69,109 @@ class PeMlpPolicy(object):
                 raise NotImplementedError #Currently supports only deterministic action policies
 
         #Higher order policy
-        with tf.variable_scope('actor'):
+        with tf.variable_scope('actor') as scope:
             self.actor_weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
-                                         scope=vs.name)
+                                         scope=scope.name)
             self.flat_actor_weights = tf.concat([tf.reshape(w, [-1]) for w in \
                                             self.actor_weights], axis=0) #flatten
-            self.n_actor_weights = len(self.flat_actor_weights)
+            self.n_actor_weights = n_actor_weights = self.flat_actor_weights.shape[0]
 
         with tf.variable_scope('higher'):
-            self.higher_mean = tf.get_variable(name='higher_mean',
+            self.higher_mean = higher_mean = tf.get_variable(name='higher_mean',
                                                shape=[self.n_actor_weights],
-                                               initializer=U.normc_initializer(1.0))
+                                               initializer=tf.initializers.random_normal(stddev=1.))
             if diagonal:
-                self.higher_var = tf.get_variable(name='higher_var',
+                self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
                                                shape=[self.n_actor_weights],
-                                               initializer=U.normc_initializer(1.0))
+                                               initializer=tf.initializers.random_normal(stddev=1.))
             else: 
                 raise NotImplementedError #Currently supports only diagonal higher order policies
         
+        #Sample actor weights
+        pdparam = tf.concat([higher_mean, higher_mean * 0. + \
+                               higher_logstd], axis=0)
+        self.pdtype = pdtype = DiagGaussianPdType(2 * n_actor_weights.value) 
+        self.pd = pdtype.pdfromflat(pdparam)
+        sampled_actor_params = self.pd.sample()
+        self._sample_actor_params = U.function([], [sampled_actor_params])
+            
+        #Assign actor weights
+        with tf.variable_scope('actor') as scope:
+            actor_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=scope.name)
 
-    #Acting    
-    def act(self, stochastic, ob):
+            self._use_sampled_actor_params = U.assignFromFlat(actor_params,
+                                                         sampled_actor_params)
+            self.custom_actor_params = tf.placeholder(dtype=tf.float32,
+                                                 shape=sampled_actor_params.shape, 
+                                                 name='custom_actor_params')
+            self._use_custom_actor_params = U.assignFromFlat(actor_params,
+                                                             self.custom_actor_params)
+
+        #Act
+        action = actor_mean
+        self._act = U.function([ob],[action])
+
+
+    #Black box usage
+    def act(self, ob, resample=False):
         """
-        Actions sampled from the policy
+        Sample weights for the actor network, then sample action(s) from the 
+        resulting actor depending on state(s)
            
         Params:
-               stochastic: use noise
-               ob: current state
+               ob: current state, or a list of states
+               resample: whether to resample actor params before acting
         """
-        ac1, vpred1 =  self._act(stochastic, ob[None])
-        return ac1[0], vpred1[0]
+        if resample and custom_actor_params is None:
+            tf.get_default_session().run(self._use_sampled_actor_params)
+        else:
+            tf.get_default_session().run(self._use_custom_actor_params,
+                feed_dict={self.custom_actor_params : custom_actor_params})
+            
+        action =  self._act(np.atleast_2d(ob))[0]
+        return action
+    
+    def eval_higher_params(self):
+        """Get current params of the higher order policy"""
+        with tf.variable_scope(self.scope+'/higher') as scope:
+            higher_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=scope.name)
+        return U.GetFlat(higher_params)()    
 
+    def set_higher_params(self, new_higher_params):
+        """Set higher order policy parameters from flat sequence"""
+        with tf.variable_scope(self.scope+'/higher') as scope:
+            higher_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=scope.name)
+            U.SetFromFlat(higher_params)(new_higher_params)
 
+    #Direct actor policy manipulation
+    def sample_actor_params(self):
+        """Sample params for an actor (without using them)"""
+        sampled_actor_params = self._sample_actor_params()[0]
+        return sampled_actor_params
+
+    def eval_actor_params(self):
+        """Get actor params as last assigned"""
+        with tf.variable_scope(self.scope+'/actor') as scope:
+            actor_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=scope.name)
+        return U.GetFlat(actor_params)()    
+
+    def set_actor_params(self, new_actor_params):
+        """Manually set actor policy parameters from flat sequence"""
+        with tf.variable_scope(self.scope+'/actor') as scope:
+            actor_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=scope.name)
+            U.SetFromFlat(actor_params)(new_actor_params)
+
+'''
     #Divergence
     def eval_renyi(self, states, other, order=2):
         """Exponentiated Renyi divergence exp(Renyi(self, other)) for each state
-        
-        Params:
+    
+    Params:
             states: flat list of states
             other: other policy
             order: order \alpha of the divergence
@@ -423,12 +491,4 @@ class PeMlpPolicy(object):
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
             U.SetFromFlat(var_list)(param)
-
-
-    #Used by original implementation
-    def get_variables(self):
-        return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
-    def get_trainable_variables(self):
-        return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)
-    def get_initial_state(self):
-        return []
+'''

@@ -130,7 +130,7 @@ class MlpPolicy(object):
         if order<2:
             raise NotImplementedError('Only order>=2 is currently supported')
         to_check = order/tf.exp(self.logstd) + (1 - order)/tf.exp(other.logstd)
-        if not (U.function([self.ob],[to_check])(states)[0] > 0).all():
+        if not all(U.function([self.ob],[to_check])(states)[0] > 0):
             raise ValueError('Conditions on standard deviations are not met')
         detSigma = tf.exp(tf.reduce_sum(self.logstd))
         detOtherSigma = tf.exp(tf.reduce_sum(other.logstd))
@@ -438,6 +438,7 @@ class MlpPolicy(object):
         with tf.variable_scope(self.scope+'/pol') as vs:
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
+        logstd = tf.get_default_session().run(self.logstd)
         return U.GetFlat(var_list)()    
     
     def get_param(self):

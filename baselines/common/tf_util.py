@@ -220,6 +220,18 @@ def flatgrad(loss, var_list, clip_norm=None, grad_ys=None, aggregation_method=No
         for (v, grad) in zip(var_list, grads)
     ])
 
+def assignFromFlat(var_list, values):
+    assigns = []
+    shapes = list(map(var_shape, var_list))
+   
+    start = 0
+    assigns = []
+    for (shape, v) in zip(shapes, var_list):
+        size = intprod(shape)
+        assigns.append(tf.assign(v, tf.reshape(values[start:start + size], shape)))
+        start += size
+    return tf.group(*assigns)
+
 class SetFromFlat(object):
     def __init__(self, var_list, dtype=tf.float32):
         assigns = []

@@ -196,6 +196,7 @@ def learn(env, policy_fn, *,
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0])==1
 
+    
     while True:
         if callback: callback(locals(), globals())
         if max_timesteps and timesteps_so_far >= max_timesteps:
@@ -209,6 +210,14 @@ def learn(env, policy_fn, *,
         with timed("sampling"):
             seg = seg_gen.__next__()
         add_vtarg_and_adv(seg, gamma, lam)
+
+        
+        #Params
+        #"""
+        params = pi.eval_param()
+        #print(params)
+        np.save('../results/trpo/weights_'+str(iters_so_far), params)
+        #"""
 
         # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
         ob, ac, atarg, tdlamret = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
@@ -312,13 +321,6 @@ def learn(env, policy_fn, *,
                                per_decision=True,
                                gamma=gamma)
 
-        #Use this to print policy params:
-        """
-        print(pi.eval_param())
-
-        J_hat
-        #"""
-        
         #Performance
         #"""
         bound_delta = .2
