@@ -50,7 +50,7 @@ def main(index=0):
                         default=SEEDS[index])
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()
-    logger.configure(dir='./run_'+str(index),format_strs=['stdout','csv'])
+    logger.configure(dir='../results/trpo/mlp/30_3_0/unbiased',format_strs=['stdout','csv'])
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

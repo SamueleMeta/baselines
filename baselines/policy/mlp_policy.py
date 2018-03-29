@@ -130,7 +130,7 @@ class MlpPolicy(object):
         if order<2:
             raise NotImplementedError('Only order>=2 is currently supported')
         to_check = order/tf.exp(self.logstd) + (1 - order)/tf.exp(other.logstd)
-        if not all(U.function([self.ob],[to_check])(states)[0] > 0):
+        if not (U.function([self.ob],[to_check])(states)[0] > 0).all():
             raise ValueError('Conditions on standard deviations are not met')
         detSigma = tf.exp(tf.reduce_sum(self.logstd))
         detOtherSigma = tf.exp(tf.reduce_sum(other.logstd))
@@ -144,7 +144,8 @@ class MlpPolicy(object):
         
     
     #Performance evaluation
-    def eval_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):        
+    def eval_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, behavioral=None, per_decision=False, 
+                   normalize=False, truncate_at=np.infty):        
         """
         Performance evaluation, possibly off-policy
         
@@ -164,13 +165,14 @@ class MlpPolicy(object):
         
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
         
         #Evaluate performance stats
         result = self._get_avg_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.asscalar(result)
 
-    def eval_var_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):        
+    def eval_var_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None,  gamma=.99, 
+                   behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):        
         """
         Performance variance evaluation, possibly off-policy
         
@@ -190,19 +192,28 @@ class MlpPolicy(object):
         
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
         
         #Evaluate performance stats
         result = self._get_var_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.asscalar(result)
 
-    def eval_max_iw(self, states, actions, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):
+    def eval_iw_stats(self, states, actions, lens_or_batch_size=1, horizon=None, gamma=.99,
+                      behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):
         batch_size, horizon, _states, _actions, _mask = self._prepare_data(states, actions, None, lens_or_batch_size, horizon)
-        self._build(batch_size, horizon, behavioral, per_decision)
-        result = self._get_max_iw(_states, _actions, gamma, _mask)[0]
-        return np.asscalar(result)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
+        results = self._get_iw_stats(_states, _actions, gamma, _mask)
+        return tuple(map(np.asscalar, results))
 
-    def eval_grad_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):
+    def eval_ret_stats(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
+                       behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):
+        batch_size, horizon, _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
+        results = self._get_ret_stats(_states, _actions, _rewards, gamma, _mask)
+        return tuple(map(np.asscalar, results))
+
+    def eval_grad_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
+                    behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):
         """
         Gradients of performance 
         
@@ -222,13 +233,14 @@ class MlpPolicy(object):
         
         #Build performance evaluation graph (lazy)
         assert batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
         
         #Evaluate gradients
         result = self._get_grad_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.ravel(result)
 
-    def eval_grad_var_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99):
+    def eval_grad_var_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
+                        behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):
         """
         Gradients of performance stats
         
@@ -248,13 +260,14 @@ class MlpPolicy(object):
         
         #Build performance evaluation graph (lazy)
         assert batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
         
         #Evaluate gradients
         result = self._get_grad_var_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.ravel(result)
 
-    def eval_bound(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99, delta=.2):
+    def eval_bound(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
+                   behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty, delta=0.2):
         """
         Student-t bound on performance
         
@@ -272,12 +285,13 @@ class MlpPolicy(object):
         
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision, delta)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at, delta)
         
         #Evaluate bound
         return np.asscalar(self._get_bound(_states, _actions, _rewards, gamma, _mask)[0])
         
-    def eval_bound_grad(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99, delta=.2):
+    def eval_bound_grad(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, 
+                        behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty, delta=.2):
         """
         Gradient of student-t bound
         
@@ -295,7 +309,7 @@ class MlpPolicy(object):
         
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision, delta)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at, delta)
         
         #Evaluate gradient
         return np.ravel(self._get_bound_grad(_states, _actions, _rewards, gamma, _mask)[0])
@@ -342,7 +356,7 @@ class MlpPolicy(object):
             resized.append(v)
         return tuple(resized)
 
-    def _build(self, batch_size, horizon, behavioral, per_decision, delta=.2):
+    def _build(self, batch_size, horizon, behavioral, per_decision, normalize=False, truncate_at=np.infty, delta=.2):
         if batch_size!=self._batch_size or horizon!=self._horizon or behavioral is not self._behavioral or \
                 per_decision!=self._per_decision or delta!=self._delta:
             #checkpoint = time.time()
@@ -374,19 +388,32 @@ class MlpPolicy(object):
                 log_ratios_by_episode = tf.stack(log_ratios_by_episode)
                 if per_decision:
                     iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
-                    #iw = tf.expand_dims(iw,axis=2)
+                    if normalize:
+                        iw = iw/tf.reduce_sum(iw, axis=0)
+                    iw = tf.clip_by_value(iw, 0, truncate_at)
+                    avg_iw, var_iw = tf.nn.moments(iw, axes=[1])
+                    avg_iw = tf.reduce_mean(avg_iw)
+                    var_iw = tf.reduce_mean(var_iw)
                     weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw), axis=1)
                 else:
                     iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
+                    if normalize:
+                        iw = iw/tf.reduce_sum(iw, axis=0)
+                    iw = tf.clip_by_value(iw, 0, truncate_at)
                     rets = tf.reduce_sum(disc_rews, axis=1)
                     weighted_rets = tf.multiply(rets, iw)
+                    avg_iw, var_iw = tf.nn.moments(iw, axes=[0])
                 max_iw = tf.reduce_max(iw)
+                
                 
                 avg_J, var_J = tf.nn.moments(weighted_rets, axes=[0])
                 grad_avg_J = U.flatgrad(avg_J, self.get_param())
                 grad_var_J = U.flatgrad(var_J, self.get_param())
                 bound = avg_J - sts.t.ppf(1 - delta, batch_size - 1) / np.sqrt(batch_size) * tf.sqrt(var_J)
                 grad_bound = U.flatgrad(bound, self.get_param())
+            
+                avg_ret, var_ret = tf.nn.moments(tf.reduce_sum(disc_rews, axis=1), axes=[0])
+                max_ret = tf.reduce_max(tf.reduce_sum(disc_rews, axis=1))
             
             self._get_avg_J = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J])
             self._get_var_J = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [var_J])
@@ -397,7 +424,8 @@ class MlpPolicy(object):
             self._get_bound = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [bound])
             self._get_bound_grad = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [grad_bound])
             self._get_all = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J, var_J, grad_avg_J, grad_var_J])
-            self._get_max_iw = U.function([self.ob, self.ac_in, self.gamma, self.mask], [max_iw])
+            self._get_iw_stats = U.function([self.ob, self.ac_in, self.gamma, self.mask], [avg_iw, var_iw, max_iw])
+            self._get_ret_stats = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_ret, var_ret, max_ret])
             #print('Recompile time:', time.time() - checkpoint)
 
 

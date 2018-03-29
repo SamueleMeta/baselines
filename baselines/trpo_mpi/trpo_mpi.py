@@ -216,7 +216,7 @@ def learn(env, policy_fn, *,
         #"""
         params = pi.eval_param()
         #print(params)
-        np.save('../results/trpo/weights_'+str(iters_so_far), params)
+        np.save('../results/trpo/mlp/30_3_0/unbiased/weights_'+str(iters_so_far), params)
         #"""
 
         # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
@@ -306,6 +306,11 @@ def learn(env, policy_fn, *,
         
         #lenbuffer.extend(lens)
         #rewbuffer.extend(rews)
+        
+        #Importance weighting variants
+        per_decision = False
+        normalize = False
+        truncate_at = np.infty
 
         #Renyi
         #"""
@@ -313,13 +318,27 @@ def learn(env, policy_fn, *,
         #print('Renyi:', renyi)
         #"""
         
-        #Max importance weight
-        max_iw = pi.eval_max_iw(states, 
+        #Importance weights stats
+        avg_iw, var_iw, max_iw = pi.eval_iw_stats(states, 
                                actions,
                                lens,
+                               gamma=gamma,
                                behavioral=oldpi,
-                               per_decision=True,
-                               gamma=gamma)
+                               per_decision=per_decision,
+                               normalize=normalize,
+                               truncate_at=truncate_at)
+
+        #Returns stats
+        avg_ret, var_ret, max_ret = pi.eval_ret_stats(states, 
+                               actions,
+                               rewards,
+                               lens,
+                               gamma=gamma,
+                               behavioral=oldpi,
+                               per_decision=per_decision,
+                               normalize=normalize,
+                               truncate_at=truncate_at)
+
 
         #Performance
         #"""
@@ -329,17 +348,22 @@ def learn(env, policy_fn, *,
                       actions,
                       rewards,
                       lens,
+                      gamma=gamma,
                       behavioral=oldpi,
-                      per_decision=True,
-                      gamma=gamma)
+                      per_decision=per_decision,
+                      normalize=normalize,
+                      truncate_at=truncate_at)
         
         var_J = pi.eval_var_J(states,
                       actions,
                       rewards,
                       lens,
+                      gamma=gamma,
                       behavioral=oldpi,
-                      per_decision=True,
-                      gamma=gamma)
+                      per_decision=per_decision,
+                      normalize=normalize,
+                      truncate_at=truncate_at)
+        
         bound = J - np.sqrt((2./bound_delta-1)/batch_size * var_J)
         #print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))    
         #"""
@@ -403,6 +427,11 @@ def learn(env, policy_fn, *,
         logger.record_tabular("Our_bound", bound)
         logger.record_tabular("Reny_4", renyi_4)
         logger.record_tabular("Max_iw", max_iw)
+        logger.record_tabular("Avg_iw", avg_iw)
+        logger.record_tabular("Var_iw", var_iw)
+        logger.record_tabular("Max_ret", max_ret)
+        logger.record_tabular("Avg_ret", avg_ret)
+        logger.record_tabular("Var_ret", var_ret)
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("DiscEpRewMean", np.mean(disc_rews))
         logger.record_tabular("EpRewMean", np.mean(rews))
