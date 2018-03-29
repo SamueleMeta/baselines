@@ -130,7 +130,7 @@ class MlpPolicy(object):
         if order<2:
             raise NotImplementedError('Only order>=2 is currently supported')
         to_check = order/tf.exp(self.logstd) + (1 - order)/tf.exp(other.logstd)
-        if not all(U.function([self.ob],[to_check])(states)[0] > 0):
+        if not (U.function([self.ob],[to_check])(states)[0] > 0).all():
             raise ValueError('Conditions on standard deviations are not met')
         detSigma = tf.exp(tf.reduce_sum(self.logstd))
         detOtherSigma = tf.exp(tf.reduce_sum(other.logstd))
