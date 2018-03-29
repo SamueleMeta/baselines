@@ -98,7 +98,8 @@ def learn(env, policy_fn, *,
         vf_stepsize=3e-4,
         vf_iters =3,
         max_timesteps=0, max_episodes=0, max_iters=0,  # time constraint
-        callback=None
+        callback=None,
+        weights_dir='.'
         ):
     nworkers = MPI.COMM_WORLD.Get_size()
     rank = MPI.COMM_WORLD.Get_rank()
@@ -216,7 +217,7 @@ def learn(env, policy_fn, *,
         #"""
         params = pi.eval_param()
         #print(params)
-        np.save('../results/trpo/mlp/30_3_0/unbiased/weights_'+str(iters_so_far), params)
+        np.save('../results/temp/weights_'+str(iters_so_far), params)
         #"""
 
         # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
@@ -308,7 +309,7 @@ def learn(env, policy_fn, *,
         #rewbuffer.extend(rews)
         
         #Importance weighting variants
-        per_decision = False
+        per_decision = True
         normalize = False
         truncate_at = np.infty
 

@@ -15,7 +15,8 @@ BATCH_SIZE = 100 # MINIMUM batch size (actual batch size in case of fixed horizo
 HORIZON = 500 # MAXIMUM horizon
 ITERATIONS = 500
 TASK = 'Swimmer-v2'
-SEED = 0
+SEEDS = [0]
+DIR = '../results/trpo/mlp/30_3_0/unbiased'
 
 def train(env_id, num_timesteps, seed):
     import baselines.common.tf_util as U
@@ -41,11 +42,11 @@ def train(env_id, num_timesteps, seed):
         max_timesteps=num_timesteps, gamma=.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3)
     env.close()
 
-def main():
+def main(trial=0):
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--env', help='environment ID', default=TASK)
-    parser.add_argument('--seed', help='RNG seed', type=int, default=SEED)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=SEEDS[trial])
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()
     logger.configure(dir='./mlp',format_strs=['stdout','csv'])

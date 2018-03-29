@@ -17,6 +17,7 @@ HORIZON = 100 # MAXIMUM horizon
 ITERATIONS = 100
 TASK = 'ContCartPole-v0'
 SEEDS = [0, 1, 2, 3, 4]
+DIR = '../results/temp'
 
 def train(env_id, num_timesteps, seed):
     import baselines.common.tf_util as U
@@ -39,7 +40,8 @@ def train(env_id, num_timesteps, seed):
 
     trpo_mpi.learn(env, policy_fn, batch_size = BATCH_SIZE, 
                    task_horizon = HORIZON, max_kl=0.01, cg_iters=20, cg_damping=0.1,
-        max_timesteps=num_timesteps, gamma=.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3)
+        max_timesteps=num_timesteps, gamma=.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3,
+            weights_dir=DIR)
     env.close()
 
 def main(index=0):
@@ -50,7 +52,7 @@ def main(index=0):
                         default=SEEDS[index])
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()
-    logger.configure(dir='../results/trpo/mlp/30_3_0/unbiased',format_strs=['stdout','csv'])
+    logger.configure(dir=DIR,format_strs=['stdout','csv'])
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 

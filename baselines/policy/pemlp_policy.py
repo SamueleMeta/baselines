@@ -123,14 +123,14 @@ class PeMlpPolicy(object):
                ob: current state, or a list of states
                resample: whether to resample actor params before acting
         """
-        if resample and custom_actor_params is None:
+        if resample:
             tf.get_default_session().run(self._use_sampled_actor_params)
-        else:
-            tf.get_default_session().run(self._use_custom_actor_params,
-                feed_dict={self.custom_actor_params : custom_actor_params})
-            
+
         action =  self._act(np.atleast_2d(ob))[0]
         return action
+
+    def resample(self):
+
     
     def eval_higher_params(self):
         """Get current params of the higher order policy"""

@@ -389,7 +389,7 @@ class MlpPolicy(object):
                 if per_decision:
                     iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
                     if normalize:
-                        iw = iw/tf.reduce_sum(iw, axis=0)
+                        iw = batch_size*iw/tf.reduce_sum(iw, axis=0)
                     iw = tf.clip_by_value(iw, 0, truncate_at)
                     avg_iw, var_iw = tf.nn.moments(iw, axes=[1])
                     avg_iw = tf.reduce_mean(avg_iw)
@@ -398,7 +398,7 @@ class MlpPolicy(object):
                 else:
                     iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
                     if normalize:
-                        iw = iw/tf.reduce_sum(iw, axis=0)
+                        iw = batch_size*iw/tf.reduce_sum(iw, axis=0)
                     iw = tf.clip_by_value(iw, 0, truncate_at)
                     rets = tf.reduce_sum(disc_rews, axis=1)
                     weighted_rets = tf.multiply(rets, iw)
