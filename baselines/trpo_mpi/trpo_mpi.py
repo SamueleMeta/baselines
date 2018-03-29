@@ -99,7 +99,10 @@ def learn(env, policy_fn, *,
         vf_iters =3,
         max_timesteps=0, max_episodes=0, max_iters=0,  # time constraint
         callback=None,
-        weights_dir='.'
+        weights_dir='.',
+        per_decision = True,
+        normalize = False,
+        truncate_at = np.infty
         ):
     nworkers = MPI.COMM_WORLD.Get_size()
     rank = MPI.COMM_WORLD.Get_rank()
@@ -307,11 +310,6 @@ def learn(env, policy_fn, *,
         
         #lenbuffer.extend(lens)
         #rewbuffer.extend(rews)
-        
-        #Importance weighting variants
-        per_decision = True
-        normalize = False
-        truncate_at = np.infty
 
         #Renyi
         #"""
