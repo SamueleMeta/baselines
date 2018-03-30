@@ -220,7 +220,7 @@ def learn(env, policy_fn, *,
         #"""
         params = pi.eval_param()
         #print(params)
-        np.save('../results/temp/weights_'+str(iters_so_far), params)
+        np.save(weights_dir+'/weights_'+str(iters_so_far), params)
         #"""
 
         # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))

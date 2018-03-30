@@ -17,7 +17,7 @@ HORIZON = 500 # MAXIMUM horizon
 ITERATIONS = 500
 TASK = 'Swimmer-v2'
 SEEDS = [0]
-DIR = '../results/trpo/mlp/30_3_0/unbiased'
+DIR = '../results/trpo/mlp/30_3_0/truncated'
 
 def train(env_id, num_timesteps, seed):
     import baselines.common.tf_util as U
@@ -41,7 +41,7 @@ def train(env_id, num_timesteps, seed):
     trpo_mpi.learn(env, policy_fn, batch_size = BATCH_SIZE, 
                    task_horizon = HORIZON, max_kl=0.01, cg_iters=20, cg_damping=0.1,
         max_timesteps=num_timesteps, gamma=.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3,
-        weights_dir=DIR, per_decision=True, normalize=False, truncate_at=np.infty)
+        weights_dir=DIR, per_decision=True, normalize=False, truncate_at=10)
     env.close()
 
 def main(trial=0):
@@ -51,7 +51,7 @@ def main(trial=0):
     parser.add_argument('--seed', help='RNG seed', type=int, default=SEEDS[trial])
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()
-    logger.configure(dir='./mlp',format_strs=['stdout','csv'])
+    logger.configure(dir=DIR,format_strs=['stdout','csv'])
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
 
 
