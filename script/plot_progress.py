@@ -29,4 +29,3 @@ plt.plot(range(iterations), kl)
 #plt.plot(range(iterations), max_iw)
 #plt.plot(range(iterations), d_4)
 plt.show()
-

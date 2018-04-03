@@ -318,8 +318,9 @@ def learn(env, policy_fn, *,
         #"""
         
         #Importance weights stats
-        avg_iw, var_iw, max_iw = pi.eval_iw_stats(states, 
+        avg_iw, var_iw, max_iw, ess = pi.eval_iw_stats(states, 
                                actions,
+                               rewards,
                                lens,
                                gamma=gamma,
                                behavioral=oldpi,
@@ -426,6 +427,7 @@ def learn(env, policy_fn, *,
         logger.record_tabular("Our_bound", bound)
         logger.record_tabular("Reny_4", renyi_4)
         logger.record_tabular("Max_iw", max_iw)
+        logger.record_tabular("Ess", ess)
         logger.record_tabular("Avg_iw", avg_iw)
         logger.record_tabular("Var_iw", var_iw)
         logger.record_tabular("Max_ret", max_ret)

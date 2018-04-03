@@ -42,7 +42,7 @@ def train(env_id, num_timesteps, seed):
     trpo_mpi.learn(env, policy_fn, batch_size = BATCH_SIZE, 
                    task_horizon = HORIZON, max_kl=0.01, cg_iters=20, cg_damping=0.1,
         max_timesteps=num_timesteps, gamma=.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3,
-            weights_dir=DIR, per_decision=True, normalize=False, truncate_at=np.infty)
+            weights_dir=DIR, per_decision=False, normalize=True, truncate_at=np.infty)
     env.close()
 
 def main(index=0):

@@ -112,6 +112,11 @@ class PeMlpPolicy(object):
         action = actor_mean
         self._act = U.function([ob],[action])
 
+        #Higher policy weights
+        with tf.variable_scope('higher') as scope:
+            higher_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=scope.name) 
+
 
     #Black box usage
     def act(self, ob, resample=False):
@@ -130,16 +135,20 @@ class PeMlpPolicy(object):
         return action
 
     def resample(self):
+        """Resample actor params
+        
+        Returns:
+            the sampled actor params
+        """
+        tf.get_default_session().run(self._use_sampled_actor_params)
+        return U.GetFlat(higher_params)() 
 
     
-    def eval_higher_params(self):
+    def eval_params(self):
         """Get current params of the higher order policy"""
-        with tf.variable_scope(self.scope+'/higher') as scope:
-            higher_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
-                                         scope=scope.name)
-        return U.GetFlat(higher_params)()    
+        return U.GetFlat(higher_params)()
 
-    def set_higher_params(self, new_higher_params):
+    def set_params(self, new_higher_params):
         """Set higher order policy parameters from flat sequence"""
         with tf.variable_scope(self.scope+'/higher') as scope:
             higher_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
@@ -147,7 +156,7 @@ class PeMlpPolicy(object):
             U.SetFromFlat(higher_params)(new_higher_params)
 
     #Direct actor policy manipulation
-    def sample_actor_params(self):
+    def draw_actor_params(self):
         """Sample params for an actor (without using them)"""
         sampled_actor_params = self._sample_actor_params()[0]
         return sampled_actor_params
