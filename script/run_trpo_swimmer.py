@@ -17,7 +17,7 @@ HORIZON = 500 # MAXIMUM horizon
 ITERATIONS = 500
 TASK = 'Swimmer-v2'
 SEEDS = [0]
-DIR = '../results/trpo/mlp/30_3_0/truncated'
+DIR = '../results/trpo/mlp/04_04_0/self_normalized'
 
 def train(env_id, num_timesteps, seed):
     import baselines.common.tf_util as U
@@ -41,7 +41,7 @@ def train(env_id, num_timesteps, seed):
     trpo_mpi.learn(env, policy_fn, batch_size = BATCH_SIZE, 
                    task_horizon = HORIZON, max_kl=0.01, cg_iters=20, cg_damping=0.1,
         max_timesteps=num_timesteps, gamma=.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3,
-        weights_dir=DIR, per_decision=True, normalize=False, truncate_at=10)
+        weights_dir=DIR, per_decision=False, normalize=True, truncate_at=np.infty)
     env.close()
 
 def main(trial=0):
