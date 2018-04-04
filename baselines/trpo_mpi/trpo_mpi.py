@@ -364,7 +364,30 @@ def learn(env, policy_fn, *,
                       normalize=normalize,
                       truncate_at=truncate_at)
         
-        bound = J - np.sqrt((2./bound_delta-1)/batch_size * var_J)
+        bound = pi.eval_bound(states,
+                      actions,
+                      rewards,
+                      lens,
+                      gamma=gamma,
+                      behavioral=oldpi,
+                      per_decision=per_decision,
+                      normalize=normalize,
+                      truncate_at=truncate_at,
+                      delta=bound_delta,
+                      use_ess=True)
+
+        grad_bound = pi.eval_grad_bound(states,
+                      actions,
+                      rewards,
+                      lens,
+                      gamma=gamma,
+                      behavioral=oldpi,
+                      per_decision=per_decision,
+                      normalize=normalize,
+                      truncate_at=truncate_at,
+                      delta=bound_delta,
+                      use_ess=True)
+        print(grad_bound)
         #print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))    
         #"""
         

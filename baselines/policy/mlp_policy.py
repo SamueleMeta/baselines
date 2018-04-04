@@ -98,11 +98,7 @@ class MlpPolicy(object):
         self.fisher = tf.einsum('i,j->ij', score, score)        
       
         #Performance graph initializations
-        self._batch_size = None
-        self._horizon = None
-        self._behavioral = None
-        self._per_decision = None
-        self._delta = None
+        self._setting = [] 
         
 
     #Acting    
@@ -268,7 +264,8 @@ class MlpPolicy(object):
         return np.ravel(result)
 
     def eval_bound(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
-                   behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty, delta=0.2):
+                   behavioral=None, per_decision=False, normalize=False,
+                   truncate_at=np.infty, delta=0.2, use_ess=False):
         """
         Student-t bound on performance
         
@@ -283,16 +280,26 @@ class MlpPolicy(object):
         """
         #Prepare data
         batch_size, horizon, _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon)
-        
+
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at, delta)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
         
         #Evaluate bound
-        return np.asscalar(self._get_bound(_states, _actions, _rewards, gamma, _mask)[0])
-        
-    def eval_bound_grad(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, 
-                        behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty, delta=.2):
+        N = self._get_ess(_states, _actions, _rewards, gamma, _mask)[0] if use_ess else batch_size 
+        N = max(N, 2)
+        bound = self._avg_J - sts.t.ppf(1 - delta, N - 1) / np.sqrt(N) * tf.sqrt(self._var_J)
+        return np.asscalar(U.function([self.ob, self.ac_in, self.rew,
+                                       self.gamma, self.mask],[bound])(
+                                       _states,
+                                       _actions,
+                                       _rewards,
+                                       gamma,
+                                       _mask)[0])
+
+    def eval_grad_bound(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, 
+                        behavioral=None, per_decision=False, normalize=False,
+                        truncate_at=np.infty, delta=.2, use_ess=False):
         """
         Gradient of student-t bound
         
@@ -308,16 +315,26 @@ class MlpPolicy(object):
             default); ignored in case of self-normalization
             delta: 1 - confidence
         """
-        #Prepare data
+         #Prepare data
         batch_size, horizon, _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon)
         
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
-        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at, delta)
+        self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
         
-        #Evaluate gradient
-        return np.ravel(self._get_bound_grad(_states, _actions, _rewards, gamma, _mask)[0])
-    
+        #Evaluate bound gradient
+        N = self._get_ess(_states, _actions, _rewards, gamma, _mask)[0] if use_ess else batch_size 
+        N = max(N, 2) 
+        bound = self._avg_J - sts.t.ppf(1 - delta, N - 1) / np.sqrt(N) * tf.sqrt(self._var_J)
+        grad_bound = U.flatgrad(bound, self.get_param())
+        return np.ravel(U.function([self.ob, self.ac_in, self.rew,
+                                       self.gamma, self.mask],[grad_bound])(
+                                       _states,
+                                       _actions,
+                                       _rewards,
+                                       gamma,
+                                       _mask)[0])
+
     def _prepare_data(self, states, actions, rewards, lens_or_batch_size, horizon, do_pad=True, do_concat=True):
         assert len(states) > 0
         assert len(states)==len(actions)
@@ -360,34 +377,31 @@ class MlpPolicy(object):
             resized.append(v)
         return tuple(resized)
 
-    def _build(self, batch_size, horizon, behavioral, per_decision, normalize=False, truncate_at=np.infty, delta=.2):
-        if batch_size!=self._batch_size or horizon!=self._horizon or behavioral is not self._behavioral or \
-                per_decision!=self._per_decision or delta!=self._delta:
+    def _build(self, batch_size, horizon, behavioral, per_decision, normalize=False, truncate_at=np.infty):
+        if [batch_size, horizon, behavioral, per_decision, normalize,
+            truncate_at]!=self._setting:
+
             #checkpoint = time.time()
-            assert batch_size > 1
-            self._batch_size = batch_size
-            self._horizon = horizon
-            self._behavioral = behavioral
-            self._per_decision = per_decision
-            self._delta = delta
-            
+            self._setting = [batch_size, horizon, behavioral, per_decision,
+                             normalize, truncate_at]
+
             self.mask = tf.placeholder(name="mask", dtype=tf.float32, shape=[batch_size*horizon, 1])
             rews_by_episode = tf.split(self.rew, batch_size)
             rews_by_episode = tf.stack(rews_by_episode)
             disc = self.gamma + 0*rews_by_episode
             disc = tf.cumprod(disc, axis=1, exclusive=True)
             disc_rews = rews_by_episode * disc
+            rets = tf.reduce_sum(disc_rews, axis=1)
             
             if behavioral is None:
                 #On policy
                 avg_J, var_J = tf.nn.moments(tf.reduce_sum(disc_rews, axis=1), axes=[0])
                 grad_avg_J = tf.constant(0)
                 grad_var_J = tf.constant(0)    
-                bound = avg_J - sts.t.ppf(1 - delta, batch_size - 1) / np.sqrt(batch_size) * tf.sqrt(var_J)
-                grad_bound = tf.constant(0)
                 avg_iw = tf.constant(1)
                 var_iw = tf.constant(0)
                 max_iw = tf.constant(1)
+                ess = batch_size
             else:
                 #Off policy -> importance weighting :(
                 log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
@@ -403,9 +417,6 @@ class MlpPolicy(object):
                         iw = tf.clip_by_value(iw, 0, truncate_at)
                         weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw), axis=1)
                         avg_J, var_J = tf.nn.moments(weighted_rets, axes=[0])
-                        avg_iw, var_iw = tf.nn.moments(tf.reduce_sum(iw*disc,
-                                                                     axis=1), axes=[0])
-                        avg_iw = avg_iw
                     else:
                         #Per-decision, self-normalized
                         iw = batch_size*iw/tf.reduce_sum(iw, axis=0)
@@ -416,22 +427,20 @@ class MlpPolicy(object):
                                                                (rews_by_episode -
                                                                 avg_J_t)**2,
                                                                axis=0)) #Da controllare
-                        avg_iw_t = tf.reduce_mean(disc*iw, axis=0)
-                        avg_iw = tf.reduce_sum(avg_iw_t)
-                        var_iw = 1./batch_size * tf.reduce_sum(
-                                                    tf.reduce_mean(disc**2*(iw - 1)**2, axis=0))
-                    max_iw = tf.reduce_max(tf.reduce_sum(iw*disc,
-                                                         axis=1))
+                        weighted_rets = tf.reduce_sum(tf.multiply(disc_rews,iw), axis=1)
+                    eff_iw = weighted_rets/rets
+                    avg_iw, var_iw = tf.nn.moments(eff_iw, axes=[0])
+                    max_iw = tf.reduce_max(eff_iw)
                 else:
                     #Per-trajectory
                     iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
-                    rets = tf.reduce_sum(disc_rews, axis=1)
                     if not normalize:
                         #Per trajectory, unnormalized (possibly truncated)
                         iw = tf.clip_by_value(iw, 0, truncate_at)
                         weighted_rets = tf.multiply(rets, iw)
                         avg_J, var_J = tf.nn.moments(weighted_rets, axes=[0])
                         avg_iw, var_iw = tf.nn.moments(iw, axes=[0])
+                        ess = tf.round(tf.reduce_sum(iw)**2 / tf.reduce_sum(iw**2))
                     else:
                         #Per-trajectory, self-normalized
                         iw = batch_size*iw/tf.reduce_sum(iw, axis=0)
@@ -440,25 +449,28 @@ class MlpPolicy(object):
                                                     (rets - avg_J)**2)
                         avg_iw = tf.reduce_mean(iw, axis=0)
                         var_iw = 1./batch_size * tf.reduce_mean((iw - 1)**2)
+                        
+                    ess = tf.round(tf.reduce_sum(iw)**2 / tf.reduce_sum(iw**2))
                     max_iw = tf.reduce_max(iw)
                 
-                ess = tf.reduce_sum(iw)**2 / tf.reduce_sum(iw**2)
 
                 grad_avg_J = U.flatgrad(avg_J, self.get_param())
                 grad_var_J = U.flatgrad(var_J, self.get_param())
-                bound = avg_J - sts.t.ppf(1 - delta, batch_size - 1) / np.sqrt(batch_size) * tf.sqrt(var_J)
-                grad_bound = U.flatgrad(bound, self.get_param())
             
                 avg_ret, var_ret = tf.nn.moments(tf.reduce_sum(disc_rews, axis=1), axes=[0])
                 max_ret = tf.reduce_max(tf.reduce_sum(disc_rews, axis=1))
             
+            self._avg_J = avg_J
+            self._var_J = var_J
+            self._grad_avg_J = grad_avg_J
+            self._grad_var_J = grad_var_J
             self._get_avg_J = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J])
             self._get_var_J = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [var_J])
             self._get_grad_J = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [grad_avg_J])
             self._get_grad_var_J = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [grad_var_J])
-            self._get_bound = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [bound])
-            self._get_bound_grad = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [grad_bound])
             self._get_all = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_J, var_J, grad_avg_J, grad_var_J])
+            self._get_ess = U.function([self.ob, self.ac_in, self.rew,
+                                        self.gamma, self.mask], [ess])
             self._get_iw_stats = U.function([self.ob, self.ac_in, self.rew,
                                              self.gamma, self.mask], [avg_iw,
                                                                       var_iw,

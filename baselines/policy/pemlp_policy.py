@@ -20,7 +20,8 @@ class PeMlpPolicy(object):
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
               deterministic=True, diagonal=True,
-              use_bias=True, use_critic=False, seed=None):
+              use_bias=True, standardize_input=True, use_critic=False, 
+              seed=None):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -35,6 +36,7 @@ class PeMlpPolicy(object):
         """
         assert isinstance(ob_space, gym.spaces.Box)
         assert len(ac_space.shape)==1
+        batch_length = None #Accepts a sequence of episodes of arbitrary length
 
         if seed is not None:
             tf.set_random_seed(seed)
@@ -48,14 +50,15 @@ class PeMlpPolicy(object):
         if use_critic:
             with tf.variable_scope('critic'):
                 obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
-                last_out = obz
+                last_out = obz if standardize_input else ob
                 for i in range(num_hid_layers):
                     last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size, name="fc%i"%(i+1), kernel_initializer=U.normc_initializer(1.0)))
                 self.vpred = tf.layers.dense(last_out, 1, name='final', kernel_initializer=U.normc_initializer(1.0))[:,0]
 
         #Actor
         with tf.variable_scope('actor'):
-            last_out = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
+            obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
+            last_out = obz if standardize_input else ob
             for i in range(num_hid_layers):
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
                                                       name='fc%i'%(i+1),
@@ -102,11 +105,6 @@ class PeMlpPolicy(object):
 
             self._use_sampled_actor_params = U.assignFromFlat(actor_params,
                                                          sampled_actor_params)
-            self.custom_actor_params = tf.placeholder(dtype=tf.float32,
-                                                 shape=sampled_actor_params.shape, 
-                                                 name='custom_actor_params')
-            self._use_custom_actor_params = U.assignFromFlat(actor_params,
-                                                             self.custom_actor_params)
 
         #Act
         action = actor_mean
@@ -114,8 +112,21 @@ class PeMlpPolicy(object):
 
         #Higher policy weights
         with tf.variable_scope('higher') as scope:
-            higher_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+            self._higher_params = higher_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=scope.name) 
+
+        #PGPE given sampled weights
+        self._actor_params_in = actor_params_in = \
+                U.get_placeholder(name='actor_params_in',
+                                  dtype=tf.float32,
+                                  shape=[batch_length] + [n_actor_weights])
+        self._rets_in = rets_in = U.get_placeholder(name='returns_in',
+                                                  dtype=tf.float32,
+                                                  shape=[batch_length])
+        logprobs = self.pd.logp(actor_params_in)
+        pgpe_times_n = U.flatgrad(logprobs*rets_in, higher_params)
+        self._get_pgpe_times_n = U.function([actor_params_in, rets_in],
+                                            [pgpe_times_n])
 
 
     #Black box usage
@@ -129,7 +140,7 @@ class PeMlpPolicy(object):
                resample: whether to resample actor params before acting
         """
         if resample:
-            tf.get_default_session().run(self._use_sampled_actor_params)
+            self.resample()
 
         action =  self._act(np.atleast_2d(ob))[0]
         return action
@@ -141,19 +152,15 @@ class PeMlpPolicy(object):
             the sampled actor params
         """
         tf.get_default_session().run(self._use_sampled_actor_params)
-        return U.GetFlat(higher_params)() 
-
+        return self.eval_actor_params()
     
     def eval_params(self):
         """Get current params of the higher order policy"""
-        return U.GetFlat(higher_params)()
+        return U.GetFlat(self._higher_params)()
 
     def set_params(self, new_higher_params):
         """Set higher order policy parameters from flat sequence"""
-        with tf.variable_scope(self.scope+'/higher') as scope:
-            higher_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
-                                         scope=scope.name)
-            U.SetFromFlat(higher_params)(new_higher_params)
+        U.SetFromFlat(self._higher_params)(new_higher_params)
 
     #Direct actor policy manipulation
     def draw_actor_params(self):
@@ -174,6 +181,18 @@ class PeMlpPolicy(object):
             actor_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=scope.name)
             U.SetFromFlat(actor_params)(new_actor_params)
+
+    #Gradient computation
+    def eval_gradient(self, actor_params, rets):
+        """Compute PGPE policy gradient given a batch of episodes
+
+        Params:
+            actor_params: list of actor parameters (arrays), one per episode
+            rets: flat list of total [discounted] returns, one per episode
+        """
+        assert rets and len(actor_params)==len(rets)
+        pgpe_times_n = np.ravel(self._get_pgpe_times_n(actor_params, rets)[0])
+        return pgpe_times_n/len(rets)
 
 '''
     #Divergence
