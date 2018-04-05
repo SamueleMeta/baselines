@@ -4,8 +4,12 @@ import tensorflow as tf
 import gym
 from baselines.common.distributions import DiagGaussianPdType
 import numpy as np
-import scipy.stats as sts
-#import time
+
+"""References
+PGPE: Sehnke, Frank, et al. "Policy gradients with parameter-based exploration for
+control." International Conference on Artificial Neural Networks. Springer,
+Berlin, Heidelberg, 2008.
+"""
 
 class PeMlpPolicy(object):
     """Multi-layer-perceptron policy with Gaussian parameter-based exploration"""
@@ -16,6 +20,7 @@ class PeMlpPolicy(object):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
             U.initialize()
+            #Sample initial actor params
             tf.get_default_session().run(self._use_sampled_actor_params)
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
@@ -46,7 +51,7 @@ class PeMlpPolicy(object):
         with tf.variable_scope("obfilter"):
             self.ob_rms = RunningMeanStd(shape=ob_space.shape)
 
-        #Critic
+        #Critic (normally not used)
         if use_critic:
             with tf.variable_scope('critic'):
                 obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
@@ -55,15 +60,17 @@ class PeMlpPolicy(object):
                     last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size, name="fc%i"%(i+1), kernel_initializer=U.normc_initializer(1.0)))
                 self.vpred = tf.layers.dense(last_out, 1, name='final', kernel_initializer=U.normc_initializer(1.0))[:,0]
 
-        #Actor
+        #Actor (N.B.: weight initialization is irrelevant)
         with tf.variable_scope('actor'):
             obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
             last_out = obz if standardize_input else ob
             for i in range(num_hid_layers):
+                #Mlp feature extraction
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
                                                       name='fc%i'%(i+1),
                                                       kernel_initializer=U.normc_initializer(1.0),use_bias=use_bias))
             if deterministic and isinstance(ac_space, gym.spaces.Box):
+                #Determinisitc action selection
                 self.actor_mean = actor_mean = tf.layers.dense(last_out, ac_space.shape[0],
                                        name='final',
                                        kernel_initializer=U.normc_initializer(0.01),
@@ -71,22 +78,24 @@ class PeMlpPolicy(object):
             else: 
                 raise NotImplementedError #Currently supports only deterministic action policies
 
-        #Higher order policy
+        #Higher order policy (Gaussian)
         with tf.variable_scope('actor') as scope:
             self.actor_weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=scope.name)
             self.flat_actor_weights = tf.concat([tf.reshape(w, [-1]) for w in \
                                             self.actor_weights], axis=0) #flatten
-            self.n_actor_weights = n_actor_weights = self.flat_actor_weights.shape[0]
+            self._n_actor_weights = n_actor_weights = self.flat_actor_weights.shape[0]
 
         with tf.variable_scope('higher'):
+            #Initial means sampled from a normal distribution N(0,1)
             self.higher_mean = higher_mean = tf.get_variable(name='higher_mean',
-                                               shape=[self.n_actor_weights],
-                                               initializer=tf.initializers.random_normal(stddev=1.))
+                                               shape=[n_actor_weights],
+                                               initializer=tf.initializers.random_normal())
             if diagonal:
+                #Diagonal covariance matrix; all stds initialized to 0
                 self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
-                                               shape=[self.n_actor_weights],
-                                               initializer=tf.initializers.random_normal(stddev=1.))
+                                               shape=[n_actor_weights],
+                                               initializer=tf.initializers.constant(0.))
             else: 
                 raise NotImplementedError #Currently supports only diagonal higher order policies
         
@@ -114,8 +123,11 @@ class PeMlpPolicy(object):
         with tf.variable_scope('higher') as scope:
             self._higher_params = higher_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=scope.name) 
+            self.flat_higher_params = tf.concat([tf.reshape(w, [-1]) for w in \
+                                            self._higher_params], axis=0) #flatten
+            self._n_higher_params = self.flat_higher_params.shape[0]
 
-        #PGPE given sampled weights
+        #Batch PGPE
         self._actor_params_in = actor_params_in = \
                 U.get_placeholder(name='actor_params_in',
                                   dtype=tf.float32,
@@ -123,12 +135,31 @@ class PeMlpPolicy(object):
         self._rets_in = rets_in = U.get_placeholder(name='returns_in',
                                                   dtype=tf.float32,
                                                   shape=[batch_length])
-        logprobs = self.pd.logp(actor_params_in)
+        self._logprobs = logprobs = self.pd.logp(actor_params_in)
         pgpe_times_n = U.flatgrad(logprobs*rets_in, higher_params)
         self._get_pgpe_times_n = U.function([actor_params_in, rets_in],
                                             [pgpe_times_n])
 
+        #One-episode PGPE
+        #Used N times to compute the baseline -> can we do better?
+        self._one_actor_param_in = one_actor_param_in = U.get_placeholder(
+                                    name='one_actor_param_in',
+                                    dtype=tf.float32,
+                                    shape=[n_actor_weights])
+        one_logprob = self.pd.logp(one_actor_param_in)
+        score = U.flatgrad(one_logprob, higher_params)
+        score_norm = tf.norm(score)
+        self._get_score = U.function([one_actor_param_in], [score])
+        self._get_score_norm = U.function([one_actor_param_in], [score_norm])
 
+        #Batch off-policy PGPE
+        self._probs = probs = tf.exp(logprobs) 
+        self._behavioral = None
+    
+        #One episode off-PGPE 
+        self._one_prob = one_prob = tf.exp(one_logprob)
+
+        
     #Black box usage
     def act(self, ob, resample=False):
         """
@@ -162,6 +193,10 @@ class PeMlpPolicy(object):
         """Set higher order policy parameters from flat sequence"""
         U.SetFromFlat(self._higher_params)(new_higher_params)
 
+    def seed(self, seed):
+        if seed is not None:
+            tf.set_random_seed(seed)
+
     #Direct actor policy manipulation
     def draw_actor_params(self):
         """Sample params for an actor (without using them)"""
@@ -183,17 +218,84 @@ class PeMlpPolicy(object):
             U.SetFromFlat(actor_params)(new_actor_params)
 
     #Gradient computation
-    def eval_gradient(self, actor_params, rets):
-        """Compute PGPE policy gradient given a batch of episodes
+    def eval_gradient(self, actor_params, rets, use_baseline=True,
+                      behavioral=None):
+        """
+        Compute PGPE policy gradient given a batch of episodes
 
         Params:
             actor_params: list of actor parameters (arrays), one per episode
             rets: flat list of total [discounted] returns, one per episode
-        """
-        assert rets and len(actor_params)==len(rets)
-        pgpe_times_n = np.ravel(self._get_pgpe_times_n(actor_params, rets)[0])
-        return pgpe_times_n/len(rets)
+            use_baseline: wether to employ a variance-minimizing baseline 
+                (may be more efficient without)
+            behavioral: higher-order policy used to collect data (off-policy
+                case). If None, the present policy is assumed to be the 
+                behavioral(on-policy case)
 
+        References:
+            Optimal baseline for PGPE: Zhao, Tingting, et al. "Analysis and
+            improvement of policy gradient estimation." Advances in Neural
+            Information Processing Systems. 2011.
+
+        """ 
+        assert rets and len(actor_params)==len(rets)
+        batch_size = len(rets)
+        
+        if not behavioral:
+            #On policy
+            if not use_baseline:
+                #Without baseline (more efficient)
+                pgpe_times_n = np.ravel(self._get_pgpe_times_n(actor_params, rets)[0])
+                return pgpe_times_n/batch_size
+            else:
+                #With optimal baseline
+                rets = np.array(rets)
+                scores = np.zeros((batch_size, self._n_higher_params))
+                score_norms = np.zeros(batch_size)
+                for (theta, i) in zip(actor_params, range(batch_size)):
+                    scores[i] = self._get_score(theta)[0]
+                    score_norms[i] = self._get_score_norm(theta)[0]
+                b = np.sum(rets * score_norms**2) / np.sum(score_norms**2)
+                pgpe = np.mean(((rets - b).T * scores.T).T, axis=0)
+                return pgpe
+        else:
+            #Off-policy
+            if behavioral is not self._behavioral:
+                self._build_iw_graph(behavioral)
+                self._behavioral = behavioral
+            if not use_baseline:
+                #Without baseline (more efficient)
+                off_pgpe_times_n = np.ravel(self._get_off_pgpe_times_n(actor_params,
+                                                              rets)[0])
+                return off_pgpe_times_n/batch_size
+            else:
+                #With optimal baseline
+                rets = np.array(rets)
+                scores = np.zeros((batch_size, self._n_higher_params))
+                score_norms = np.zeros(batch_size)
+                for (theta, i) in zip(actor_params, range(batch_size)):
+                    scores[i] = self._get_score(theta)[0]
+                    score_norms[i] = self._get_score_norm(theta)[0]
+                iws = np.ravel(self._get_iws(actor_params)[0])
+                b = np.sum(rets * iws**2 * score_norms**2)/ np.sum(iws**2 *
+                                                                   score_norms**2)
+                pgpe = np.mean(((rets - b).T * scores.T).T, axis=0)
+                return pgpe
+                
+
+
+    def _build_iw_graph(self, behavioral):
+        #Batch
+        iws = self._probs/behavioral._probs
+        self._get_iws = U.function([self._actor_params_in], [iws])
+        off_pgpe_times_n = U.flatgrad((tf.stop_gradient(iws) * 
+                                             self._logprobs * 
+                                             self._rets_in), 
+                                            self._higher_params)
+        self._get_off_pgpe_times_n = U.function([self._actor_params_in,
+                                                self._rets_in],
+                                                [off_pgpe_times_n])
+        
 '''
     #Divergence
     def eval_renyi(self, states, other, order=2):
