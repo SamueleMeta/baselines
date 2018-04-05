@@ -196,14 +196,13 @@ class DiagGaussianPd(Pd):
         return tf.reduce_sum(self.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
     def sample(self):
         return self.mean + self.std * tf.random_normal(tf.shape(self.mean))
-    """
     def renyi(self, other, alpha=2.):
         assert isinstance(other, DiagGaussianPd)
         var_alpha = alpha * tf.square(other.std) + (1. - alpha) * tf.square(self.std)
-        return alpha/2. * tf.reduce_sum(tf.square(self.mean - other.mean) / var_alpha, axis=-1) - \
+        return alpha/2. * tf.reduce_sum(2 * tf.square(self.mean - other.mean) / var_alpha, axis=-1) - \
                1./(2*(alpha - 1)) * tf.log(tf.reduce_prod(var_alpha, axis=-1) / (tf.reduce_prod(tf.square(self.std), axis=-1) ** (1-alpha) \
                                 * tf.reduce_prod(tf.square(other.std), axis=-1) ** alpha))
-    """
+
 
     @classmethod
     def fromflat(cls, flat):

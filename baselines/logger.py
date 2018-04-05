@@ -168,7 +168,7 @@ class TensorBoardOutputFormat(KVWriter):
             self.writer.Close()
             self.writer = None
 
-def make_output_format(format, ev_dir):
+def make_output_format(format, ev_dir, file_name=None):
     from mpi4py import MPI
     os.makedirs(ev_dir, exist_ok=True)
     rank = MPI.COMM_WORLD.Get_rank()
@@ -179,10 +179,10 @@ def make_output_format(format, ev_dir):
         return HumanOutputFormat(osp.join(ev_dir, 'log%s.txt' % suffix))
     elif format == 'json':
         assert rank==0
-        return JSONOutputFormat(osp.join(ev_dir, 'progress.json'))
+        return JSONOutputFormat(osp.join(ev_dir, 'progress.json' if file_name is None else '%s.json' % file_name))
     elif format == 'csv':
         assert rank==0
-        return CSVOutputFormat(osp.join(ev_dir, 'progress.csv'))
+        return CSVOutputFormat(osp.join(ev_dir, 'progress.csv' if file_name is None else '%s.csv' % file_name))
     elif format == 'tensorboard':
         assert rank==0
         return TensorBoardOutputFormat(osp.join(ev_dir, 'tb'))
@@ -307,7 +307,7 @@ class Logger(object):
 
 Logger.DEFAULT = Logger.CURRENT = Logger(dir=None, output_formats=[HumanOutputFormat(sys.stdout)])
 
-def configure(dir=None, format_strs=None):
+def configure(dir=None, format_strs=None, file_name=None):
     if dir is None:
         dir = os.getenv('OPENAI_LOGDIR')
     if dir is None:
@@ -319,7 +319,7 @@ def configure(dir=None, format_strs=None):
     if format_strs is None:
         strs = os.getenv('OPENAI_LOG_FORMAT')
         format_strs = strs.split(',') if strs else LOG_OUTPUT_FORMATS
-    output_formats = [make_output_format(f, dir) for f in format_strs]
+    output_formats = [make_output_format(f, dir, file_name) for f in format_strs]
 
     Logger.CURRENT = Logger(dir=dir, output_formats=output_formats)
     log('Logging to %s'%dir)
