@@ -10,17 +10,19 @@ from baselines import logger
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines import bench
 from baselines.trpo_mpi import trpo_mpi
-import baselines.envs.continuous_cartpole
 import numpy as np
+import baselines.envs.continuous_cartpole
 
 BATCH_SIZE = 20 # MINIMUM batch size (actual batch size in case of fixed horizon)
 HORIZON = 100 # MAXIMUM horizon
 ITERATIONS = 100
 TASK = 'ContCartPole-v0'
-SEEDS = [0, 1, 2, 3, 4]
-DIR = '../results/temp'
+PREFIX = '../results/trpo/cartpole/18_04_06'
 
-def train(env_id, num_timesteps, seed):
+#SEEDS: [324, 640, 454, 27, 496]
+
+
+def train(env_id, num_timesteps, seed, save_dir):
     import baselines.common.tf_util as U
     sess = U.single_threaded_session()
     sess.__enter__()
@@ -42,20 +44,23 @@ def train(env_id, num_timesteps, seed):
     trpo_mpi.learn(env, policy_fn, batch_size = BATCH_SIZE, 
                    task_horizon = HORIZON, max_kl=0.01, cg_iters=20, cg_damping=0.1,
         max_timesteps=num_timesteps, gamma=.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3,
-            weights_dir=DIR, per_decision=False, normalize=True, truncate_at=np.infty)
+        weights_dir=save_dir, per_decision=False, normalize=True, truncate_at=np.infty)
     env.close()
 
-def main(index=0):
+def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--env', help='environment ID', default=TASK)
-    parser.add_argument('--seed', help='RNG seed', type=int,
-                        default=SEEDS[index])
+    parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()
-    logger.configure(dir=DIR,format_strs=['stdout','csv'])
-    train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
+    save_dir = PREFIX + '_' +  str(args.seed)
+    import os
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    logger.configure(dir=save_dir,format_strs=['stdout','csv'])
+    train(args.env, num_timesteps=args.num_timesteps, seed=args.seed, save_dir=save_dir)
 
 
 if __name__ == '__main__':
-    [main(i) for i in range(1)]
+    main()
