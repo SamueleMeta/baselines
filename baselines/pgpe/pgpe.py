@@ -51,7 +51,10 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
     for it in range(max_iterations):
         rho = pol.eval_params() #Higher-order-policy parameters
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
-        
+        if verbose>1:
+            print('Higher-order parameters:', rho)
+            print('Fisher diagonal:', pol.eval_fisher())
+            
         #Batch of episodes
         actor_params = []
         rets, disc_rets, lens = [], [], []
@@ -65,7 +68,8 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
             rets.append(ret)
             disc_rets.append(disc_ret)
             lens.append(ep_len)
-            
+        
+        
         logger.log('\n********** Iteration %i ************' % it)
         logger.record_tabular('AvgRet', np.mean(rets))
         logger.record_tabular('J', np.mean(disc_rets))
