@@ -194,6 +194,14 @@ class MlpPolicy(object):
         result = self._get_var_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.asscalar(result)
 
+    def eval_simple_iw(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
+                       behavioral=None):
+        batch_size, horizon, _states, _actions, _rewards, _mask = (
+        self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon))
+        self._build(batch_size, horizon, behavioral)
+        result = self._get_simple_iw(_states, _actions, _rewards, gamma, _mask)[0]
+        return np.ravel(result) 
+
     def eval_iw_stats(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
                       behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):
         batch_size, horizon, _states, _actions, _rewards, _mask = (
@@ -377,7 +385,7 @@ class MlpPolicy(object):
             resized.append(v)
         return tuple(resized)
 
-    def _build(self, batch_size, horizon, behavioral, per_decision, normalize=False, truncate_at=np.infty):
+    def _build(self, batch_size, horizon, behavioral, per_decision=False, normalize=False, truncate_at=np.infty):
         if [batch_size, horizon, behavioral, per_decision, normalize,
             truncate_at]!=self._setting:
 
@@ -401,14 +409,20 @@ class MlpPolicy(object):
                 avg_iw = tf.constant(1)
                 var_iw = tf.constant(0)
                 max_iw = tf.constant(1)
+                simple_iw = tf.ones(batch_size)
                 ess = batch_size
             else:
+                
                 #Off policy -> importance weighting :(
                 log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
                 log_ratios = tf.expand_dims(log_ratios, axis=1)
                 log_ratios = tf.multiply(log_ratios, self.mask)
                 log_ratios_by_episode = tf.split(log_ratios, batch_size)
                 log_ratios_by_episode = tf.stack(log_ratios_by_episode)
+                
+                simple_iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
+
+                
                 if per_decision:
                     #Per-decision
                     iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
@@ -477,6 +491,7 @@ class MlpPolicy(object):
                                                                       max_iw,
                                                                       ess])
             self._get_ret_stats = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_ret, var_ret, max_ret])
+            self._get_simple_iw = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [simple_iw])
             #print('Recompile time:', time.time() - checkpoint)
 
 

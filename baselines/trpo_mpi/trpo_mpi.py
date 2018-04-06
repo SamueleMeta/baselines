@@ -307,17 +307,34 @@ def learn(env, policy_fn, *,
             disc_rewards = np.array(rewards[start:end]) * disc
             disc_rews.append(np.sum(disc_rewards))
             start = end
+            
+        #Save importance weights
+        simple_iw = pi.eval_simple_iw(states, 
+                               actions,
+                               rewards,
+                               lens,
+                               gamma=gamma,
+                               behavioral=oldpi)
+        np.save(weights_dir+'/iws_'+str(iters_so_far), simple_iw)
+        print(len(simple_iw), simple_iw)
         
+        #Save returns
+        ep_rets = np.array(disc_rews)
+        np.save(weights_dir+'/rets_'+str(iters_so_far), ep_rets)
+        print(len(ep_rets), ep_rets)
+        
+
         #lenbuffer.extend(lens)
         #rewbuffer.extend(rews)
 
         #Renyi
-        #"""
-        renyi_4 = np.max(pi.eval_renyi(states, oldpi, 4))
+        """
+        renyi_4 = np.mean(pi.eval_renyi(states, oldpi, 4))
         #print('Renyi:', renyi)
         #"""
         
         #Importance weights stats
+        """
         avg_iw, var_iw, max_iw, ess = pi.eval_iw_stats(states, 
                                actions,
                                rewards,
@@ -327,8 +344,10 @@ def learn(env, policy_fn, *,
                                per_decision=per_decision,
                                normalize=normalize,
                                truncate_at=truncate_at)
-
+        #"""
+        
         #Returns stats
+        """
         avg_ret, var_ret, max_ret = pi.eval_ret_stats(states, 
                                actions,
                                rewards,
@@ -338,7 +357,7 @@ def learn(env, policy_fn, *,
                                per_decision=per_decision,
                                normalize=normalize,
                                truncate_at=truncate_at)
-
+        #"""
 
         #Performance
         #"""
@@ -364,6 +383,7 @@ def learn(env, policy_fn, *,
                       normalize=normalize,
                       truncate_at=truncate_at)
         
+        """
         bound = pi.eval_bound(states,
                       actions,
                       rewards,
@@ -375,7 +395,19 @@ def learn(env, policy_fn, *,
                       truncate_at=truncate_at,
                       delta=bound_delta,
                       use_ess=True)
-
+        #"""
+        
+        #Sample Renyi
+        d2s = pi.eval_renyi(states, oldpi, 2)
+        d2s_by_episode = []
+        start = 0
+        for ep_len in lens:
+            end = start + ep_len
+            d2s_by_episode = np.prod(d2s[start:end])
+            start = end
+        sample_d2 = np.mean(d2s_by_episode)
+        
+        """
         grad_bound = pi.eval_grad_bound(states,
                       actions,
                       rewards,
@@ -447,15 +479,16 @@ def learn(env, policy_fn, *,
         
         #Logging
         logger.record_tabular("Step_size", stepsize)
-        logger.record_tabular("Our_bound", bound)
-        logger.record_tabular("Reny_4", renyi_4)
-        logger.record_tabular("Max_iw", max_iw)
-        logger.record_tabular("Ess", ess)
-        logger.record_tabular("Avg_iw", avg_iw)
-        logger.record_tabular("Var_iw", var_iw)
-        logger.record_tabular("Max_ret", max_ret)
-        logger.record_tabular("Avg_ret", avg_ret)
-        logger.record_tabular("Var_ret", var_ret)
+        #logger.record_tabular("Our_bound", bound)
+        #logger.record_tabular("Reny_4", renyi_4)
+        logger.record_tabular("SampleRenyi2", sample_d2)
+        #logger.record_tabular("Max_iw", max_iw)
+        #logger.record_tabular("Ess", ess)
+        #logger.record_tabular("Avg_iw", avg_iw)
+        #logger.record_tabular("Var_iw", var_iw)
+        #logger.record_tabular("Max_ret", max_ret)
+        #logger.record_tabular("Avg_ret", avg_ret)
+        #logger.record_tabular("Var_ret", var_ret)
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("DiscEpRewMean", np.mean(disc_rews))
         logger.record_tabular("EpRewMean", np.mean(rews))

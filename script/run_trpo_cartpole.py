@@ -17,7 +17,7 @@ BATCH_SIZE = 20 # MINIMUM batch size (actual batch size in case of fixed horizon
 HORIZON = 100 # MAXIMUM horizon
 ITERATIONS = 100
 TASK = 'ContCartPole-v0'
-PREFIX = '../results/trpo/cartpole/18_04_06'
+PREFIX = '../results/trpo/cartpole/18_04_07'
 
 #SEEDS: [324, 640, 454, 27, 496]
 
