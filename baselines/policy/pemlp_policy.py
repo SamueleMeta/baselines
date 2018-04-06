@@ -4,6 +4,7 @@ import tensorflow as tf
 import gym
 from baselines.common.distributions import DiagGaussianPdType
 import numpy as np
+from baselines.common import set_global_seeds
 
 """References
 PGPE: Sehnke, Frank, et al. "Policy gradients with parameter-based exploration for
@@ -41,10 +42,11 @@ class PeMlpPolicy(object):
         """
         assert isinstance(ob_space, gym.spaces.Box)
         assert len(ac_space.shape)==1
+        self.diagonal = diagonal
         batch_length = None #Accepts a sequence of episodes of arbitrary length
 
         if seed is not None:
-            tf.set_random_seed(seed)
+            set_global_seeds(seed)
 
         ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[None] + list(ob_space.shape))
 
@@ -158,6 +160,15 @@ class PeMlpPolicy(object):
     
         #One episode off-PGPE 
         self._one_prob = one_prob = tf.exp(one_logprob)
+        
+        #Renyi computation
+        self._det_sigma = tf.exp(tf.reduce_sum(self.higher_logstd))
+
+        #Fisher computation (diagonal case)
+        mean_fisher_diag = tf.exp(-self.higher_logstd)
+        cov_fisher_diag = 2*tf.exp(2*self.higher_logstd)
+        self._fisher_diag = tf.concat([mean_fisher_diag, mean_fisher_diag * 0. +
+                               cov_fisher_diag], axis=0)
 
         
     #Black box usage
@@ -195,7 +206,7 @@ class PeMlpPolicy(object):
 
     def seed(self, seed):
         if seed is not None:
-            tf.set_random_seed(seed)
+            set_global_seeds(seed)
 
     #Direct actor policy manipulation
     def draw_actor_params(self):
@@ -216,6 +227,50 @@ class PeMlpPolicy(object):
             actor_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=scope.name)
             U.SetFromFlat(actor_params)(new_actor_params)
+
+    #Distribution properties
+    def renyi(self, other, order=2, exponentiate=True):
+        """Renyi divergence
+        
+        Params:
+            other: policy to evaluate the distance from
+            order: order of the Renyi divergence
+            exponentiate: if true, actually returns e^Renyi(self, other)
+        """
+        if order<2:
+            raise NotImplementedError('Only order>=2 currently available')
+        if not self.diagonal:
+            raise NotImplementedError(
+                'Only diagonal covariance currently supported')
+        to_check = (order/tf.exp(self.higher_logstd) +
+                    (1 - order)/tf.exp(other.higher_logstd))
+        if not (U.function([],
+                           [to_check])()[0] > 0).all():
+            raise ValueError('Conditions on standard deviations not met')
+        det0 = self._det_sigma
+        det1 = other._det_sigma
+        mix = (order*tf.exp(self.higher_logstd) + 
+                   (1 - order)*tf.exp(other.higher_logstd))
+        det_mix = tf.reduce_prod(mix)
+        renyi = (order/2 * tf.reduce_sum((self.higher_mean -
+                                           other.higher_mean)**2/mix) -
+                            1./(2*order - 1)*(tf.log(det_mix) - 
+                                              (1-order)*tf.log(det0) -
+                                              order*tf.log(det1)))
+        result = tf.exp(renyi) if exponentiate else renyi
+        return U.function([], [result])()[0]
+
+    def eval_fisher(self, return_diagonal=True):
+        if not self.diagonal or not return_diagonal:
+            raise NotImplementedError(
+                'Only diagonal covariance currently supported')
+        return np.ravel(U.function([],[self._fisher_diag])()[0])
+
+    def fisher_product(self, theta):
+        if not self.diagonal or not return_diagonal:
+            raise NotImplementedError(
+                'Only diagonal covariance currently supported')
+        return theta/self.eval_fisher()
 
     #Gradient computation
     def eval_gradient(self, actor_params, rets, use_baseline=True,
@@ -452,7 +507,7 @@ class PeMlpPolicy(object):
         
     def eval_bound_grad(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, behavioral=None, per_decision=False, gamma=.99, delta=.2):
         """
-        Gradient of student-t bound
+        
         
         Params:
             states, actions, rewards as lists, flat wrt time

@@ -112,7 +112,7 @@ class MlpPolicy(object):
         """
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
-
+    
 
     #Divergence
     def eval_renyi(self, states, other, order=2):
