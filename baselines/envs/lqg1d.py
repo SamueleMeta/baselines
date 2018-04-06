@@ -65,7 +65,6 @@ class LQG1D(gym.Env):
         self.reset()
 
     def step(self, action, render=False):
-        self.t+=1
         u = np.clip(action, -self.max_action, self.max_action)
         noise = self.np_random.randn() * self.sigma_noise
         xn = np.dot(self.A, self.state) + np.dot(self.B, u) + noise
@@ -75,18 +74,17 @@ class LQG1D(gym.Env):
             np.dot(u, np.dot(self.R, u))
         assert cost>=0
 
-        normalized_cost = cost / self.max_cost * 2 - 1
-        #normalized_cost = cost
+        #normalized_cost = cost / self.max_cost * 2 - 1
+        normalized_cost = cost
         self.state = np.array(xn.ravel())
         if self.discrete_reward:
             if abs(self.state[0]) <= 2 and abs(u) <= 2:
                 return self.get_state(), 0, False, {}
             return self.get_state(), -1, False, {}
-        done = self.t>=self.horizon
-        return self.get_state(), -np.asscalar(normalized_cost), done, {}
+
+        return self.get_state(), -np.asscalar(normalized_cost), False, {}
 
     def reset(self, state=None):
-        self.t = 0
         if state is None:
             self.state = np.array([self.np_random.uniform(low=-self.max_pos,
                                                           high=self.max_pos)])
