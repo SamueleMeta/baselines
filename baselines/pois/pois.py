@@ -334,13 +334,23 @@ def learn(env, policy_func, *,
     else:
         raise NotImplementedError()
 
-    if iw_method == 'is':
-        ess = tf.linalg.norm(iw_split, 1) ** 2 / tf.linalg.norm(iw_split, 2) ** 2
+    empirical_d1 = tf.exp(tf.reduce_mean(pi.pd.renyi(oldpi.pd, 1.0001)))
+    empirical_d2 = tf.exp(tf.reduce_mean(pi.pd.renyi(oldpi.pd, 2.)))
+    empirical_d4 = tf.exp(tf.reduce_mean(pi.pd.renyi(oldpi.pd, 4.)))
 
-    if iw_method == 'is' and ess_correction:
-        n = ess
-    else:
-        n = tf.constant(float(num_episodes))
+    #cumulative_empirical_d2 = tf.reduce_mean(iw_split[:, -1])
+
+    cumulative_empirical_d2 = tf.split(pi.pd.renyi(oldpi.pd, 2.), num_episodes) * mask_split
+    cumulative_empirical_d2 = tf.reduce_sum(cumulative_empirical_d2, axis=1)
+    cumulative_empirical_d2 = tf.reduce_mean(tf.exp(cumulative_empirical_d2))
+
+    ess_classic = tf.linalg.norm(iw_split, 1) ** 2 / tf.linalg.norm(iw_split, 2) ** 2
+    ess_renyi = num_episodes / cumulative_empirical_d2 + 1
+
+    if ess_correction == True or ess_correction == 'classic':
+        ess = ess_classic
+    elif ess_correction == 'renyi':
+        ess = ess_renyi
 
     if iw_norm == 'sn':
         if iw_method == 'pdis':
@@ -374,9 +384,7 @@ def learn(env, policy_func, *,
     elif bound == 'johnson':
         bound_ = return_mean - np.sqrt(1. / delta - 1) / np.sqrt(num_episodes) * return_std + third_central_moment / (6 * num_episodes * return_std ** 2)
 
-    empirical_d1 = tf.exp(tf.reduce_mean(pi.pd.renyi(oldpi.pd, 1.0001)))
-    empirical_d2 = tf.exp(tf.reduce_mean(pi.pd.renyi(oldpi.pd, 2.)))
-    empirical_d4 = tf.exp(tf.reduce_mean(pi.pd.renyi(oldpi.pd, 4.)))
+
 
     if use_natural_gradient in ['approximate', 'approx', True]:
         p = tf.placeholder(dtype=tf.float32, shape=[None])
@@ -388,12 +396,12 @@ def learn(env, policy_func, *,
     elif use_natural_gradient == 'exact':
         log_grads = tf.stack(
             [U.flatgrad(target_logpdf_split[i] * mask_split[i], var_list) for i in range(len(target_logpdf_split))])
-        fisher = tf.matmul(tf.transpose(log_grads), tf.matmul(tf.diag(iw_split[:, -1]), log_grads)) / num_episodes
+        fisher = tf.matmul(tf.transpose(log_grads), tf.matmul(tf.diag(iwn_split[:, -1]), log_grads))
         nat_grad = tf.squeeze(tf.linalg.solve(fisher + fisher_reg * np.eye(n_parameters), gradient_))
         compute_natural_gradient = U.function([gradient_, ob, ac, disc_rew, mask], [nat_grad])
 
-    losses = [bound_, return_mean, return_std, empirical_d1, empirical_d2, empirical_d4, tf.reduce_max(iw_split), tf.reduce_min(iw_split), tf.reduce_mean(iw_split), U.reduce_std(iw_split),  tf.reduce_max(iwn_split), tf.reduce_min(iwn_split), tf.reduce_sum(iwn_split), tf.reduce_mean((iwn_split - 1./num_episodes)**2), ess]
-    loss_names = ['Bound', 'EpDiscRewMean', 'EpDiscRewStd', 'EmpD1', 'EmpD2', 'EmpD4', 'MaxIW', 'MinIW', 'MeanIW', 'StdIW', 'MaxIWNorm', 'MinIWNorm', 'MeanIWNorm', 'StdIWNorm', 'ESS']
+    losses = [bound_, return_mean, return_std, cumulative_empirical_d2, empirical_d1, empirical_d2, empirical_d4, tf.reduce_max(iw_split), tf.reduce_min(iw_split), tf.reduce_mean(iw_split), U.reduce_std(iw_split),  tf.reduce_max(iwn_split), tf.reduce_min(iwn_split), tf.reduce_sum(iwn_split), tf.reduce_mean((iwn_split - 1./num_episodes)**2), ess_classic, ess_renyi]
+    loss_names = ['Bound', 'EpDiscRewMean', 'EpDiscRewStd', 'CumEmpD2', 'EmpD1', 'EmpD2', 'EmpD4', 'MaxIW', 'MinIW', 'MeanIW', 'StdIW', 'MaxIWNorm', 'MinIWNorm', 'MeanIWNorm', 'StdIWNorm', 'ESSClassic', 'ESSRenyi']
 
     compute_lossandgrad = U.function([ob, ac, disc_rew, mask], losses + [U.flatgrad(bound_, var_list)])
 

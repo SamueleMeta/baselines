@@ -9,6 +9,8 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.pois import pois
 from baselines.envs.continuous_cartpole import CartPoleEnv
 import baselines.common.tf_util as U
+import ast
+import time
 
 
 def train(num_episodes, horizon, iw_method, iw_norm, natural, bound, ess, seed):
@@ -22,7 +24,7 @@ def train(num_episodes, horizon, iw_method, iw_norm, natural, bound, ess, seed):
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
 
-    env = gym.make('Swimmer-v2')
+    env = gym.make('Hopper-v2')
 
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
@@ -40,17 +42,17 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--num_episodes', type=int, default=10)
-    parser.add_argument('--horizon', type=int, default=50)
+    parser.add_argument('--num_episodes', type=int, default=100)
+    parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_method', type=str, default='is')
     parser.add_argument('--iw_norm', type=str, default='sn')
     parser.add_argument('--natural', type=bool, default=False)
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--bound', type=str, default='student')
-    parser.add_argument('--ess', type=bool, default=False)
+    parser.add_argument('--ess', type=ast.literal_eval, default=False)
     args = parser.parse_args()
     if args.file_name == 'progress':
-        file_name = 'pois_iw_method=%s_iw_norm=%s_natural=%s_bound=%s_ess=%s' % (args.iw_method, args.iw_norm, args.natural, args.bound, args.ess)
+        file_name = 'pois_hopper_iw_method=%s_iw_norm=%s_natural=%s_bound=%s_ess=%s_%s' % (args.iw_method, args.iw_norm, args.natural, args.bound, args.ess, time.time())
     else:
         file_name = args.file_name
     logger.configure(dir='.', format_strs=['stdout', 'csv'], file_name=file_name)
