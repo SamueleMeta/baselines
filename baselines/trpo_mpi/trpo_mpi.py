@@ -316,12 +316,12 @@ def learn(env, policy_fn, *,
                                gamma=gamma,
                                behavioral=oldpi)
         np.save(weights_dir+'/iws_'+str(iters_so_far), simple_iw)
-        print(len(simple_iw), simple_iw)
+        #print(len(simple_iw), simple_iw)
         
         #Save returns
         ep_rets = np.array(disc_rews)
         np.save(weights_dir+'/rets_'+str(iters_so_far), ep_rets)
-        print(len(ep_rets), ep_rets)
+        #print(len(ep_rets), ep_rets)
         
 
         #lenbuffer.extend(lens)
@@ -403,9 +403,9 @@ def learn(env, policy_fn, *,
         start = 0
         for ep_len in lens:
             end = start + ep_len
-            d2s_by_episode = np.prod(d2s[start:end])
+            d2s_by_episode = np.sum(d2s[start:end])
             start = end
-        sample_d2 = np.mean(d2s_by_episode)
+        sample_d2 = np.mean(np.exp(d2s_by_episode))
         
         """
         grad_bound = pi.eval_grad_bound(states,

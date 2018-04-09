@@ -15,7 +15,7 @@ import numpy as np
 BATCH_SIZE = 100 # MINIMUM batch size (actual batch size in case of fixed horizon)
 HORIZON = 500 # MAXIMUM horizon
 ITERATIONS = 500
-PREFIX = '../results/trpo/'
+PREFIX = '../results/trpo/correct'
 
 #SEEDS: [324, 640, 454, 27, 496]
 

@@ -17,7 +17,7 @@ BATCH_SIZE = 20 # MINIMUM batch size (actual batch size in case of fixed horizon
 HORIZON = 100 # MAXIMUM horizon
 ITERATIONS = 100
 TASK = 'ContCartPole-v0'
-PREFIX = '../results/trpo/cartpole/18_04_07'
+PREFIX = '../results/temp'
 
 #SEEDS: [324, 640, 454, 27, 496]
 
@@ -51,7 +51,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--env', help='environment ID', default=TASK)
-    parser.add_argument('--seed', help='RNG seed', type=int, default=None)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()
     save_dir = PREFIX + '_' +  str(args.seed)

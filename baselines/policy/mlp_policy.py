@@ -115,29 +115,37 @@ class MlpPolicy(object):
     
 
     #Divergence
-    def eval_renyi(self, states, other, order=2):
-        """Exponentiated Renyi divergence exp(Renyi(self, other)) for each state
+    def eval_renyi(self, states, other, order=2., exponentiate=False):
+        """Renyi divergence exp(Renyi(self, other)) for each state
         
         Params:
             states: flat list of states
             other: other policy
             order: order \alpha of the divergence
         """
+        result = self.pd.renyi(other.pd, alpha=order)
+        if exponentiate:
+            result = tf.exp(result)
+        fun = U.function([self.ob], [result])
+        return fun(states)[0]
+        
+        """Check this!
         if order<2:
             raise NotImplementedError('Only order>=2 is currently supported')
-        to_check = order/tf.exp(self.logstd) + (1 - order)/tf.exp(other.logstd)
+        to_check = order/tf.exp(2*self.logstd) + (1 - order)/tf.exp(2*other.logstd)
         if not (U.function([self.ob],[to_check])(states)[0] > 0).all():
-            raise ValueError('Conditions on standard deviations are not met')
-        detSigma = tf.exp(tf.reduce_sum(self.logstd))
-        detOtherSigma = tf.exp(tf.reduce_sum(other.logstd))
-        mixSigma = order*tf.exp(self.logstd) + (1 - order) * tf.exp(other.logstd)
+            print('Conditions not met!')
+            #raise ValueError('Conditions on standard deviations are not met')
+        detSigma = tf.exp(2*tf.reduce_sum(self.logstd))
+        detOtherSigma = tf.exp(tf.reduce_sum(2*other.logstd))
+        mixSigma = order*tf.exp(2*self.logstd) + (1 - order) * tf.exp(2*other.logstd)
         detMixSigma = tf.reduce_prod(mixSigma)
-        renyi = order/2 * (self.mean - other.mean)/mixSigma*(self.mean - other.mean) - \
+        renyi = order/2 * tf.reduce_sum((self.mean - other.mean)/mixSigma*(self.mean - other.mean), axis=-1) - \
             1./(2*(order - 1))*(tf.log(detMixSigma) - (1-order)*tf.log(detSigma) - order*tf.log(detOtherSigma))
         e_renyi = tf.exp(renyi)
         fun = U.function([self.ob],[e_renyi])
         return fun(states)[0]
-        
+        """
     
     #Performance evaluation
     def eval_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, behavioral=None, per_decision=False, 
