@@ -13,11 +13,11 @@ from baselines.trpo_mpi import trpo_mpi
 import numpy as np
 import baselines.envs.continuous_cartpole
 
-BATCH_SIZE = 20 # MINIMUM batch size (actual batch size in case of fixed horizon)
-HORIZON = 100 # MAXIMUM horizon
-ITERATIONS = 100
+BATCH_SIZE = 100 # MINIMUM batch size (actual batch size in case of fixed horizon)
+HORIZON = 200 # MAXIMUM horizon
+ITERATIONS = 200
 TASK = 'ContCartPole-v0'
-PREFIX = '../results/temp'
+PREFIX = '../results/trpo/cartpole/seed'
 
 #SEEDS: [324, 640, 454, 27, 496]
 
@@ -35,7 +35,7 @@ def train(env_id, num_timesteps, seed, save_dir):
     env = gym.make(env_id)
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-            hid_size=64, num_hid_layers=2,gaussian_fixed_var=True,use_bias=True)
+            hid_size=64, num_hid_layers=0,gaussian_fixed_var=True,use_bias=True)
     env = bench.Monitor(env, logger.get_dir() and
         osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)
