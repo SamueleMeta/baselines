@@ -13,11 +13,11 @@ from baselines.trpo_mpi import trpo_mpi
 import numpy as np
 import baselines.envs.continuous_cartpole
 
-BATCH_SIZE = 20 # MINIMUM batch size (actual batch size in case of fixed horizon)
+BATCH_SIZE = 100 # MINIMUM batch size (actual batch size in case of fixed horizon)
 HORIZON = 200 # MAXIMUM horizon
-ITERATIONS = 100
+ITERATIONS = 200
 TASK = 'ContCartPole-v0'
-PREFIX = '../results/temp'
+PREFIX = '../results/trpo/cartpole/seed'
 
 #SEEDS: [324, 640, 454, 27, 496]
 
