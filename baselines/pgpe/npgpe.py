@@ -19,6 +19,7 @@ Created on Wed Apr  4 18:13:18 2018
 import numpy as np
 from baselines import logger
 
+eps = 1e-12
 
 def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
     ret = disc_ret = 0
@@ -84,7 +85,7 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
         grad2norm = np.linalg.norm(grad, 2)
         #Diagonal covariance case!
         fisher = pol.eval_fisher(return_diagonal=True)
-        nat_grad = grad/fisher
+        nat_grad = grad/(fisher + eps)
         nat_grad2norm = np.linalg.norm(grad, 2)
         step_size_it = {'const': step_size,
                         'norm': step_size/nat_grad2norm if nat_grad2norm>0 else 0,

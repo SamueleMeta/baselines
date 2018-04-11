@@ -15,32 +15,41 @@ import baselines.common.tf_util as U
 sess = U.single_threaded_session()
 sess.__enter__()
 
-SEED = 1
-DIR = '../results/pgpe/cartpole/05_04_' + str(SEED)
-import os
-if not os.path.exists(DIR):
-    os.makedirs(DIR)
+#Seeds: 0, 27, 62, 315, 640
 
-env = gym.make('ContCartPole-v0')
-env.seed(SEED)
+def train(seed):
+    DIR = '../results/pgpe/cartpole/seed_' + str(seed)
+    import os
+    if not os.path.exists(DIR):
+        os.makedirs(DIR)
+    
+    env = gym.make('ContCartPole-v0')
+    env.seed(seed)
+    
+    pol = PeMlpPolicy('pol',
+                      env.observation_space,
+                      env.action_space,
+                      hid_size=64,
+                      num_hid_layers=0,
+                      use_bias=True,
+                      standardize_input = True,
+                      seed=seed)
+    
+    pgpe.learn(env,
+              pol,
+              gamma=0.99,
+              step_size=0.1,
+              batch_size=100,
+              task_horizon=200,
+              max_iterations=100,
+              use_baseline=True,
+              step_size_strategy='vanish',
+              save_to=DIR,
+              verbose=2)
 
-pol = PeMlpPolicy('pol',
-                  env.observation_space,
-                  env.action_space,
-                  hid_size=8,
-                  num_hid_layers=2,
-                  use_bias=True,
-                  standardize_input = True,
-                  seed=SEED)
-
-pgpe.learn(env,
-          pol,
-          gamma=0.99,
-          step_size=0.01,
-          batch_size=100,
-          task_horizon=100,
-          max_iterations=500,
-          use_baseline=True,
-          step_size_strategy=None,
-          save_to=DIR,
-          verbose=1)
+if __name__=='__main__':
+    import argparse
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+    args = parser.parse_args()
+    train(args.seed)

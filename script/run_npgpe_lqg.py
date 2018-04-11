@@ -10,6 +10,7 @@ import gym
 import baselines.envs.continuous_cartpole
 from baselines.policy.pemlp_policy import PeMlpPolicy
 import baselines.pgpe.npgpe as npgpe
+import baselines.envs.lqg1d
 
 import baselines.common.tf_util as U
 sess = U.single_threaded_session()
@@ -18,12 +19,12 @@ sess.__enter__()
 #Seeds: 0, 27, 62, 315, 640
 
 def train(seed):
-    DIR = '../results/npgpe/cartpole/seed_' + str(seed)
+    DIR = '../results/npgpe/lqg/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
     
-    env = gym.make('ContCartPole-v0')
+    env = gym.make('LQG1D-v0')
     env.seed(seed)
     
     pol = PeMlpPolicy('pol',
@@ -31,19 +32,19 @@ def train(seed):
                       env.action_space,
                       hid_size=64,
                       num_hid_layers=0,
-                      use_bias=True,
+                      use_bias=False,
                       standardize_input = True,
                       seed=seed)
     
     npgpe.learn(env,
               pol,
               gamma=0.99,
-              step_size=1e-2,
+              step_size=1.,
               batch_size=100,
-              task_horizon=200,
-              max_iterations=100,
+              task_horizon=500,
+              max_iterations=500,
               use_baseline=True,
-              step_size_strategy=None,
+              step_size_strategy='norm',
               save_to=DIR,
               verbose=1)
 

@@ -54,6 +54,7 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
         if verbose>1:
             print('Higher-order parameters:', rho)
             print('Fisher diagonal:', pol.eval_fisher())
+            #print('Renyi:', pol.renyi(pol))
             
         #Batch of episodes
         actor_params = []

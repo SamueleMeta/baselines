@@ -99,7 +99,8 @@ class PeMlpPolicy(object):
                                                shape=[n_actor_weights],
                                                initializer=tf.initializers.constant(0.))
             else: 
-                raise NotImplementedError #Currently supports only diagonal higher order policies
+                #Cholesky covariance matri
+                raise NotImplementedError
         
         #Sample actor weights
         pdparam = tf.concat([higher_mean, higher_mean * 0. + \
@@ -229,7 +230,7 @@ class PeMlpPolicy(object):
             U.SetFromFlat(actor_params)(new_actor_params)
 
     #Distribution properties
-    def renyi(self, other, order=2, exponentiate=True):
+    def renyi(self, other, order=2, exponentiate=False):
         """Renyi divergence
         
         Params:
@@ -242,22 +243,12 @@ class PeMlpPolicy(object):
         if not self.diagonal:
             raise NotImplementedError(
                 'Only diagonal covariance currently supported')
-        to_check = (order/tf.exp(self.higher_logstd) +
-                    (1 - order)/tf.exp(other.higher_logstd))
-        if not (U.function([],
-                           [to_check])()[0] > 0).all():
-            raise ValueError('Conditions on standard deviations not met')
-        det0 = self._det_sigma
-        det1 = other._det_sigma
-        mix = (order*tf.exp(self.higher_logstd) + 
-                   (1 - order)*tf.exp(other.higher_logstd))
-        det_mix = tf.reduce_prod(mix)
-        renyi = (order/2 * tf.reduce_sum((self.higher_mean -
-                                           other.higher_mean)**2/mix) -
-                            1./(2*order - 1)*(tf.log(det_mix) - 
-                                              (1-order)*tf.log(det0) -
-                                              order*tf.log(det1)))
-        result = tf.exp(renyi) if exponentiate else renyi
+        else:
+            result = self.pd.renyi(other.pd, alpha=order)
+        
+        if exponentiate:
+            result = tf.exp(result)
+
         return U.function([], [result])()[0]
 
     def eval_fisher(self, return_diagonal=True):
