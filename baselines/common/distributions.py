@@ -208,28 +208,49 @@ class DiagGaussianPd(Pd):
     def fromflat(cls, flat):
         return cls(flat)
 
+#Single distribution: use for higher order policy or on single state
 class CholeskyGaussianPd(Pd):
-    def __init__(self, flat):
+    def __init__(self, flat, size):
         self.flat = flat
-        mean, logstd = tf.split(axis=len(flat.shape)-1, num_or_size_splits=2, value=flat)
+        self.size = size
+        mask = np.triu_indices(size)
+        mask = mask[0] * size + mask[1]
+        mask = np.expand_dims(mask, -1)
+        mean, logstd_params = tf.split(axis=0, 
+                                num_or_size_splits=[size, flat.shape[-1].value - size], 
+                                value=flat)
         self.mean = mean
-        self.logstd = logstd
-        self.std = tf.exp(logstd)
+        self.logstd = logstd = tf.scatter_nd(mask, logstd_params, shape=[size**2])
+        self.logstd = tf.reshape(logstd, shape=[size, size])
+        self.std = tf.exp(self.logstd)
+        
     def flatparam(self):
         return self.flat
     def mode(self):
         return self.mean
+    #TODO: test
     def neglogp(self, x):
-        return 0.5 * tf.reduce_sum(tf.square((x - self.mean) / self.std), axis=-1) \
-               + 0.5 * np.log(2.0 * np.pi) * tf.to_float(tf.shape(x)[-1]) \
-               + tf.reduce_sum(self.logstd, axis=-1)
+        log_det_cov = 2 * tf.trace(self.logstd)
+        delta = tf.expand_dims(x - self.mean, axis=-1)
+        stds = tf.tile(self.std, [self.mean.shape[0].value, 1])
+        stds = tf.reshape(stds, shape=[self.mean.shape[0].value, 2, 2])
+        half_quadratic = tf.matrix_triangular_solve(stds, 
+                                                    delta, lower=False)
+        quadratic = tf.matmul(half_quadratic, tf.matrix_transpose(half_quadratic))
+        
+        return 0.5 * (log_det_cov + quadratic + self.size*tf.log(2*tf.constant(np.pi)))
+    #TODO:
     def kl(self, other):
         assert isinstance(other, DiagGaussianPd)
         return tf.reduce_sum(other.logstd - self.logstd + (tf.square(self.std) + tf.square(self.mean - other.mean)) / (2.0 * tf.square(other.std)) - 0.5, axis=-1)
+    #TODO:
     def entropy(self):
         return tf.reduce_sum(self.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
+    #TODO: test
     def sample(self):
-        return self.mean + self.std * tf.random_normal(tf.shape(self.mean))
+        noise = tf.random_normal([self.size])
+        return self.mean + tf.einsum('ij,i->i', self.std, noise)
+    #TODO:
     def renyi(self, other, alpha=2.):
         assert isinstance(other, DiagGaussianPd)
         var_alpha = alpha * tf.square(other.std) + (1. - alpha) * tf.square(self.std)
