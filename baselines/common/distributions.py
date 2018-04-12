@@ -210,53 +210,91 @@ class DiagGaussianPd(Pd):
 
 #Single distribution: use for higher order policy or on single state
 class CholeskyGaussianPd(Pd):
-    def __init__(self, flat, size):
-        self.flat = flat
-        self.size = size
+    """d-dimensional multivariate Gaussian distribution"""
+    def __init__(self, flat, size=None):
+        """Params:
+            flat: the d(d+3)/2 necessary parameters in a flat tensor. 
+                For a d-dimensional Gaussian, first d parameters for the mean,
+                then d(d+1)/2 parameters for the nonzero elements of upper triangular
+                standard deviation matrix L. The diagonal entries are exponentiated, while the others are kept
+                as is. The covariance matrix is then LL^T. Initializing all standard deviation parameters to
+                zero produces an identity covariance matrix.
+            size: dimension d, inferred if None and tf default session is active
+        """
+        #Infer dimension
+        l = flat.shape[-1].value
+        if size is None:
+            if tf.get_default_session() is None:
+                raise ValueError('Multivariate Gaussian: state dimension explicitly or enter session to infer')
+            
+            self.flat = flat
+            self.size = size = U.function([],[tf.cast(0.5*(-3 + tf.sqrt(
+                    9. + 8*l)), tf.int32)])()[0]
+        else: 
+            self.size = size
+            if size*(size+3)!=2*l:
+                raise ValueError('Multivariate Gaussian: parameter size does not match dimension')
+        #Build std matrix    
         mask = np.triu_indices(size)
         mask = mask[0] * size + mask[1]
         mask = np.expand_dims(mask, -1)
-        mean, logstd_params = tf.split(axis=0, 
-                                num_or_size_splits=[size, flat.shape[-1].value - size], 
+        mean, std_params = tf.split(axis=0, 
+                                num_or_size_splits=[size, l-size], 
                                 value=flat)
         self.mean = mean
-        self.logstd = logstd = tf.scatter_nd(mask, logstd_params, shape=[size**2])
-        self.logstd = tf.reshape(logstd, shape=[size, size])
-        self.std = tf.exp(self.logstd)
+        self.std = tf.scatter_nd(mask, std_params, shape=[size**2])
+        self.std = tf.reshape(self.std, shape=[size, size])
+        self.std = (tf.ones(shape=[self.size, self.size]) - tf.eye(self.size)) * self.std + \
+            tf.eye(self.size) * tf.exp(self.std)
+        self.cov = tf.matmul(self.std, self.std, transpose_b=True)
+        #Distribution properties
+        self.log_det_cov = 2*tf.reduce_sum(tf.log(tf.matrix_diag_part(self.std)))
+        self._entropy = 0.5*(self.size + 
+                             self.size*tf.log(tf.constant(2*np.pi)) + 
+                             self.log_det_cov)
         
     def flatparam(self):
         return self.flat
     def mode(self):
         return self.mean
-    #TODO: test
     def neglogp(self, x):
-        log_det_cov = 2 * tf.trace(self.logstd)
         delta = tf.expand_dims(x - self.mean, axis=-1)
-        stds = tf.tile(self.std, [self.mean.shape[0].value, 1])
-        stds = tf.reshape(stds, shape=[self.mean.shape[0].value, 2, 2])
+        stds = 0*delta + self.std
         half_quadratic = tf.matrix_triangular_solve(stds, 
                                                     delta, lower=False)
-        quadratic = tf.matmul(half_quadratic, tf.matrix_transpose(half_quadratic))
+        quadratic = tf.matmul(half_quadratic, half_quadratic, transpose_a=True)
         
-        return 0.5 * (log_det_cov + quadratic + self.size*tf.log(2*tf.constant(np.pi)))
-    #TODO:
+        return 0.5 * (self.log_det_cov + quadratic + self.size*tf.log(2*tf.constant(np.pi)))
     def kl(self, other):
-        assert isinstance(other, DiagGaussianPd)
-        return tf.reduce_sum(other.logstd - self.logstd + (tf.square(self.std) + tf.square(self.mean - other.mean)) / (2.0 * tf.square(other.std)) - 0.5, axis=-1)
-    #TODO:
+        assert isinstance(other, CholeskyGaussianPd)
+        assert self.size==other.size
+        std_mix = tf.matrix_triangular_solve(other.std, self.std, lower=False)
+        trace_mix = tf.trace(tf.matmul(std_mix, std_mix, transpose_b=True))
+        delta = self.mean - other.mean 
+        delta = tf.expand_dims(delta, axis=-1)
+        half_quadratic = tf.matrix_triangular_solve(other.std, delta, lower=False)
+        quadratic = tf.matmul(half_quadratic, half_quadratic, transpose_a=True)
+        return 0.5 * (self.log_det_cov - other.log_det_cov + trace_mix +
+                      quadratic - self.size)        
     def entropy(self):
-        return tf.reduce_sum(self.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
-    #TODO: test
+        return self._entropy
     def sample(self):
         noise = tf.random_normal([self.size])
-        return self.mean + tf.einsum('ij,i->i', self.std, noise)
-    #TODO:
+        return self.mean + tf.einsum('n,nm->m', noise, self.std)
+    #TODO: test
     def renyi(self, other, alpha=2.):
-        assert isinstance(other, DiagGaussianPd)
-        var_alpha = alpha * tf.square(other.std) + (1. - alpha) * tf.square(self.std)
-        return alpha/2. * tf.reduce_sum(tf.square(self.mean - other.mean) / var_alpha, axis=-1) - \
-               1./(2*(alpha - 1)) * tf.log(tf.reduce_prod(var_alpha, axis=-1) / (tf.reduce_prod(tf.square(self.std), axis=-1) ** (1-alpha) \
-                                * tf.reduce_prod(tf.square(other.std), axis=-1) ** alpha))
+        assert isinstance(other, CholeskyGaussianPd)
+        assert self.size==other.size
+        delta = self.mean - other.mean
+        delta = tf.expand_dims(delta, axis=-1)
+        mix_cov = alpha*other.cov + (1-alpha)*self.cov
+        mix_std = tf.cholesky(mix_cov)
+        half_quadratic = tf.matrix_triangular_solve(mix_std, delta, lower=True)
+        quadratic = tf.matmul(half_quadratic, half_quadratic, transpose_a=True)
+        log_det_mix = 2*tf.reduce_sum(tf.log(tf.matrix_diag_part(mix_std)))
+        return 0.5*alpha*quadratic - 1./(2*(alpha-1))*(log_det_mix - 
+                                      (1-alpha)*self.log_det_cov - 
+                                      alpha*other.log_det_cov)
 
 
     @classmethod
