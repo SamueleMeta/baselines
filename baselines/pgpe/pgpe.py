@@ -53,6 +53,7 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
             
         #Batch of episodes
+        #TODO: try symmetric sampling
         actor_params = []
         rets, disc_rets, lens = [], [], []
         for ep in range(batch_size):
@@ -63,25 +64,6 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
             disc_rets.append(disc_ret)
             lens.append(ep_len)
             
-            """
-            #Sample symmetric actor parameters
-            theta_1, theta_2 = pol.draw_symmetric_actor_params()
-            actor_params.append(theta_1)
-            
-            #Run 2 episodes and save average return
-            pol.set_actor_params(theta_1)
-            ret_1, disc_ret_1, ep_len_1 = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
-            rets.append(ret_1)
-            lens.append(ep_len_1)
-            
-            pol.set_actor_params(theta_2)
-            ret_2, disc_ret_2, ep_len_2 = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
-            rets.append(ret_2)
-            lens.append(ep_len_2)
-            
-            disc_rets.append((disc_ret_1 + disc_ret_2)/2)
-            """
-        
         logger.log('\n********** Iteration %i ************' % it)
         if verbose>1:
             print('Higher-order parameters:', rho)

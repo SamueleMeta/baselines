@@ -18,6 +18,14 @@ import baselines.common.tf_util as U
 sess = U.single_threaded_session()
 sess.__enter__()
 
+envs = {'cartpole': 'ContCartPole-v0',
+        'lqg': 'LQG1D',
+        }
+
+algos = {'pgpe': pgpe,
+         'npgpe': npgpe,
+        }
+
 #Seeds: 0, 27, 62, 315, 640
 
 def train(seed):
@@ -36,25 +44,27 @@ def train(seed):
                       num_hid_layers=0,
                       diagonal=True,
                       use_bias=False,
-                      standardize_input =False,
+                      standardize_input=True,
                       seed=seed)
     
-    npgpe.learn(env,
+    pgpe.learn(env,
               pol,
               gamma=0.99,
-              step_size=1e-2,
-              batch_size=50,
+              step_size=1., #1e-2
+              batch_size=100,
               task_horizon=200,
               max_iterations=100,
               use_baseline=True,
-              step_size_strategy=None,
+              step_size_strategy='norm',
               save_to=DIR,
-              verbose=2,
+              verbose=1,
               feature_fun=np.ravel)
 
 if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--seed', help='RNG seed', type=int, default=None)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=107)
+    parser.add_argument('--algo', help='Algorithm (pgpe, npgpe...)', type=int, default='pgpe')
+    parser.add_argument('--env', help='Environment (RL task)', type=int, default='cartpole')
     args = parser.parse_args()
     train(args.seed)

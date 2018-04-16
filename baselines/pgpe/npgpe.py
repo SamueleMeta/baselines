@@ -12,14 +12,11 @@ Created on Wed Apr  4 18:13:18 2018
     Optimal baseline: Zhao, Tingting, et al. "Analysis and
         improvement of policy gradient estimation." Advances in Neural
         Information Processing Systems. 2011.
-    NPGPE: Zhao, Tingting, et al. "Analysis and improvement of policy gradient
-        estimation." Advances in Neural Information Processing Systems. 2011.
 """
 
 import numpy as np
 from baselines import logger
 
-eps = 1e-12
 
 def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
     ret = disc_ret = 0
@@ -54,32 +51,24 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
     for it in range(max_iterations):
         rho = pol.eval_params() #Higher-order-policy parameters
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
-        if verbose>1:
-            print('Higher-order parameters:', rho)
-            print('Fisher diagonal:', pol.eval_fisher())
             
         #Batch of episodes
+        #TODO: try symmetric sampling
         actor_params = []
         rets, disc_rets, lens = [], [], []
-        for ep in range(batch_size//2):
-            #Sample symmetric actor parameters
-            theta_1, theta_2 = pol.draw_symmetric_actor_params()
-            actor_params.append(theta_1)
+        for ep in range(batch_size):
+            theta = pol.resample()
+            actor_params.append(theta)
+            ret, disc_ret, ep_len = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
+            rets.append(ret)
+            disc_rets.append(disc_ret)
+            lens.append(ep_len)
             
-            #Run 2 episodes and save average return
-            pol.set_actor_params(theta_1)
-            ret_1, disc_ret_1, ep_len_1 = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
-            rets.append(ret_1)
-            lens.append(ep_len_1)
-            
-            pol.set_actor_params(theta_2)
-            ret_2, disc_ret_2, ep_len_2 = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
-            rets.append(ret_2)
-            lens.append(ep_len_2)
-            
-            disc_rets.append((disc_ret_1 + disc_ret_2)/2)        
-        
         logger.log('\n********** Iteration %i ************' % it)
+        if verbose>1:
+            print('Higher-order parameters:', rho)
+            #print('Fisher diagonal:', pol.eval_fisher())
+            #print('Renyi:', pol.renyi(pol))
         logger.record_tabular('AvgRet', np.mean(rets))
         logger.record_tabular('J', np.mean(disc_rets))
         logger.record_tabular('VarJ', np.var(disc_rets, ddof=1)/batch_size)
@@ -87,24 +76,24 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
         logger.record_tabular('AvgEpLen', np.mean(lens))
         
         #Update higher-order policy
-        grad = pol.eval_gradient(actor_params, disc_rets, use_baseline=use_baseline)
-        grad2norm = np.linalg.norm(grad, 2)
-        #Diagonal covariance case!
-        fisher = pol.eval_fisher(return_diagonal=True)
-        nat_grad = grad/(fisher + eps)
-        nat_grad2norm = np.linalg.norm(grad, 2)
+        #grad = pol.eval_gradient(actor_params, disc_rets, use_baseline=use_baseline)
+        natgrad = pol.eval_natural_gradient(actor_params, disc_rets, use_baseline=use_baseline)
+        if verbose>1:
+            print('natGrad:', natgrad)
+            
+        grad2norm = np.linalg.norm(natgrad, 2)
+        gradmaxnorm = np.linalg.norm(natgrad, np.infty)
+        
         step_size_it = {'const': step_size,
-                        'norm': step_size/nat_grad2norm if nat_grad2norm>0 else 0,
+                        'norm': step_size/grad2norm if grad2norm>0 else 0,
                         'vanish': step_size/np.sqrt(it+1)
                 }.get(step_size_strategy, step_size)
-        delta_rho = step_size_it * nat_grad
+        delta_rho = step_size_it * natgrad
         pol.set_params(rho + delta_rho)
         
         logger.record_tabular('StepSize', step_size_it)
-        logger.record_tabular('GradInftyNorm', np.linalg.norm(grad, np.infty))
-        logger.record_tabular('Grad2Norm', grad2norm)
-        logger.record_tabular('NatGradInftyNorm', np.linalg.norm(nat_grad, np.infty))
-        logger.record_tabular('NatGrad2Norm', nat_grad2norm)
+        logger.record_tabular('NatGradInftyNorm', gradmaxnorm)
+        logger.record_tabular('NatGrad2Norm', grad2norm) 
         logger.dump_tabular()
         
     
