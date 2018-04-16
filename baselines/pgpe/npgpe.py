@@ -61,17 +61,23 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
         #Batch of episodes
         actor_params = []
         rets, disc_rets, lens = [], [], []
-        for ep in range(batch_size):
-            #Initialize actor
-            theta = pol.resample() #Sample actor parameters
-            actor_params.append(theta)
+        for ep in range(batch_size//2):
+            #Sample symmetric actor parameters
+            theta_1, theta_2 = pol.draw_symmetric_actor_params()
+            actor_params.append(theta_1)
             
-            #Run episode
-            ret, disc_ret, ep_len = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
-            rets.append(ret)
-            disc_rets.append(disc_ret)
-            lens.append(ep_len)
-        
+            #Run 2 episodes and save average return
+            pol.set_actor_params(theta_1)
+            ret_1, disc_ret_1, ep_len_1 = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
+            rets.append(ret_1)
+            lens.append(ep_len_1)
+            
+            pol.set_actor_params(theta_2)
+            ret_2, disc_ret_2, ep_len_2 = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
+            rets.append(ret_2)
+            lens.append(ep_len_2)
+            
+            disc_rets.append((disc_ret_1 + disc_ret_2)/2)        
         
         logger.log('\n********** Iteration %i ************' % it)
         logger.record_tabular('AvgRet', np.mean(rets))

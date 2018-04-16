@@ -82,6 +82,20 @@ class DiagGaussianPdType(PdType):
     def sample_dtype(self):
         return tf.float32
 
+class CholeskyGaussianPdType(PdType):
+    def __init__(self, size):
+        self.size = size
+    def pdclass(self):
+        return CholeskyGaussianPd
+    def param_shape(self):
+        return [self.size*(self.size+3)//2]
+    def sample_shape(self):
+        return [self.size]
+    def sample_dtype(self):
+        return tf.float32
+    def pdfromflat(self, flat):
+        return self.pdclass()(flat, self.size)
+
 class BernoulliPdType(PdType):
     def __init__(self, size):
         self.size = size
@@ -196,6 +210,10 @@ class DiagGaussianPd(Pd):
         return tf.reduce_sum(self.logstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1)
     def sample(self):
         return self.mean + self.std * tf.random_normal(tf.shape(self.mean))
+    def sample_symmetric(self):
+        noise = tf.random_normal(tf.shape(self.mean))
+        return (self.mean + self.std * noise, self.mean - self.std * noise)
+                
     def renyi(self, other, alpha=2.):
         assert isinstance(other, DiagGaussianPd)
         var_alpha = alpha * tf.square(other.std) + (1. - alpha) * tf.square(self.std)
@@ -211,7 +229,7 @@ class DiagGaussianPd(Pd):
 #Single distribution: use for higher order policy or on single state
 class CholeskyGaussianPd(Pd):
     """d-dimensional multivariate Gaussian distribution"""
-    def __init__(self, flat, size=None):
+    def __init__(self, flat, size):
         """Params:
             flat: the d(d+3)/2 necessary parameters in a flat tensor. 
                 For a d-dimensional Gaussian, first d parameters for the mean,
@@ -219,21 +237,13 @@ class CholeskyGaussianPd(Pd):
                 standard deviation matrix L. The diagonal entries are exponentiated, while the others are kept
                 as is. The covariance matrix is then LL^T. Initializing all standard deviation parameters to
                 zero produces an identity covariance matrix.
-            size: dimension d, inferred if None and tf default session is active
+            size: dimension d
         """
-        #Infer dimension
         l = flat.shape[-1].value
-        if size is None:
-            if tf.get_default_session() is None:
-                raise ValueError('Multivariate Gaussian: state dimension explicitly or enter session to infer')
-            
-            self.flat = flat
-            self.size = size = U.function([],[tf.cast(0.5*(-3 + tf.sqrt(
-                    9. + 8*l)), tf.int32)])()[0]
-        else: 
-            self.size = size
-            if size*(size+3)!=2*l:
-                raise ValueError('Multivariate Gaussian: parameter size does not match dimension')
+        if size*(size+3)!=2*l:
+            raise ValueError('Multivariate Gaussian: parameter size does not match dimension')
+        self.size = size
+        
         #Build std matrix    
         mask = np.triu_indices(size)
         mask = mask[0] * size + mask[1]
@@ -281,6 +291,10 @@ class CholeskyGaussianPd(Pd):
     def sample(self):
         noise = tf.random_normal([self.size])
         return self.mean + tf.einsum('n,nm->m', noise, self.std)
+    def sample_symmetric(self):
+        noise = tf.random_normal([self.size])
+        return (self.mean + tf.einsum('n,nm->m', noise, self.std),
+                self.mean - tf.einsum('n,nm->m', noise, self.std))
     #TODO: test
     def renyi(self, other, alpha=2.):
         assert isinstance(other, CholeskyGaussianPd)

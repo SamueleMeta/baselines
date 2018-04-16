@@ -2,7 +2,7 @@ from baselines.common.mpi_running_mean_std import RunningMeanStd
 import baselines.common.tf_util as U
 import tensorflow as tf
 import gym
-from baselines.common.distributions import DiagGaussianPdType
+from baselines.common.distributions import DiagGaussianPdType, CholeskyGaussianPdType
 import numpy as np
 from baselines.common import set_global_seeds
 
@@ -70,7 +70,7 @@ class PeMlpPolicy(object):
                 #Mlp feature extraction
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
                                                       name='fc%i'%(i+1),
-                                                      kernel_initializer=U.normc_initializer(1.0),use_bias=use_bias))
+                                                      kernel_initializer=U.normc_initializer(1),use_bias=use_bias))
             if deterministic and isinstance(ac_space, gym.spaces.Box):
                 #Determinisitc action selection
                 self.actor_mean = actor_mean = tf.layers.dense(last_out, ac_space.shape[0],
@@ -92,22 +92,32 @@ class PeMlpPolicy(object):
             #Initial means sampled from a normal distribution N(0,1)
             self.higher_mean = higher_mean = tf.get_variable(name='higher_mean',
                                                shape=[n_actor_weights],
-                                               initializer=tf.initializers.random_normal())
+                                               initializer=tf.initializers.random_normal(stddev=1.))
             if diagonal:
                 #Diagonal covariance matrix; all stds initialized to 0
                 self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
                                                shape=[n_actor_weights],
                                                initializer=tf.initializers.constant(0.))
+                pdparam = tf.concat([higher_mean, higher_mean * 0. + 
+                                   higher_logstd], axis=0)
+                self.pdtype = pdtype = DiagGaussianPdType(n_actor_weights.value) 
             else: 
-                #Cholesky covariance matri
-                raise NotImplementedError
-        
+                #Cholesky covariance matrix
+                self.higher_logstd = higher_logstd = tf.get_variable(
+                    name='higher_logstd',
+                    shape=[n_actor_weights*(n_actor_weights + 1)//2],
+                    initializer=tf.initializers.constant(0.))
+                pdparam = tf.concat([higher_mean, 
+                                    higher_logstd], axis=0)
+                self.pdtype = pdtype = CholeskyGaussianPdType(
+                    n_actor_weights.value) 
+
         #Sample actor weights
-        pdparam = tf.concat([higher_mean, higher_mean * 0. + \
-                               higher_logstd], axis=0)
-        self.pdtype = pdtype = DiagGaussianPdType(2 * n_actor_weights.value) 
         self.pd = pdtype.pdfromflat(pdparam)
         sampled_actor_params = self.pd.sample()
+        symm_sampled_actor_params = self.pd.sample_symmetric()
+        self._sample_symm_actor_params = U.function(
+            [],list(symm_sampled_actor_params))
         self._sample_actor_params = U.function([], [sampled_actor_params])
             
         #Assign actor weights
@@ -215,6 +225,9 @@ class PeMlpPolicy(object):
         sampled_actor_params = self._sample_actor_params()[0]
         return sampled_actor_params
 
+    def draw_symmetric_actor_params(self):
+        return tuple(self._sample_symm_actor_params())
+
     def eval_actor_params(self):
         """Get actor params as last assigned"""
         with tf.variable_scope(self.scope+'/actor') as scope:
@@ -231,24 +244,23 @@ class PeMlpPolicy(object):
 
     #Distribution properties
     def renyi(self, other, order=2, exponentiate=False):
-        """Renyi divergence
+        """Renyi divergence 
+            Special case: order=1 is kl divergence
         
         Params:
             other: policy to evaluate the distance from
             order: order of the Renyi divergence
-            exponentiate: if true, actually returns e^Renyi(self, other)
+            exponentiate: if true, actually returns e^Renyi(self||other)
         """
-        if order<2:
-            raise NotImplementedError('Only order>=2 currently available')
-        if not self.diagonal:
-            raise NotImplementedError(
-                'Only diagonal covariance currently supported')
+        if order==1:
+            result = self.pd.kl(other.pd)
+        elif order>=2:
+            result = self.pd.renyi(other.pd, alpha=order) 
         else:
-            result = self.pd.renyi(other.pd, alpha=order)
+            raise ValueError('Order must be >= 1')
         
         if exponentiate:
             result = tf.exp(result)
-
         return U.function([], [result])()[0]
 
     def eval_fisher(self, return_diagonal=True):
@@ -329,6 +341,51 @@ class PeMlpPolicy(object):
                 return pgpe
                 
 
+    def eval_natural_gradient(self, actor_params, rets, use_baseline=True,
+                      behavioral=None):
+        """
+        Compute PGPE policy gradient given a batch of episodes
+
+        Params:
+            actor_params: list of actor parameters (arrays), one per episode
+            rets: flat list of total [discounted] returns, one per episode
+            use_baseline: wether to employ a variance-minimizing baseline 
+                (may be more efficient without)
+            behavioral: higher-order policy used to collect data (off-policy
+                case). If None, the present policy is assumed to be the 
+                behavioral(on-policy case)
+
+        References:
+            Optimal baseline for PGPE: Zhao, Tingting, et al. "Analysis and
+            improvement of policy gradient estimation." Advances in Neural
+            Information Processing Systems. 2011.
+
+        """ 
+        assert rets and len(actor_params)==len(rets)
+        batch_size = len(rets)
+        fisher = self.eval_fisher() + 1e-24
+        
+        if not behavioral:
+            #On policy
+            if not use_baseline:
+                #Without baseline (more efficient)
+                pgpe_times_n = np.ravel(self._get_pgpe_times_n(actor_params, rets)[0])
+                grad = pgpe_times_n/batch_size
+                if self.diagonal:
+                    return grad/(fisher)
+            elif self.diagonal:
+                #With optimal baseline
+                rets = np.array(rets)
+                scores = np.zeros((batch_size, self._n_higher_params))
+                score_norms = np.zeros(batch_size)
+                for (theta, i) in zip(actor_params, range(batch_size)):
+                    scores[i] = self._get_score(theta)[0]
+                    score_norms[i] = np.norm(scores[i]/fisher)
+                b = np.sum(rets * score_norms**2) / np.sum(score_norms**2)
+                pgpe = np.mean(((rets - b).T * scores.T).T, axis=0)
+                return pgpe
+        else:
+            raise NotImplementedError
 
     def _build_iw_graph(self, behavioral):
         #Batch

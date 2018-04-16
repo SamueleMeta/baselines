@@ -51,27 +51,42 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
     for it in range(max_iterations):
         rho = pol.eval_params() #Higher-order-policy parameters
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
-        if verbose>1:
-            print('Higher-order parameters:', rho)
-            print('Fisher diagonal:', pol.eval_fisher())
-            #print('Renyi:', pol.renyi(pol))
             
         #Batch of episodes
         actor_params = []
         rets, disc_rets, lens = [], [], []
         for ep in range(batch_size):
-            #Initialize actor
-            theta = pol.resample() #Sample actor parameters
+            theta = pol.resample()
             actor_params.append(theta)
-            
-            #Run episode
             ret, disc_ret, ep_len = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
             rets.append(ret)
             disc_rets.append(disc_ret)
             lens.append(ep_len)
-        
+            
+            """
+            #Sample symmetric actor parameters
+            theta_1, theta_2 = pol.draw_symmetric_actor_params()
+            actor_params.append(theta_1)
+            
+            #Run 2 episodes and save average return
+            pol.set_actor_params(theta_1)
+            ret_1, disc_ret_1, ep_len_1 = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
+            rets.append(ret_1)
+            lens.append(ep_len_1)
+            
+            pol.set_actor_params(theta_2)
+            ret_2, disc_ret_2, ep_len_2 = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
+            rets.append(ret_2)
+            lens.append(ep_len_2)
+            
+            disc_rets.append((disc_ret_1 + disc_ret_2)/2)
+            """
         
         logger.log('\n********** Iteration %i ************' % it)
+        if verbose>1:
+            print('Higher-order parameters:', rho)
+            #print('Fisher diagonal:', pol.eval_fisher())
+            #print('Renyi:', pol.renyi(pol))
         logger.record_tabular('AvgRet', np.mean(rets))
         logger.record_tabular('J', np.mean(disc_rets))
         logger.record_tabular('VarJ', np.var(disc_rets, ddof=1)/batch_size)
@@ -80,7 +95,12 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
         
         #Update higher-order policy
         grad = pol.eval_gradient(actor_params, disc_rets, use_baseline=use_baseline)
+        if verbose>1:
+            print('grad:', grad)
+            
         grad2norm = np.linalg.norm(grad, 2)
+        gradmaxnorm = np.linalg.norm(grad, np.infty)
+        
         step_size_it = {'const': step_size,
                         'norm': step_size/grad2norm if grad2norm>0 else 0,
                         'vanish': step_size/np.sqrt(it+1)
@@ -89,7 +109,7 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
         pol.set_params(rho + delta_rho)
         
         logger.record_tabular('StepSize', step_size_it)
-        logger.record_tabular('GradInftyNorm', np.linalg.norm(grad, np.infty))
+        logger.record_tabular('GradInftyNorm', gradmaxnorm)
         logger.record_tabular('Grad2Norm', grad2norm) 
         logger.dump_tabular()
         

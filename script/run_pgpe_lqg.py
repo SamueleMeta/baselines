@@ -10,6 +10,7 @@ import gym
 import baselines.envs.continuous_cartpole
 from baselines.policy.pemlp_policy import PeMlpPolicy
 import baselines.pgpe.pgpe as pgpe
+import baselines.pgpe.npgpe as npgpe
 import baselines.envs.lqg1d
 
 import baselines.common.tf_util as U
@@ -33,14 +34,14 @@ def train(seed):
                       hid_size=64,
                       num_hid_layers=0,
                       use_bias=False,
-                      standardize_input = True,
+                      standardize_input=False,
                       seed=seed)
     
     pgpe.learn(env,
               pol,
               gamma=0.99,
-              step_size=1.,
-              batch_size=100,
+              step_size=0.1,
+              batch_size=20,
               task_horizon=500,
               max_iterations=500,
               use_baseline=True,
