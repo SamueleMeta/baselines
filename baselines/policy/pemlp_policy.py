@@ -5,6 +5,7 @@ import gym
 from baselines.common.distributions import DiagGaussianPdType, CholeskyGaussianPdType
 import numpy as np
 from baselines.common import set_global_seeds
+import scipy.stats as sts
 
 """References
 PGPE: Sehnke, Frank, et al. "Policy gradients with parameter-based exploration for
@@ -271,11 +272,11 @@ class PeMlpPolicy(object):
                 'Only diagonal covariance currently supported')
         return np.ravel(U.function([],[self._fisher_diag])()[0])
 
-    def fisher_product(self, theta):
-        if not self.diagonal or not return_diagonal:
+    def fisher_product(self, x):
+        if not self.diagonal:
             raise NotImplementedError(
                 'Only diagonal covariance currently supported')
-        return theta/self.eval_fisher()
+        return x/self.eval_fisher()
 
     #Gradient computation
     def eval_gradient(self, actor_params, rets, use_baseline=True,
@@ -374,29 +375,63 @@ class PeMlpPolicy(object):
                 pgpe_times_n = np.ravel(self._get_pgpe_times_n(actor_params, rets)[0])
                 grad = pgpe_times_n/batch_size
                 if self.diagonal:
-                    return grad/(fisher)
-            elif self.diagonal:
+                    return grad/fisher
+                else: 
+                    raise NotImplementedError #TODO: full on w/o baseline
+            else:
                 #With optimal baseline
-                rets = np.array(rets)
-                scores = np.zeros((batch_size, self._n_higher_params))
-                score_norms = np.zeros(batch_size)
-                for (theta, i) in zip(actor_params, range(batch_size)):
-                    scores[i] = self._get_score(theta)[0]
-                    score_norms[i] = np.linalg.norm(scores[i]/fisher)
-                b = np.sum(rets * score_norms**2) / np.sum(score_norms**2)
-                npgpe = np.mean(((rets - b).T * scores.T).T, axis=0)/fisher
-                return npgpe
+                if self.diagonal:
+                    rets = np.array(rets)
+                    scores = np.zeros((batch_size, self._n_higher_params))
+                    score_norms = np.zeros(batch_size)
+                    for (theta, i) in zip(actor_params, range(batch_size)):
+                        scores[i] = self._get_score(theta)[0]
+                        score_norms[i] = np.linalg.norm(scores[i]/fisher)
+                    b = np.sum(rets * score_norms**2) / np.sum(score_norms**2)
+                    npgpe = np.mean(((rets - b).T * scores.T).T, axis=0)/fisher
+                    return npgpe
+                else:
+                    raise NotImplementedError #TODO: full on with baseline
         else:
-            raise NotImplementedError
+            #Off-policy
+            if behavioral is not self._behavioral:
+                self._build_iw_graph(behavioral)
+                self._behavioral = behavioral
+            if not use_baseline and self.diagonal:
+                #Without baseline (more efficient)
+                off_pgpe_times_n = np.ravel(self._get_off_pgpe_times_n(actor_params,
+                                                              rets)[0])
+                grad = off_pgpe_times_n/batch_size
+                return grad/fisher
+            else:
+                raise NotImplementedError #TODO: full off with baseline, diagonal off with baseline
+    
+    def eval_bound(self, actor_params, rets, behavioral, delta):
+        if behavioral is not self._behavioral:
+                self._build_iw_graph(behavioral)
+                self._behavioral = behavioral
+        batch_size = len(rets)
+        penal_coeff = sts.t.ppf(1 - delta, batch_size - 1) / np.sqrt(batch_size)
 
+        return self._get_bound_and_grad(actor_params, rets, penal_coeff)
+             
+    
     def _build_iw_graph(self, behavioral):
         #Batch
-        iws = self._probs/behavioral._probs
+        unn_iws = self._probs/behavioral._probs
+        iws = unn_iws/tf.reduce_sum(unn_iws)
+        self._get_unn_iws = U.function([self._actor_params_in], [unn_iws])
         self._get_iws = U.function([self._actor_params_in], [iws])
+        J_hat, J_var = tf.nn.moments(self._rets_in * iws)
+        self._penal_coeff = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
+        bound = self.J_hat - tf.sqrt(self.J_var) * self.penal_coeff
+        bound_grad = U.flatgrad(bound)
         off_pgpe_times_n = U.flatgrad((tf.stop_gradient(iws) * 
                                              self._logprobs * 
                                              self._rets_in), 
                                             self._higher_params)
+                    
         self._get_off_pgpe_times_n = U.function([self._actor_params_in,
                                                 self._rets_in],
                                                 [off_pgpe_times_n])
+        self._get_bound_and_grad = U.function([self._actor_params_in, self._rets_in, self._penal_coeff],[bound, bound_grad])
