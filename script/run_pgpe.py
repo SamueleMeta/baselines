@@ -20,6 +20,8 @@ sess.__enter__()
 
 envs = {'cartpole': 'ContCartPole-v0',
         'lqg': 'LQG1D-v0',
+        'swimmer': 'Swimmer-v2',
+        'cheetah': 'HalfCheetah-v2',
         }
 
 algos = {'pgpe': pgpe,
@@ -44,7 +46,7 @@ def train(seed, env_name, algo_name):
                       num_hid_layers=0,
                       diagonal=True,
                       use_bias=False,
-                      standardize_input=True,
+                      standardize_input=False,
                       seed=seed)
     
     algos[algo_name].learn(env,
@@ -64,7 +66,7 @@ if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
-    parser.add_argument('--algo', help='Algorithm (pgpe, npgpe...)', type=str, default='pgpe')
+    parser.add_argument('--algo', help='Algorithm (pgpe, npgpe...)', type=str, default='npgpe')
     parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
     args = parser.parse_args()
     train(args.seed, args.env, args.algo)
