@@ -1,4 +1,4 @@
-from baselines.common.mpi_running_mean_std import RunningMeanStd
+from baselines.common.running_mean_std import RunningMeanStd
 import baselines.common.tf_util as U
 import tensorflow as tf
 import gym
@@ -24,15 +24,14 @@ class PeMlpPolicy(object):
             #Sample initial actor params
             tf.get_default_session().run(self._use_sampled_actor_params)
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
+    def _init(self, ob_space, ac_space, hid_layers=[],
               deterministic=True, diagonal=True,
               use_bias=True, standardize_input=True, use_critic=False, 
               seed=None):
         """Params:
             ob_space: task observation space
             ac_space : task action space
-            hid_size: width of hidden layers of action policy networks
-            num_hid_layers: depth of action policy networks
+            hid__layers: list with width of each hidden layer
             deterministic: whether the actor is deterministic
             diagonal: whether the higher order policy has a diagonal covariance
             matrix
@@ -58,15 +57,15 @@ class PeMlpPolicy(object):
             with tf.variable_scope('critic'):
                 obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
                 last_out = obz if standardize_input else ob
-                for i in range(num_hid_layers):
+                for i, hid_size in enumerate(hid_layers):
                     last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size, name="fc%i"%(i+1), kernel_initializer=U.normc_initializer(1.0)))
                 self.vpred = tf.layers.dense(last_out, 1, name='final', kernel_initializer=U.normc_initializer(1.0))[:,0]
 
         #Actor (N.B.: weight initialization is irrelevant)
         with tf.variable_scope('actor'):
-            obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
+            obz = tf.clip_by_value((ob - self.ob_rms.mean) / np.sqrt(self.ob_rms.var), -5.0, 5.0)
             last_out = obz if standardize_input else ob
-            for i in range(num_hid_layers):
+            for i, hid_size in enumerate(hid_layers):
                 #Mlp feature extraction
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
                                                       name='fc%i'%(i+1),
@@ -166,11 +165,11 @@ class PeMlpPolicy(object):
         self._get_score_norm = U.function([one_actor_param_in], [score_norm])
 
         #Batch off-policy PGPE
-        self._probs = probs = tf.exp(logprobs) 
+        self._probs = tf.exp(logprobs) 
         self._behavioral = None
     
         #One episode off-PGPE 
-        self._one_prob = one_prob = tf.exp(one_logprob)
+        self._one_prob = tf.exp(one_logprob)
         
         #Renyi computation
         self._det_sigma = tf.exp(tf.reduce_sum(self.higher_logstd))
@@ -192,6 +191,9 @@ class PeMlpPolicy(object):
                ob: current state, or a list of states
                resample: whether to resample actor params before acting
         """
+        if hasattr(self, "ob_rms"):
+            self.ob_rms.update(ob) # update running mean/std for policy
+        
         if resample:
             self.resample()
 

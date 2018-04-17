@@ -28,10 +28,11 @@ algos = {'pgpe': pgpe,
          'npgpe': npgpe,
         }
 
-#Seeds: 0, 27, 62, 315, 640
+#Seeds: 107, 583, 850, 730, 808
 
 def train(seed, env_name, algo_name):
-    DIR = '../results/' + algo_name + '/' + env_name + '/seed_' + str(seed)
+    DIR = './temp'
+    #DIR = '../results/' + algo_name + '/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
@@ -42,20 +43,19 @@ def train(seed, env_name, algo_name):
     pol = PeMlpPolicy('pol',
                       env.observation_space,
                       env.action_space,
-                      hid_size=4,
-                      num_hid_layers=0,
+                      hid_layers=[100,50,25],
                       diagonal=True,
-                      use_bias=False,
-                      standardize_input=False,
+                      use_bias=True,
+                      standardize_input=True,
                       seed=seed)
     
     algos[algo_name].learn(env,
               pol,
-              gamma=0.99,
+              gamma=1.,
               step_size=1., #1e-2
               batch_size=100,
-              task_horizon=200,
-              max_iterations=100,
+              task_horizon=500,
+              max_iterations=500,
               use_baseline=True,
               step_size_strategy='norm',
               save_to=DIR,

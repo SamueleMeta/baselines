@@ -14,11 +14,14 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 #classic_control
-from gym.envs.registration import register
-register(
-    id='ContCartPole-v0',
-    entry_point='baselines.envs.continuous_cartpole:CartPoleEnv'
-)
+from gym.envs.registration import register, spec
+try:
+    spec('ContCartPole-v0')
+except:
+    register(
+        id='ContCartPole-v0',
+        entry_point='baselines.envs.continuous_cartpole:CartPoleEnv'
+    )
 
 class CartPoleEnv(gym.Env):
     metadata = {
