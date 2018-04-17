@@ -213,7 +213,7 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
     return theta_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
 
-def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=30):
+def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
     theta = theta_init
     improvement = 0.
     set_parameter(theta)
@@ -280,6 +280,7 @@ def learn(env, policy_func, *,
           bound='student',
           ess_correction=False,
           line_search_type='binary',
+          save_weights=False,
           callback=None):
 
     nworkers = MPI.COMM_WORLD.Get_size()
@@ -345,7 +346,7 @@ def learn(env, policy_func, *,
     cumulative_empirical_d2 = tf.reduce_mean(tf.exp(cumulative_empirical_d2))
 
     ess_classic = tf.linalg.norm(iw_split, 1) ** 2 / tf.linalg.norm(iw_split, 2) ** 2
-    ess_renyi = num_episodes / cumulative_empirical_d2 + 1
+    ess_renyi = num_episodes / cumulative_empirical_d2
 
     if ess_correction == True or ess_correction == 'classic':
         ess = ess_classic
@@ -355,27 +356,27 @@ def learn(env, policy_func, *,
     if iw_norm == 'sn':
         if iw_method == 'pdis':
             raise NotImplementedError()
-        iwn_split = (iw_split + 1e-24) / tf.reduce_sum(iw_split + 1e-24, axis=0)
-        #iwn_split = iw_split / tf.reduce_sum(iw_split, axis=0)
+        iwn_split = iw_split / tf.reduce_sum(iw_split, axis=0)
         iwn_split = tf.squeeze(iwn_split)
         ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
         return_mean = tf.reduce_sum(ep_return * iwn_split)
-        if ess_correction: #non è corretto
-            return_std = tf.sqrt(tf.reduce_sum(iwn_split ** 2 * (ep_return - return_mean) ** 2) * num_episodes / (ess - 1))
+        if ess_correction:
+            return_std = tf.sqrt(tf.reduce_sum(iwn_split * (ep_return - return_mean) ** 2) * cumulative_empirical_d2)
         else:
             return_std = tf.sqrt(tf.reduce_sum(iwn_split ** 2 * (ep_return - return_mean) ** 2) * num_episodes)
         third_central_moment = tf.reduce_sum(iwn_split ** 3 * (ep_return - return_mean) ** 3) * num_episodes
-        #return_std = tf.sqrt(tf.reduce_sum(iw_split ** 2 * (ep_return - return_mean) ** 2) / (num_episodes - 1))
-        #third_central_moment = tf.reduce_sum(iw_split ** 3 * (ep_return - return_mean) ** 3) / (num_episodes - 1)
     else:
         iwn_split = iw_split / num_episodes
         ep_return = tf.reduce_sum(iwn_split * mask_split * disc_rew_split, axis=1)
         return_mean = tf.reduce_sum(ep_return)
-        return_std = tf.sqrt(tf.reduce_sum((ep_return - return_mean) ** 2) / (num_episodes - 1))
+        if ess_correction:
+            return_std = tf.sqrt(tf.reduce_sum((ep_return - return_mean) ** 2) / (num_episodes - 1) * ess_classic / ess_renyi)
+        else:
+            return_std = tf.sqrt(tf.reduce_sum((ep_return - return_mean) ** 2) / (num_episodes - 1))
         third_central_moment = tf.reduce_sum(ep_return - return_mean) ** 3 / (num_episodes - 1)
 
     if bound == 'student':
-        if ess_correction: #anche i gradi di libertà dovrebbero essere considerati
+        if ess_correction:
             bound_ = return_mean - sts.t.ppf(1 - delta, num_episodes - 1) / np.sqrt(num_episodes) * return_std
         else:
             bound_ = return_mean - sts.t.ppf(1 - delta, num_episodes - 1) / np.sqrt(num_episodes) * return_std
@@ -383,8 +384,6 @@ def learn(env, policy_func, *,
         bound_ = return_mean - np.sqrt(1. / delta - 1) / np.sqrt(num_episodes) * return_std
     elif bound == 'johnson':
         bound_ = return_mean - np.sqrt(1. / delta - 1) / np.sqrt(num_episodes) * return_std + third_central_moment / (6 * num_episodes * return_std ** 2)
-
-
 
     if use_natural_gradient in ['approximate', 'approx', True]:
         p = tf.placeholder(dtype=tf.float32, shape=[None])
@@ -459,6 +458,8 @@ def learn(env, policy_func, *,
             logger.record_tabular("EpisodesSoFar", episodes_so_far)
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
+            if save_weights:
+                logger.record_tabular('Weights', str(get_parameter()))
 
             if rank == 0:
                 logger.dump_tabular()
@@ -483,11 +484,13 @@ def learn(env, policy_func, *,
             seg = seg_gen.__next__()
 
         add_vtarg_and_adv(seg, gamma)
-        disc_rew_standard = seg["disc_rew"]  / (max(seg["disc_rew"]) - min(seg["disc_rew"]))
-        #disc_rew_standard = (seg["disc_rew"] - np.mean(seg["disc_rew"])) / np.std(seg["disc_rew"])
+        #disc_rew_standard = seg["disc_rew"]  / (max(seg["disc_rew"]) - min(seg["disc_rew"]))
+        disc_rew_standard = (seg["disc_rew"] - np.mean(seg["disc_rew"])) / np.std(seg["disc_rew"])
         #disc_rew_standard = seg['disc_rew']
         args = seg["ob"], seg["ac"], disc_rew_standard, seg['mask']
         args2 = seg["ob"], seg["ac"], seg["disc_rew"], seg['mask']
+
+        if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])
 
         lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
         listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
