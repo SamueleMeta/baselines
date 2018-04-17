@@ -13,6 +13,9 @@ import baselines.pgpe.npgpe as npgpe
 import baselines.envs.lqg1d
 
 import baselines.common.tf_util as U
+
+export OPENBLAS_NUM_THREADS=4
+
 sess = U.single_threaded_session()
 sess.__enter__()
 
