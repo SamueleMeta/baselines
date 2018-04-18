@@ -90,13 +90,15 @@ class PeMlpPolicy(object):
 
         with tf.variable_scope('higher'):
             #Initial means sampled from a normal distribution N(0,1)
+            higher_mean_init = tf.where(tf.not_equal(self.flat_actor_weights, tf.constant(0, dtype=tf.float32)),
+                        tf.random_normal(shape=[n_actor_weights.value]), tf.zeros(shape=[n_actor_weights]))
             self.higher_mean = higher_mean = tf.get_variable(name='higher_mean',
-                                               shape=[n_actor_weights],
-                                               initializer=tf.initializers.random_normal(stddev=1.))
+                                               initializer=higher_mean_init)
+            
             if diagonal:
                 #Diagonal covariance matrix; all stds initialized to 0
                 self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
-                                               shape=[n_actor_weights],
+                                                                     shape=[n_actor_weights],
                                                initializer=tf.initializers.constant(0.))
                 pdparam = tf.concat([higher_mean, higher_mean * 0. + 
                                    higher_logstd], axis=0)
@@ -148,6 +150,8 @@ class PeMlpPolicy(object):
         self._rets_in = rets_in = U.get_placeholder(name='returns_in',
                                                   dtype=tf.float32,
                                                   shape=[batch_length])
+        ret_mean = tf.reduce_mean(rets_in)
+        self._get_ret_mean = U.function([self._rets_in], [ret_mean])
         self._logprobs = logprobs = self.pd.logp(actor_params_in)
         pgpe_times_n = U.flatgrad(logprobs*rets_in, higher_params)
         self._get_pgpe_times_n = U.function([actor_params_in, rets_in],
@@ -246,7 +250,7 @@ class PeMlpPolicy(object):
             U.SetFromFlat(actor_params)(new_actor_params)
 
     #Distribution properties
-    def renyi(self, other, order=2, exponentiate=False):
+    def eval_renyi(self, other, order=2, exponentiate=False):
         """Renyi divergence 
             Special case: order=1 is kl divergence
         
@@ -266,8 +270,8 @@ class PeMlpPolicy(object):
             result = tf.exp(result)
         return U.function([], [result])()[0]
 
-    def eval_fisher(self, return_diagonal=True):
-        if not self.diagonal or not return_diagonal:
+    def eval_fisher(self):
+        if not self.diagonal:
             raise NotImplementedError(
                 'Only diagonal covariance currently supported')
         return np.ravel(U.function([],[self._fisher_diag])()[0])
@@ -277,6 +281,19 @@ class PeMlpPolicy(object):
             raise NotImplementedError(
                 'Only diagonal covariance currently supported')
         return x/self.eval_fisher()
+
+    #Performance evaluation
+    def eval_performance(self, rets, actor_params, behavioral=None):
+        if behavioral is None:
+            #On policy
+            return self._get_ret_mean(rets)[0]
+        else:
+            #Off policy
+            if behavioral is not self._behavioral:
+                self._build_iw_graph(behavioral)
+                self._behavioral = behavioral
+            return self._get_off_ret_mean(rets, actor_params)[0]
+            
 
     #Gradient computation
     def eval_gradient(self, actor_params, rets, use_baseline=True,
@@ -406,26 +423,53 @@ class PeMlpPolicy(object):
             else:
                 raise NotImplementedError #TODO: full off with baseline, diagonal off with baseline
     
-    def eval_bound(self, actor_params, rets, behavioral, delta):
+    def eval_iws(self, actor_params, behavioral, normalize=True):
+        if behavioral is not self._behavioral:
+            self._build_iw_graph(behavioral)
+            self._behavioral = behavioral        
+        if normalize:
+            return self._get_iws(actor_params)[0]
+        else:
+            return self._get_unn_iws(actor_params)[0]
+    
+    def eval_bound(self, actor_params, rets, behavioral, delta=0.2, correct=True):
         if behavioral is not self._behavioral:
                 self._build_iw_graph(behavioral)
                 self._behavioral = behavioral
         batch_size = len(rets)
-        penal_coeff = sts.t.ppf(1 - delta, batch_size - 1) / np.sqrt(batch_size)
-
-        return self._get_bound_and_grad(actor_params, rets, penal_coeff)
-             
+        ppf = sts.t.ppf(1 - delta, batch_size - 1)
+        if correct:
+            bound = self._get_corr_bound(actor_params, rets, batch_size, ppf)[0]
+        else:
+            bound = self._get_bound(actor_params, rets, batch_size, ppf)[0]
+        return bound
+    
+    def eval_bound_and_grad(self, actor_params, rets, behavioral, delta=0.2, correct=True):
+        if behavioral is not self._behavioral:
+                self._build_iw_graph(behavioral)
+                self._behavioral = behavioral
+        batch_size = len(rets)
+        ppf = sts.t.ppf(1 - delta, batch_size - 1)
+        if correct:
+            bound, grad = self._get_corr_bound_grad(actor_params, rets, batch_size, ppf)
+        else:
+            bound, grad = self._get_bound_grad(actor_params, rets, batch_size, ppf)
+        return bound, grad
     
     def _build_iw_graph(self, behavioral):
-        #Batch
+        self._batch_size = batch_size = tf.placeholder(name='batchsize', dtype=tf.float32, shape=[])
+        
+        #Self-normalized importance weights
         unn_iws = self._probs/behavioral._probs
         iws = unn_iws/tf.reduce_sum(unn_iws)
         self._get_unn_iws = U.function([self._actor_params_in], [unn_iws])
         self._get_iws = U.function([self._actor_params_in], [iws])
-        J_hat, J_var = tf.nn.moments(self._rets_in * iws)
-        self._penal_coeff = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
-        bound = self.J_hat - tf.sqrt(self.J_var) * self.penal_coeff
-        bound_grad = U.flatgrad(bound)
+        
+        #Offline performance
+        ret_mean = tf.reduce_sum(self._rets_in * iws)
+        self._get_off_ret_mean = U.function([self._rets_in, self._actor_params_in], [ret_mean])
+        
+        #Offline gradient
         off_pgpe_times_n = U.flatgrad((tf.stop_gradient(iws) * 
                                              self._logprobs * 
                                              self._rets_in), 
@@ -434,4 +478,24 @@ class PeMlpPolicy(object):
         self._get_off_pgpe_times_n = U.function([self._actor_params_in,
                                                 self._rets_in],
                                                 [off_pgpe_times_n])
-        self._get_bound_and_grad = U.function([self._actor_params_in, self._rets_in, self._penal_coeff],[bound, bound_grad])
+        
+        #Bounds
+        renyi = self.pd.renyi(behavioral.pd)
+        ret_std = tf.sqrt(tf.reduce_sum(iws ** 2 * (self._rets_in - ret_mean) ** 2) * batch_size)
+        corr_ret_std = tf.sqrt(tf.multiply(
+                tf.reduce_sum(iws * (self._rets_in - ret_mean) ** 2), tf.exp(renyi)))
+        self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
+        #Student t bound
+        bound = ret_mean - ret_std * self._ppf
+        bound_grad = U.flatgrad(bound, self._higher_params)
+        self._get_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
+                                     [bound])
+        self._get_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
+                                     [bound, bound_grad])
+        #POIS corrected bound
+        corr_bound = ret_mean - corr_ret_std * self._ppf  
+        corr_bound_grad = U.flatgrad(corr_bound, self._higher_params)
+        self._get_corr_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
+                                          [corr_bound, corr_bound])
+        self._get_corr_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
+                                          [corr_bound, corr_bound_grad])

@@ -31,8 +31,8 @@ algos = {'pgpe': pgpe,
 #Seeds: 107, 583, 850, 730, 808
 
 def train(seed, env_name, algo_name):
-    DIR = './temp'
-    #DIR = '../results/' + algo_name + '/' + env_name + '/seed_' + str(seed)
+    #DIR = './temp'
+    DIR = '../results/' + algo_name + '/' + env_name + '_nobias/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
@@ -43,7 +43,7 @@ def train(seed, env_name, algo_name):
     pol = PeMlpPolicy('pol',
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[100,50,25],
+                      hid_layers=[],
                       diagonal=True,
                       use_bias=True,
                       standardize_input=True,
@@ -54,18 +54,18 @@ def train(seed, env_name, algo_name):
               gamma=1.,
               step_size=1., #1e-2
               batch_size=100,
-              task_horizon=500,
-              max_iterations=500,
+              task_horizon=200,
+              max_iterations=100,
               use_baseline=True,
               step_size_strategy='norm',
               save_to=DIR,
-              verbose=1,
+              verbose=2,
               feature_fun=np.ravel)
 
 if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--seed', help='RNG seed', type=int, default=None)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=107)
     parser.add_argument('--algo', help='Algorithm (pgpe, npgpe...)', type=str, default='npgpe')
     parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
     args = parser.parse_args()
