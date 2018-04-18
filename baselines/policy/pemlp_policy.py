@@ -150,8 +150,9 @@ class PeMlpPolicy(object):
         self._rets_in = rets_in = U.get_placeholder(name='returns_in',
                                                   dtype=tf.float32,
                                                   shape=[batch_length])
-        ret_mean = tf.reduce_mean(rets_in)
+        ret_mean, ret_std = tf.nn.moments(rets_in, axes=[0])
         self._get_ret_mean = U.function([self._rets_in], [ret_mean])
+        self._get_ret_std = U.function([self._rets_in], [ret_std])
         self._logprobs = logprobs = self.pd.logp(actor_params_in)
         pgpe_times_n = U.flatgrad(logprobs*rets_in, higher_params)
         self._get_pgpe_times_n = U.function([actor_params_in, rets_in],
@@ -283,17 +284,19 @@ class PeMlpPolicy(object):
         return x/self.eval_fisher()
 
     #Performance evaluation
-    def eval_performance(self, rets, actor_params, behavioral=None):
+    def eval_performance(self, actor_params, rets, behavioral=None):
+        batch_size = len(rets)
         if behavioral is None:
             #On policy
-            return self._get_ret_mean(rets)[0]
+            return self._get_ret_mean(rets)[0], self._get_ret_std(rets)[0]
         else:
             #Off policy
             if behavioral is not self._behavioral:
                 self._build_iw_graph(behavioral)
                 self._behavioral = behavioral
-            return self._get_off_ret_mean(rets, actor_params)[0]
+            return self._get_off_ret_mean(rets, actor_params)[0], self._get_off_ret_std(rets, actor_params, batch_size)[0]
             
+        
 
     #Gradient computation
     def eval_gradient(self, actor_params, rets, use_baseline=True,
@@ -482,6 +485,7 @@ class PeMlpPolicy(object):
         #Bounds
         renyi = self.pd.renyi(behavioral.pd)
         ret_std = tf.sqrt(tf.reduce_sum(iws ** 2 * (self._rets_in - ret_mean) ** 2) * batch_size)
+        self._get_off_ret_std = U.function([self._rets_in, self._actor_params_in, self._batch_size], [ret_std])
         corr_ret_std = tf.sqrt(tf.multiply(
                 tf.reduce_sum(iws * (self._rets_in - ret_mean) ** 2), tf.exp(renyi)))
         self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
