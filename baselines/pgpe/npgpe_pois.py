@@ -237,7 +237,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         #Offline optimization
         with timed('Optimizing offline'):
             rho, improvement = optimize_offline(pol, newpol, actor_params, rets, correct_ess=True,
-                                                max_offline_ite=max_offline_ite,
+                                                max_offline_ite=100,
                                                 search_strategy='binary')
             newpol.set_params(rho)
             assert(improvement>=0.)

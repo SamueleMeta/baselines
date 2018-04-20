@@ -31,8 +31,8 @@ algos = {'pgpepois': pgpepois,
 #Seeds: 107, 583, 850, 730, 808
 
 def train(seed, env_name, algo_name):
-    #DIR = 'temp/'
-    DIR = '../results/' + algo_name + '/' + env_name + '/seed_' + str(seed)
+    DIR = 'temp/'
+    #DIR = '../results/' + algo_name + '/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
