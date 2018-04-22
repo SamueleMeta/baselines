@@ -31,7 +31,7 @@ algos = {'pgpepois': pgpepois,
 #Seeds: 107, 583, 850, 730, 808
 
 def train(seed, env_name, algo_name):
-    DIR = 'temp/'
+    #DIR = 'temp/'
     DIR = '../results/' + algo_name + '/nc/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
@@ -66,7 +66,7 @@ def train(seed, env_name, algo_name):
 if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--seed', help='RNG seed', type=int, default=107)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--algo', help='Algorithm', type=str, default='npgpepois')
     parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
     args = parser.parse_args()

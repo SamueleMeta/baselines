@@ -215,10 +215,10 @@ class DiagGaussianPd(Pd):
         return (self.mean + self.std * noise, self.mean - self.std * noise)
                 
     def renyi(self, other, alpha=2.):
-        tol = 0
+        tol = 1e-45
         assert isinstance(other, DiagGaussianPd)
         var_alpha = alpha * tf.square(other.std) + (1. - alpha) * tf.square(self.std)
-        return alpha/2. * tf.reduce_sum(tf.square(self.mean - other.mean) / var_alpha, axis=-1) - \
+        return alpha/2. * tf.reduce_sum(tf.square(self.mean - other.mean) / (var_alpha + tol), axis=-1) - \
                1./(2*(alpha - 1)) * (tf.log(tf.reduce_prod(var_alpha, axis=-1) + tol) - 
                    tf.log(tf.reduce_prod(tf.square(self.std), axis=-1) + tol) * (1-alpha) 
                                 - tf.log(tf.reduce_prod(tf.square(other.std), axis=-1) + tol) * alpha)
