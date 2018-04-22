@@ -77,6 +77,7 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
         
         #Update higher-order policy
         #grad = pol.eval_gradient(actor_params, disc_rets, use_baseline=use_baseline)
+        grad = pol.eval_gradient(actor_params, disc_rets, use_baseline=use_baseline)
         natgrad = pol.eval_natural_gradient(actor_params, disc_rets, use_baseline=use_baseline)
         if verbose>1:
             print('natGrad:', natgrad)
@@ -85,7 +86,7 @@ def learn(env, pol, gamma, step_size, batch_size, task_horizon, max_iterations,
         gradmaxnorm = np.linalg.norm(natgrad, np.infty)
         
         step_size_it = {'const': step_size,
-                        'norm': step_size/grad2norm if grad2norm>0 else 0,
+                        'norm': step_size/np.sqrt(np.dot(grad, natgrad)) if grad2norm>0 else 0,
                         'vanish': step_size/np.sqrt(it+1)
                 }.get(step_size_strategy, step_size)
         delta_rho = step_size_it * natgrad

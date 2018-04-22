@@ -42,19 +42,19 @@ def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
     return ret, disc_ret, t
 
 #PARABOLIC line search
-def parabol_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, max_search_ite=20, delta_bound_tol=1e-4):
+def parabol_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, normalize=True, max_search_ite=20, delta_bound_tol=1e-4):
     max_increase = 2.
     epsilon = 1.
     epsilon_old = 0.
     delta_bound_old = -np.inf
-    bound_init = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct)
+    bound_init = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct, normalize=normalize)
     rho_old = rho_init = newpol.eval_params()
 
     for i in range(max_search_ite):
 
         rho = rho_init + epsilon * alpha * natgrad
         newpol.set_params(rho)
-        bound = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct)
+        bound = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct, normalize=normalize)
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -82,11 +82,11 @@ def parabol_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct
     return rho_old, epsilon_old, delta_bound_old, i+1
 
 #BINARY line search
-def binary_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, max_search_ite=30):
+def binary_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, normalize=True, max_search_ite=30):
     rho_init = newpol.eval_params()
     low = 0.
     high = None
-    bound_init = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct)
+    bound_init = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct, normalize=normalize)
     #old_delta_bound = 0.
     rho_opt = rho_init
     i_opt = 0.
@@ -97,7 +97,7 @@ def binary_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=
     for i in range(max_search_ite):
         rho = rho_init + epsilon * natgrad * alpha
         newpol.set_params(rho)
-        bound = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct)
+        bound = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct, normalize=normalize)
         delta_bound = bound - bound_init        
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -120,26 +120,27 @@ def binary_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=
     
     return rho_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
-def no_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct):
+def no_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct, normalize):
     epsilon = 1.
     rho_init = newpol.eval_params()
-    bound_init = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct)
+    bound_init = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct, normalize=normalize)
     rho_opt = rho_init + natgrad * alpha
     newpol.set_params(rho_opt)
     bound_opt = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct)
     
     return rho_opt, epsilon, bound_opt - bound_init, 1  
 
-
-def line_search(pol, newpol, actor_params, rets, alpha, natgrad, search_strategy='binary', correct=True, max_search_ite=20, delta_bound_tol=1e-4):
+def line_search(pol, newpol, actor_params, rets, alpha, natgrad, search_strategy='binary', 
+                correct=True, normalize=True, max_search_ite=20, delta_bound_tol=1e-4):
     if not search_strategy:
-        return no_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct)
+        return no_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct, normalize)
     if search_strategy=='binary':
-        return binary_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct, max_search_ite)
+        return binary_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct, normalize, max_search_ite)
     if search_strategy=='parabolic':
-        return parabol_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, max_search_ite=20, delta_bound_tol=1e-4)
+        return parabol_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct, normalize, max_search_ite, delta_bound_tol)
 
-def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, correct_ess=True, search_strategy='binary'):
+def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
+                     correct_ess=True, normalize=True, search_strategy='binary', max_search_ite=30):
     improvement = 0.
     rho = pol.eval_params()
     
@@ -154,7 +155,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         newpol.set_params(rho)
         
         #Bound with gradient
-        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, behavioral=pol, correct=correct_ess)
+        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, behavioral=pol, correct=correct_ess, normalize=normalize)
         if np.any(np.isnan(grad)):
             warnings.warn('Got NaN gradient! Stopping!')
             return rho, improvement
@@ -164,7 +165,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         
         #Natural gradient
         if newpol.diagonal: 
-            natgrad = grad#/(newpol.eval_fisher() + 1e-24)
+            natgrad = grad/(newpol.eval_fisher() + 1e-24)
         else:
             raise NotImplementedError
         assert np.dot(grad, natgrad) >= 0
@@ -183,7 +184,9 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
                                                                  alpha, 
                                                                  natgrad, 
                                                                  search_strategy=search_strategy, 
-                                                                 correct=correct_ess)
+                                                                 correct=correct_ess,
+                                                                 normalize=normalize,
+                                                                 max_search_ite=max_search_ite)
         newpol.set_params(rho)
         improvement+=delta_bound
         print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, grad_norm, delta_bound, improvement))
@@ -196,7 +199,8 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
 
 
 def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations, 
-          feature_fun=None, max_offline_ite=100,
+          feature_fun=None, max_offline_ite=100, correct_ess=True, normalize=True,
+          max_search_ite=30,
           verbose=True, 
           save_to=None):
     
@@ -236,9 +240,11 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         
         #Offline optimization
         with timed('Optimizing offline'):
-            rho, improvement = optimize_offline(pol, newpol, actor_params, rets, correct_ess=True,
+            rho, improvement = optimize_offline(pol, newpol, actor_params, rets, correct_ess=correct_ess,
+                                                normalize=normalize,
                                                 max_offline_ite=100,
-                                                search_strategy='binary')
+                                                search_strategy='binary',
+                                                max_search_ite=max_search_ite)
             newpol.set_params(rho)
             assert(improvement>=0.)
         
@@ -247,7 +253,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         iws = unn_iws/np.sum(unn_iws)
         ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
         J, varJ = newpol.eval_performance(actor_params, disc_rets, behavioral=pol)
-        eRenyi = newpol.eval_renyi(pol, exponentiate=True)
+        eRenyi = np.exp(newpol.eval_renyi(pol))
         
         logger.record_tabular('Bound', pol.eval_bound(actor_params, disc_rets, behavioral=pol))
         logger.record_tabular('ESSClassic', ess)

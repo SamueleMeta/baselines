@@ -43,6 +43,7 @@ class PeMlpPolicy(object):
         assert isinstance(ob_space, gym.spaces.Box)
         assert len(ac_space.shape)==1
         self.diagonal = diagonal
+        self.standardize_input = standardize_input
         batch_length = None #Accepts a sequence of episodes of arbitrary length
 
         if seed is not None:
@@ -141,6 +142,8 @@ class PeMlpPolicy(object):
             self.flat_higher_params = tf.concat([tf.reshape(w, [-1]) for w in \
                                             self._higher_params], axis=0) #flatten
             self._n_higher_params = self.flat_higher_params.shape[0]
+            self._get_flat_higher_params = U.GetFlat(higher_params)
+            self._set_higher_params = U.SetFromFlat(self._higher_params)
 
         #Batch PGPE
         self._actor_params_in = actor_params_in = \
@@ -173,6 +176,7 @@ class PeMlpPolicy(object):
         #Batch off-policy PGPE
         self._probs = tf.exp(logprobs) 
         self._behavioral = None
+        self._renyi_other = None
     
         #One episode off-PGPE 
         self._one_prob = tf.exp(one_logprob)
@@ -185,7 +189,7 @@ class PeMlpPolicy(object):
         cov_fisher_diag = 2*tf.exp(2*self.higher_logstd)
         self._fisher_diag = tf.concat([mean_fisher_diag, mean_fisher_diag * 0. +
                                cov_fisher_diag], axis=0)
-
+        self._get_fisher_diag = U.function([], [self._fisher_diag])
         
     #Black box usage
     def act(self, ob, resample=False):
@@ -197,7 +201,7 @@ class PeMlpPolicy(object):
                ob: current state, or a list of states
                resample: whether to resample actor params before acting
         """
-        if hasattr(self, "ob_rms"):
+        if self.standardize_input:
             self.ob_rms.update(ob) # update running mean/std for policy
         
         if resample:
@@ -217,11 +221,11 @@ class PeMlpPolicy(object):
     
     def eval_params(self):
         """Get current params of the higher order policy"""
-        return U.GetFlat(self._higher_params)()
+        return self._get_flat_higher_params()
 
     def set_params(self, new_higher_params):
         """Set higher order policy parameters from flat sequence"""
-        U.SetFromFlat(self._higher_params)(new_higher_params)
+        self._set_higher_params(new_higher_params)
 
     def seed(self, seed):
         if seed is not None:
@@ -251,7 +255,7 @@ class PeMlpPolicy(object):
             U.SetFromFlat(actor_params)(new_actor_params)
 
     #Distribution properties
-    def eval_renyi(self, other, order=2, exponentiate=False):
+    def eval_renyi(self, other, order=2):
         """Renyi divergence 
             Special case: order=1 is kl divergence
         
@@ -260,22 +264,23 @@ class PeMlpPolicy(object):
             order: order of the Renyi divergence
             exponentiate: if true, actually returns e^Renyi(self||other)
         """
-        if order==1:
-            result = self.pd.kl(other.pd)
-        elif order>=2:
-            result = self.pd.renyi(other.pd, alpha=order) 
-        else:
-            raise ValueError('Order must be >= 1')
-        
-        if exponentiate:
-            result = tf.exp(result)
-        return U.function([], [result])()[0]
+        if other is not self._renyi_other:
+            print('EXTENDING!!')
+            self._renyi_order = tf.placeholder(name='renyi_order', dtype=tf.float32, shape=[])
+            self._renyi_other = other
+            if order<1:
+                raise ValueError('Order must be >= 1')
+            else:   
+                renyi = self.pd.renyi(other.pd, alpha=self._renyi_order) 
+                self._get_renyi = U.function([self._renyi_order], [renyi])
+
+        return self._get_renyi(order)[0]
 
     def eval_fisher(self):
         if not self.diagonal:
             raise NotImplementedError(
                 'Only diagonal covariance currently supported')
-        return np.ravel(U.function([],[self._fisher_diag])()[0])
+        return np.ravel(self._get_fisher_diag()[0])
 
     def fisher_product(self, x):
         if not self.diagonal:
@@ -435,31 +440,44 @@ class PeMlpPolicy(object):
         else:
             return self._get_unn_iws(actor_params)[0]
     
-    def eval_bound(self, actor_params, rets, behavioral, delta=0.2, correct=True):
+    def eval_bound(self, actor_params, rets, behavioral, delta=0.2, correct=True, normalize=True):
         if behavioral is not self._behavioral:
                 self._build_iw_graph(behavioral)
                 self._behavioral = behavioral
         batch_size = len(rets)
         ppf = sts.t.ppf(1 - delta, batch_size - 1)
-        if correct:
-            bound = self._get_corr_bound(actor_params, rets, batch_size, ppf)[0]
+        if normalize:
+            if correct:
+                bound = self._get_corr_bound(actor_params, rets, batch_size, ppf)[0]
+            else:
+                bound = self._get_bound(actor_params, rets, batch_size, ppf)[0]
         else:
-            bound = self._get_bound(actor_params, rets, batch_size, ppf)[0]
+            if correct:
+                bound = self._get_unn_corr_bound(actor_params, rets, batch_size, ppf)[0]
+            else: 
+                raise NotImplementedError
         return bound
     
-    def eval_bound_and_grad(self, actor_params, rets, behavioral, delta=0.2, correct=True):
+    def eval_bound_and_grad(self, actor_params, rets, behavioral, delta=0.2, correct=True, normalize=True):
         if behavioral is not self._behavioral:
                 self._build_iw_graph(behavioral)
                 self._behavioral = behavioral
         batch_size = len(rets)
         ppf = sts.t.ppf(1 - delta, batch_size - 1)
-        if correct:
-            bound, grad = self._get_corr_bound_grad(actor_params, rets, batch_size, ppf)
+        if normalize:
+            if correct:
+                bound, grad = self._get_corr_bound_grad(actor_params, rets, batch_size, ppf)
+            else:
+                bound, grad = self._get_bound_grad(actor_params, rets, batch_size, ppf)
         else:
-            bound, grad = self._get_bound_grad(actor_params, rets, batch_size, ppf)
+            if correct:
+                bound, grad = self._get_unn_corr_bound_grad(actor_params, rets, batch_size, ppf)
+            else:
+                raise NotImplementedError
         return bound, grad
     
     def _build_iw_graph(self, behavioral):
+        print('EXTENDING!!')
         self._batch_size = batch_size = tf.placeholder(name='batchsize', dtype=tf.float32, shape=[])
         
         #Self-normalized importance weights
@@ -470,6 +488,7 @@ class PeMlpPolicy(object):
         
         #Offline performance
         ret_mean = tf.reduce_sum(self._rets_in * iws)
+        unn_ret_mean = tf.reduce_mean(self._rets_in*unn_iws)
         self._get_off_ret_mean = U.function([self._rets_in, self._actor_params_in], [ret_mean])
         
         #Offline gradient
@@ -488,6 +507,7 @@ class PeMlpPolicy(object):
         self._get_off_ret_std = U.function([self._rets_in, self._actor_params_in, self._batch_size], [ret_std])
         corr_ret_std = tf.sqrt(tf.multiply(
                 tf.reduce_sum(iws * (self._rets_in - ret_mean) ** 2), tf.exp(renyi)))
+        unn_corr_ret_std = tf.reduce_sum((self._rets_in*unn_iws - unn_ret_mean)**2)/(batch_size-1)/tf.exp(renyi)
         self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
         #Student t bound
         bound = ret_mean - ret_std * self._ppf
@@ -500,6 +520,14 @@ class PeMlpPolicy(object):
         corr_bound = ret_mean - corr_ret_std * self._ppf  
         corr_bound_grad = U.flatgrad(corr_bound, self._higher_params)
         self._get_corr_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
-                                          [corr_bound, corr_bound])
+                                          [corr_bound])
         self._get_corr_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
                                           [corr_bound, corr_bound_grad])
+        
+        #POIS corrected bound (unnormalized)
+        unn_corr_bound = unn_ret_mean - unn_corr_ret_std * self._ppf  
+        unn_corr_bound_grad = U.flatgrad(unn_corr_bound, self._higher_params)
+        self._get_unn_corr_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
+                                          [unn_corr_bound])
+        self._get_unn_corr_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
+                                          [unn_corr_bound, unn_corr_bound_grad])

@@ -32,7 +32,7 @@ algos = {'pgpe': pgpe,
 
 def train(seed, env_name, algo_name):
     #DIR = './temp'
-    DIR = '../results/' + algo_name + '/' + env_name + '_nobias/seed_' + str(seed)
+    DIR = '../results/' + algo_name + '/nobias/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
@@ -45,7 +45,7 @@ def train(seed, env_name, algo_name):
                       env.action_space,
                       hid_layers=[],
                       diagonal=True,
-                      use_bias=True,
+                      use_bias=False,
                       standardize_input=True,
                       seed=seed)
     
