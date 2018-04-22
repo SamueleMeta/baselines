@@ -140,7 +140,8 @@ def line_search(pol, newpol, actor_params, rets, alpha, natgrad, search_strategy
         return parabol_line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct, normalize, max_search_ite, delta_bound_tol)
 
 def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
-                     correct_ess=True, normalize=True, search_strategy='binary', max_search_ite=30):
+                     correct_ess=True, normalize=True, search_strategy='binary', max_search_ite=30,
+                     stop_sigma=False):
     improvement = 0.
     rho = pol.eval_params()
     
@@ -169,6 +170,8 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         else:
             raise NotImplementedError
         assert np.dot(grad, natgrad) >= 0
+        if i>0 and newpol.diagonal and stop_sigma:
+            natgrad[len(natgrad)//2:] = 0
         grad_norm = np.sqrt(np.dot(grad, natgrad))
         if grad_norm < grad_tol:
             print("stopping - gradient norm < gradient_tol")
@@ -200,7 +203,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
 
 def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations, 
           feature_fun=None, max_offline_ite=100, correct_ess=True, normalize=True,
-          max_search_ite=30,
+          max_search_ite=30, stop_sigma=False,
           verbose=True, 
           save_to=None):
     
@@ -244,7 +247,8 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
                                                 normalize=normalize,
                                                 max_offline_ite=100,
                                                 search_strategy='binary',
-                                                max_search_ite=max_search_ite)
+                                                max_search_ite=max_search_ite,
+                                                stop_sigma=stop_sigma)
             newpol.set_params(rho)
             assert(improvement>=0.)
         

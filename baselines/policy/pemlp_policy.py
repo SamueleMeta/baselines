@@ -502,6 +502,8 @@ class PeMlpPolicy(object):
         
         #Bounds
         renyi = self.pd.renyi(behavioral.pd)
+        renyi = tf.cond(tf.is_nan(renyi), lambda: tf.constant(np.inf), lambda: renyi)
+        renyi = tf.cond(renyi<0., lambda: tf.constant(np.inf), lambda: renyi)
         ret_std = tf.sqrt(tf.reduce_sum(iws ** 2 * (self._rets_in - ret_mean) ** 2) * batch_size)
         self._get_off_ret_std = U.function([self._rets_in, self._actor_params_in, self._batch_size], [ret_std])
         corr_ret_std = tf.sqrt(tf.multiply(
