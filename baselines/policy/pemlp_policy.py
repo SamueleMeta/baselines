@@ -185,10 +185,9 @@ class PeMlpPolicy(object):
         self._det_sigma = tf.exp(tf.reduce_sum(self.higher_logstd))
 
         #Fisher computation (diagonal case)
-        mean_fisher_diag = tf.exp(-self.higher_logstd)
-        cov_fisher_diag = 2*tf.exp(2*self.higher_logstd)
-        self._fisher_diag = tf.concat([mean_fisher_diag, mean_fisher_diag * 0. +
-                               cov_fisher_diag], axis=0)
+        mean_fisher_diag = tf.exp(-2*self.higher_logstd)
+        cov_fisher_diag = mean_fisher_diag*0 + 2
+        self._fisher_diag = tf.concat([mean_fisher_diag, cov_fisher_diag], axis=0)
         self._get_fisher_diag = U.function([], [self._fisher_diag])
         
     #Black box usage
