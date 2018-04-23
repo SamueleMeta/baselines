@@ -20,28 +20,37 @@ sess.__enter__()
 
 envs = {'cartpole': 'ContCartPole-v0',
         'lqg': 'LQG1D-v0',
-        'swimmer': 'Swimmer-v2',
-        'cheetah': 'HalfCheetah-v2',
         }
 
 algos = {'pgpepois': pgpepois,
          'npgpepois': npgpepois,
         }
 
+horizons = {'cartpole': 200,
+            'lqg': 500,
+            }
+
+rews = {'cartpole': 10,
+      'lqg': 28.8,
+      }
+
+iters = {'cartpole': 100,
+         'lqg': 100,
+         }
+
 #Seeds: 107, 583, 850, 730, 808
 
-def train(seed, env_name, algo_name, stop_sigma):
-    #DIR = 'temp/'
-    DIR = '../results/' + algo_name + '/z' + str(stop_sigma) + '/' + env_name + '/seed_' + str(seed)
+def train(seed, env_name, algo_name, stop_sigma, gamma):
+    DIR = 'temp/'
+    #DIR = '../results/' + algo_name + '/z/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
     
     env = gym.make(envs[env_name])
     env.seed(seed)
-    horizon = 200
-    gamma = 0.99
-    rmax = sum([10*gamma**i for i in range(horizon)])
+    horizon = horizons[env_name]
+    rmax = sum([rews[env_name]*gamma**i for i in range(horizon)])
     
     pol_maker = lambda name: PeMlpPolicy(name,
                       env.observation_space,
@@ -74,7 +83,8 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--stop', help='Stop sigma?', type=int, default=0)
+    parser.add_argument('--gamma', help='Stop sigma?', type=float, default=0.99)
     parser.add_argument('--algo', help='Algorithm', type=str, default='npgpepois')
-    parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
+    parser.add_argument('--env', help='Environment (RL task)', type=str, default='lqg')
     args = parser.parse_args()
-    train(args.seed, args.env, args.algo, args.stop)
+    train(args.seed, args.env, args.algo, args.stop, args.gamma)
