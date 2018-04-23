@@ -554,7 +554,7 @@ class PeMlpPolicy(object):
         
         #Z-bound
         self._rmax = tf.placeholder(name='R_max', dtype=tf.float32, shape=[])
-        z_std = self._rmax * tf.exp(0.5*renyi)
+        z_std = self._rmax * tf.exp(0.5*renyi) / tf.sqrt(self._batch_size)
         z_bound = ret_mean - self._ppf * z_std
         z_bound_grad = U.flatgrad(z_bound, self._higher_params)
         unn_z_bound = unn_ret_mean - self._ppf * z_std
