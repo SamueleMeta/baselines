@@ -439,40 +439,59 @@ class PeMlpPolicy(object):
         else:
             return self._get_unn_iws(actor_params)[0]
     
-    def eval_bound(self, actor_params, rets, behavioral, delta=0.2, correct=True, normalize=True):
+    def eval_bound(self, actor_params, rets, behavioral, delta=0.2, correct=True, normalize=True,
+                   bound_name='t', rmax=None):
         if behavioral is not self._behavioral:
                 self._build_iw_graph(behavioral)
                 self._behavioral = behavioral
         batch_size = len(rets)
-        ppf = sts.t.ppf(1 - delta, batch_size - 1)
-        if normalize:
-            if correct:
-                bound = self._get_corr_bound(actor_params, rets, batch_size, ppf)[0]
+        
+        if bound_name=='t':
+            ppf = sts.t.ppf(1 - delta, batch_size - 1)
+            if normalize:
+                if correct:
+                    bound = self._get_corr_bound(actor_params, rets, batch_size, ppf)[0]
+                else:
+                    bound = self._get_bound(actor_params, rets, batch_size, ppf)[0]
             else:
-                bound = self._get_bound(actor_params, rets, batch_size, ppf)[0]
-        else:
-            if correct:
-                bound = self._get_unn_corr_bound(actor_params, rets, batch_size, ppf)[0]
-            else: 
-                raise NotImplementedError
+                if correct:
+                    bound = self._get_unn_corr_bound(actor_params, rets, batch_size, ppf)[0]
+                else: 
+                    raise NotImplementedError
+        elif bound_name=='z':
+            ppf = sts.norm.ppf(1 - delta)
+            if normalize:
+                bound = self._get_z_bound(actor_params, rets, batch_size, ppf, rmax)[0]
+            else:
+                bound = self._get_unn_z_bound(actor_params, rets, batch_size, ppf, rmax)[0]    
+        else: raise ValueError
+        
         return bound
     
-    def eval_bound_and_grad(self, actor_params, rets, behavioral, delta=0.2, correct=True, normalize=True):
+    def eval_bound_and_grad(self, actor_params, rets, behavioral, delta=0.2, correct=True, normalize=True,
+                            bound_name='t', rmax=None):
         if behavioral is not self._behavioral:
                 self._build_iw_graph(behavioral)
                 self._behavioral = behavioral
         batch_size = len(rets)
-        ppf = sts.t.ppf(1 - delta, batch_size - 1)
-        if normalize:
-            if correct:
-                bound, grad = self._get_corr_bound_grad(actor_params, rets, batch_size, ppf)
+        if bound_name=='t':
+            ppf = sts.t.ppf(1 - delta, batch_size - 1)
+            if normalize:
+                if correct:
+                    bound, grad = self._get_corr_bound_grad(actor_params, rets, batch_size, ppf)
+                else:
+                    bound, grad = self._get_bound_grad(actor_params, rets, batch_size, ppf)
             else:
-                bound, grad = self._get_bound_grad(actor_params, rets, batch_size, ppf)
-        else:
-            if correct:
-                bound, grad = self._get_unn_corr_bound_grad(actor_params, rets, batch_size, ppf)
+                if correct:
+                    bound, grad = self._get_unn_corr_bound_grad(actor_params, rets, batch_size, ppf)
+                else:
+                    raise NotImplementedError
+        elif bound_name=='z':
+            ppf = sts.norm.ppf(1 - delta)
+            if normalize:
+                bound, grad = self._get_z_bound_grad(actor_params, rets, batch_size, ppf, rmax)
             else:
-                raise NotImplementedError
+                bound, grad = self._get_unn_z_bound_grad(actor_params, rets, batch_size, ppf, rmax)
         return bound, grad
     
     def _build_iw_graph(self, behavioral):
@@ -508,7 +527,7 @@ class PeMlpPolicy(object):
         self._get_off_ret_std = U.function([self._rets_in, self._actor_params_in, self._batch_size], [ret_std])
         corr_ret_std = tf.sqrt(tf.multiply(
                 tf.reduce_sum(iws * (self._rets_in - ret_mean) ** 2), tf.exp(renyi)))
-        unn_corr_ret_std = tf.reduce_sum((self._rets_in*unn_iws - unn_ret_mean)**2)/(batch_size-1)/tf.exp(renyi)
+        unn_corr_ret_std = tf.sqrt(tf.reduce_sum((self._rets_in*unn_iws - unn_ret_mean)**2)/(batch_size-1)/tf.exp(renyi))
         self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
         #Student t bound
         bound = ret_mean - ret_std * self._ppf
@@ -532,3 +551,19 @@ class PeMlpPolicy(object):
                                           [unn_corr_bound])
         self._get_unn_corr_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
                                           [unn_corr_bound, unn_corr_bound_grad])
+        
+        #Z-bound
+        self._rmax = tf.placeholder(name='R_max', dtype=tf.float32, shape=[])
+        z_std = self._rmax * tf.exp(0.5*renyi)
+        z_bound = ret_mean - self._ppf * z_std
+        z_bound_grad = U.flatgrad(z_bound, self._higher_params)
+        unn_z_bound = unn_ret_mean - self._ppf * z_std
+        unn_z_bound_grad = U.flatgrad(unn_z_bound, self._higher_params)
+        self._get_z_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
+                                       [z_bound])
+        self._get_z_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
+                                            [z_bound, z_bound_grad])
+        self._get_unn_z_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
+                                       [unn_z_bound])
+        self._get_unn_z_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
+                                            [unn_z_bound, unn_z_bound_grad])

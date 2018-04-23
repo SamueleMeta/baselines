@@ -32,13 +32,16 @@ algos = {'pgpepois': pgpepois,
 
 def train(seed, env_name, algo_name, stop_sigma):
     #DIR = 'temp/'
-    DIR = '../results/' + algo_name + '/nc' + str(stop_sigma) + '/' + env_name + '/seed_' + str(seed)
+    DIR = '../results/' + algo_name + '/z' + str(stop_sigma) + '/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
     
     env = gym.make(envs[env_name])
     env.seed(seed)
+    horizon = 200
+    gamma = 0.99
+    rmax = sum([10*gamma**i for i in range(horizon)])
     
     pol_maker = lambda name: PeMlpPolicy(name,
                       env.observation_space,
@@ -51,9 +54,9 @@ def train(seed, env_name, algo_name, stop_sigma):
     
     algos[algo_name].learn(env,
               pol_maker,
-              gamma=0.99,
+              gamma=gamma,
               batch_size=100,
-              task_horizon=200,
+              task_horizon=horizon,
               max_iterations=100,
               save_to=DIR,
               verbose=2,
@@ -62,7 +65,9 @@ def train(seed, env_name, algo_name, stop_sigma):
               normalize=True,
               stop_sigma=stop_sigma,
               max_offline_ite=100,
-              max_search_ite=30)
+              max_search_ite=30,
+              bound_name='z',
+              rmax=rmax)
 
 if __name__=='__main__':
     import argparse
