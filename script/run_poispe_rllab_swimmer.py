@@ -26,7 +26,7 @@ def train(num_episodes, horizon, seed):
     pol_maker = lambda name: PeMlpPolicy(name,
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[100,50,25],
+                      hid_layers=[],
                       diagonal=True,
                       use_bias=False,
                       standardize_input=True,
