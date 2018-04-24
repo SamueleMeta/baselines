@@ -41,8 +41,8 @@ iters = {'cartpole': 100,
 #Seeds: 107, 583, 850, 730, 808
 
 def train(seed, env_name, algo_name, stop_sigma, gamma):
-    #DIR = 'temp/'
-    DIR = '../results/' + algo_name + '/z/' + env_name + '/seed_' + str(seed)
+    DIR = 'temp/'
+    #DIR = '../results/' + algo_name + '/z/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
@@ -50,7 +50,8 @@ def train(seed, env_name, algo_name, stop_sigma, gamma):
     env = gym.make(envs[env_name])
     env.seed(seed)
     horizon = horizons[env_name]
-    rmax = sum([rews[env_name]*gamma**i for i in range(horizon)])
+    #rmax = sum([rews[env_name]*gamma**i for i in range(horizon)])
+    rmax = None #Empirical
     
     pol_maker = lambda name: PeMlpPolicy(name,
                       env.observation_space,

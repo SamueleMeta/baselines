@@ -8,7 +8,7 @@ import baselines.pgpe.npgpe_pois as npgpepois
 import baselines.common.tf_util as U
 import numpy as np
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
-from rllab.envs.mujoco.swimmer_env import SwimmerEnv
+from rllab.envs.box2d.cartpole_env import CartpoleEnv
 
 
 def train(num_episodes, horizon, seed):
@@ -16,9 +16,9 @@ def train(num_episodes, horizon, seed):
     sess = U.single_threaded_session()
     sess.__enter__()
 
-    DIR = '../results/npgpepois/z/swimmer/seed_' + str(seed)
-    gamma = 1.
-    env = SwimmerEnv()
+    DIR = '../results/npgpepois/z/rllab_cartpole/seed_' + str(seed)
+    gamma = 0.999
+    env = CartpoleEnv()
     env = Rllab2GymWrapper(env)
 
     rmax = None #Empirical

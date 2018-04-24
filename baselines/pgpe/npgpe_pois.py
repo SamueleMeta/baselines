@@ -27,7 +27,7 @@ def timed(msg):
 
 def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
     ret = disc_ret = 0
-    
+    max_ret = 0
     t = 0
     ob = env.reset()
     done = False
@@ -37,9 +37,10 @@ def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
         ob, r, done, _ = env.step(a)
         ret += r
         disc_ret += gamma**t * r
+        max_ret = max(abs(r), max_ret)
         t+=1
         
-    return ret, disc_ret, t
+    return ret, disc_ret, t, max_ret
 
 #BINARY line search
 def line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, normalize=True, max_search_ite=30,
@@ -175,27 +176,31 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         #TODO: try symmetric sampling
         with timed('Sampling'):
             actor_params = []
-            rets, disc_rets, lens = [], [], []
+            rets, disc_rets, lens, max_rets = [], [], [], []
             for ep in range(batch_size):
                 theta = pol.resample()
                 actor_params.append(theta)
-                ret, disc_ret, ep_len = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
+                ret, disc_ret, ep_len, max_ret = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
                 rets.append(ret)
                 disc_rets.append(disc_ret)
                 lens.append(ep_len)
+                max_rets.append(max_ret)
         logger.log('Performance: ', np.mean(rets))
         #if save_to: np.save(save_to + '/rets_' + str(it), rets)
             
         
         #Offline optimization
         with timed('Optimizing offline'):
+            if rmax is None:
+                _rmax = sum(max(max_rets)*gamma**i for i in range(task_horizon)) 
+                if verbose: print('Using empirical maxRet %f' % _rmax)
             rho, improvement = optimize_offline(pol, newpol, actor_params, rets, correct_ess=correct_ess,
                                                 normalize=normalize,
                                                 max_offline_ite=100,
                                                 max_search_ite=max_search_ite,
                                                 stop_sigma=stop_sigma,
                                                 bound_name=bound_name,
-                                                rmax=rmax)
+                                                rmax=_rmax)
             newpol.set_params(rho)
             assert(improvement>=0.)
         
