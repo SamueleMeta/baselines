@@ -10,8 +10,8 @@ import gym
 import baselines.envs.continuous_cartpole
 import baselines.envs.lqg1d
 from baselines.policy.pemlp_policy import PeMlpPolicy
-import baselines.pgpe.pgpe_pois as pgpepois
-import baselines.pgpe.npgpe_pois as npgpepois
+import baselines.pgpe.poisnpe as poisnpe
+import baselines.pgpe.poispe as poispe
 import numpy as np
 
 import baselines.common.tf_util as U
@@ -22,8 +22,8 @@ envs = {'cartpole': 'ContCartPole-v0',
         'lqg': 'LQG1D-v0',
         }
 
-algos = {'pgpepois': pgpepois,
-         'npgpepois': npgpepois,
+algos = {'poisnpe': poisnpe,
+         'poispe': poispe,
         }
 
 horizons = {'cartpole': 200,
@@ -85,7 +85,7 @@ if __name__=='__main__':
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--stop', help='Stop sigma?', type=int, default=0)
     parser.add_argument('--gamma', help='Stop sigma?', type=float, default=0.99)
-    parser.add_argument('--algo', help='Algorithm', type=str, default='npgpepois')
-    parser.add_argument('--env', help='Environment (RL task)', type=str, default='lqg')
+    parser.add_argument('--algo', help='Algorithm', type=str, default='poisnpe')
+    parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
     args = parser.parse_args()
     train(args.seed, args.env, args.algo, args.stop, args.gamma)

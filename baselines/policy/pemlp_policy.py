@@ -44,12 +44,15 @@ class PeMlpPolicy(object):
         assert len(ac_space.shape)==1
         self.diagonal = diagonal
         self.standardize_input = standardize_input
+        self.use_bias = use_bias
         batch_length = None #Accepts a sequence of episodes of arbitrary length
+        self.ac_dim = ac_space.shape[0]
+        self.ob_dim = ob_space.shape[0]
 
         if seed is not None:
             set_global_seeds(seed)
 
-        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[None] + list(ob_space.shape))
+        self._ob = ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[None] + list(ob_space.shape))
 
         with tf.variable_scope("obfilter"):
             self.ob_rms = RunningMeanStd(shape=ob_space.shape)
@@ -75,7 +78,7 @@ class PeMlpPolicy(object):
             if deterministic and isinstance(ac_space, gym.spaces.Box):
                 #Determinisitc action selection
                 self.actor_mean = actor_mean = tf.layers.dense(last_out, ac_space.shape[0],
-                                       name='final',
+                                       name='action',
                                        kernel_initializer=U.normc_initializer(0.01),
                                        use_bias=use_bias)
             else: 
@@ -130,9 +133,13 @@ class PeMlpPolicy(object):
 
             self._use_sampled_actor_params = U.assignFromFlat(actor_params,
                                                          sampled_actor_params)
+            
+            self._set_actor_params = U.SetFromFlat(actor_params)
+            
+            self._get_actor_params = U.GetFlat(actor_params)
 
         #Act
-        action = actor_mean
+        self._action = action = actor_mean
         self._act = U.function([ob],[action])
 
         #Higher policy weights
@@ -204,10 +211,48 @@ class PeMlpPolicy(object):
             self.ob_rms.update(ob) # update running mean/std for policy
         
         if resample:
-            self.resample()
+            actor_param = self.resample()
 
         action =  self._act(np.atleast_2d(ob))[0]
-        return action
+        return action, actor_param if resample else action
+    
+    class _FrozenLinearActor(object):
+        def __init__(self, higher_params, ob_dim, ac_dim, use_bias):
+            self.higher_params = np.ravel(higher_params)
+            self.ob_dim = ob_dim
+            self.ac_dim = ac_dim
+            self.use_bias = use_bias
+            self.resample()
+        
+        def resample(self):
+            higher_mean = self.higher_params[:len(self.higher_params)//2]
+            higher_cov = np.diag(np.exp(2*self.higher_params[len(self.higher_params)//2:]))
+            self.actor_params = np.random.multivariate_normal(higher_mean, higher_cov)
+            return self.actor_params
+        
+        def act(self, ob, resample=False):
+            if resample:
+                self.resample()
+            
+            ob = np.ravel(ob)
+            if self.use_bias:
+                np.append(ob, 1)
+            ob = ob.reshape((self.ob_dim + self.use_bias, 1))
+            theta = self.actor_params.reshape((self.ac_dim, self.ob_dim + self.use_bias))
+            return np.ravel(np.dot(theta, ob))
+
+    def freeze(self, linear=True):
+        if not linear:
+            raise NotImplementedError
+            
+        return self._FrozenLinearActor(self.eval_params(),
+                                  self.ob_dim,
+                                  self.ac_dim,
+                                  self.use_bias)
+
+    def act_with(self, ob, actor_params):
+        self.set_actor_params(actor_params)
+        return self.act(ob)
 
     def resample(self):
         """Resample actor params
@@ -241,17 +286,11 @@ class PeMlpPolicy(object):
 
     def eval_actor_params(self):
         """Get actor params as last assigned"""
-        with tf.variable_scope(self.scope+'/actor') as scope:
-            actor_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
-                                         scope=scope.name)
-        return U.GetFlat(actor_params)()    
+        self._get_actor_params()
 
     def set_actor_params(self, new_actor_params):
         """Manually set actor policy parameters from flat sequence"""
-        with tf.variable_scope(self.scope+'/actor') as scope:
-            actor_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
-                                         scope=scope.name)
-            U.SetFromFlat(actor_params)(new_actor_params)
+        self._set_actor_params(new_actor_params)
 
     #Distribution properties
     def eval_renyi(self, other, order=2):

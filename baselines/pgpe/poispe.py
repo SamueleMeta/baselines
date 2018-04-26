@@ -112,7 +112,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         
         #Natural gradient
         if newpol.diagonal: 
-            natgrad = grad/(newpol.eval_fisher() + 1e-24)
+            natgrad = grad #/(newpol.eval_fisher() + 1e-24)
         else:
             raise NotImplementedError
         assert np.dot(grad, natgrad) >= 0
@@ -170,6 +170,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         rho = pol.eval_params() #Higher-order-policy parameters
         if verbose>1:
             logger.log('Higher-order parameters: ', rho)
+            print(len(rho))
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
             
         #Batch of episodes
@@ -178,9 +179,10 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
             actor_params = []
             rets, disc_rets, lens, max_rets = [], [], [], []
             for ep in range(batch_size):
-                theta = pol.resample()
+                frozen_pol = pol.freeze()
+                theta = frozen_pol.resample()
                 actor_params.append(theta)
-                ret, disc_ret, ep_len, max_ret = eval_trajectory(env, pol, gamma, task_horizon, feature_fun)
+                ret, disc_ret, ep_len, max_ret = eval_trajectory(env, frozen_pol, gamma, task_horizon, feature_fun)
                 rets.append(ret)
                 disc_rets.append(disc_ret)
                 lens.append(ep_len)
@@ -193,6 +195,8 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         with timed('Optimizing offline'):
             if rmax is None:
                 _rmax = sum(max(max_rets)*gamma**i for i in range(task_horizon)) 
+            else:
+                _rmax = rmax
                 if verbose: print('Using empirical maxRet %f' % _rmax)
             rho, improvement = optimize_offline(pol, newpol, actor_params, rets, correct_ess=correct_ess,
                                                 normalize=normalize,
@@ -212,7 +216,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         eRenyi = np.exp(newpol.eval_renyi(pol))
         
         logger.record_tabular('Bound', newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct_ess, 
-                                                         normalize=normalize, bound_name=bound_name, rmax=rmax))
+                                                         normalize=normalize, bound_name=bound_name, rmax=_rmax))
         logger.record_tabular('ESSClassic', ess)
         logger.record_tabular('ESSRenyi', batch_size/eRenyi)
         logger.record_tabular('MaxVanillaIw', np.max(unn_iws))
