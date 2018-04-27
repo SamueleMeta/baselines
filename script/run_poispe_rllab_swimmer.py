@@ -37,7 +37,6 @@ def train(num_episodes, horizon, seed, algo):
                       hid_layers=[],
                       diagonal=True,
                       use_bias=False,
-                      standardize_input=False,
                       seed=seed)
     
     algos[algo].learn(env,
