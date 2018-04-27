@@ -1,4 +1,3 @@
-from baselines.common.running_mean_std import RunningMeanStd
 import baselines.common.tf_util as U
 import tensorflow as tf
 import gym
@@ -15,7 +14,6 @@ Berlin, Heidelberg, 2008.
 
 class PeMlpPolicy(object):
     """Multi-layer-perceptron policy with Gaussian parameter-based exploration"""
-    recurrent = False
     def __init__(self, name, *args, **kwargs):
         #with tf.device('/cpu:0'):
         with tf.variable_scope(name):
@@ -27,7 +25,7 @@ class PeMlpPolicy(object):
 
     def _init(self, ob_space, ac_space, hid_layers=[],
               deterministic=True, diagonal=True,
-              use_bias=True, standardize_input=True, use_critic=False, 
+              use_bias=True, use_critic=False, 
               seed=None):
         """Params:
             ob_space: task observation space
@@ -43,33 +41,28 @@ class PeMlpPolicy(object):
         assert isinstance(ob_space, gym.spaces.Box)
         assert len(ac_space.shape)==1
         self.diagonal = diagonal
-        self.standardize_input = standardize_input
         self.use_bias = use_bias
         batch_length = None #Accepts a sequence of episodes of arbitrary length
         self.ac_dim = ac_space.shape[0]
         self.ob_dim = ob_space.shape[0]
+        self.linear = not hid_layers
 
         if seed is not None:
             set_global_seeds(seed)
 
         self._ob = ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[None] + list(ob_space.shape))
 
-        with tf.variable_scope("obfilter"):
-            self.ob_rms = RunningMeanStd(shape=ob_space.shape)
-
         #Critic (normally not used)
         if use_critic:
             with tf.variable_scope('critic'):
-                obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
-                last_out = obz if standardize_input else ob
+                last_out = ob
                 for i, hid_size in enumerate(hid_layers):
                     last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size, name="fc%i"%(i+1), kernel_initializer=U.normc_initializer(1.0)))
                 self.vpred = tf.layers.dense(last_out, 1, name='final', kernel_initializer=U.normc_initializer(1.0))[:,0]
 
         #Actor (N.B.: weight initialization is irrelevant)
         with tf.variable_scope('actor'):
-            obz = tf.clip_by_value((ob - self.ob_rms.mean) / np.sqrt(self.ob_rms.var), -5.0, 5.0)
-            last_out = obz if standardize_input else ob
+            last_out = ob
             for i, hid_size in enumerate(hid_layers):
                 #Mlp feature extraction
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
@@ -207,8 +200,6 @@ class PeMlpPolicy(object):
                ob: current state, or a list of states
                resample: whether to resample actor params before acting
         """
-        if self.standardize_input:
-            self.ob_rms.update(ob) # update running mean/std for policy
         
         if resample:
             actor_param = self.resample()
@@ -240,9 +231,12 @@ class PeMlpPolicy(object):
             ob = ob.reshape((self.ob_dim + self.use_bias, 1))
             theta = self.actor_params.reshape((self.ac_dim, self.ob_dim + self.use_bias))
             return np.ravel(np.dot(theta, ob))
+        
+        def seed(self, seed):
+            np.random.seed(seed)
 
-    def freeze(self, linear=True):
-        if not linear:
+    def freeze(self):
+        if not self.linear:
             raise NotImplementedError
             
         return self._FrozenLinearActor(self.eval_params(),
