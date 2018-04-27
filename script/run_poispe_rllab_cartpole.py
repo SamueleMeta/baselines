@@ -4,7 +4,7 @@ import sys
 sys.path.append('/home/alberto/rllab')
 
 from baselines.policy.pemlp_policy import PeMlpPolicy
-import baselines.pgpe.npgpe_pois as npgpepois
+import baselines.pgpe.poisnpe as poisnpe
 import baselines.common.tf_util as U
 import numpy as np
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
@@ -16,8 +16,8 @@ def train(num_episodes, horizon, seed):
     sess = U.single_threaded_session()
     sess.__enter__()
 
-    DIR = '../results/npgpepois/z/rllab_cartpole/seed_' + str(seed)
-    gamma = 0.999
+    DIR = '../results/poisnpe/rllab_cartpole/seed_' + str(seed)
+    gamma = 1.
     env = CartpoleEnv()
     env = Rllab2GymWrapper(env)
 
@@ -29,10 +29,10 @@ def train(num_episodes, horizon, seed):
                       hid_layers=[],
                       diagonal=True,
                       use_bias=False,
-                      standardize_input=True,
+                      standardize_input=False,
                       seed=seed)
     
-    npgpepois.learn(env,
+    poisnpe.learn(env,
               pol_maker,
               gamma=gamma,
               batch_size=100,
