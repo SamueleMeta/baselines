@@ -14,10 +14,13 @@ class MlpPolicy(object):
         #with tf.device('/cpu:0'):
         with tf.variable_scope(name):
             self._init(*args, **kwargs)
-            self.scope = tf.get_variable_scope().name
             U.initialize()
+            self.scope = tf.get_variable_scope().name
+            self._prepare_getsetters()
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True, use_critic=True, seed=None):
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True, use_critic=True,
+              seed=None, hidden_W_init=U.normc_initializer(1.0), hidden_b_init=tf.zeros_initializer(),
+                 output_W_init=U.normc_initializer(0.01), output_b_init=tf.zeros_initializer()):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -27,6 +30,11 @@ class MlpPolicy(object):
             use_bias: whether to include bias in neurons
         """
         assert isinstance(ob_space, gym.spaces.Box)
+
+        if isinstance(hid_size, list):
+            num_hid_layers = len(hid_size)
+        else:
+            hid_size = [hid_size] * num_hid_layers
 
         if seed is not None:
             tf.set_random_seed(seed)
@@ -44,27 +52,27 @@ class MlpPolicy(object):
                 obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
                 last_out = obz
                 for i in range(num_hid_layers):
-                    last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size, name="fc%i"%(i+1), kernel_initializer=U.normc_initializer(1.0)))
-                self.vpred = tf.layers.dense(last_out, 1, name='final', kernel_initializer=U.normc_initializer(1.0))[:,0]
+                    last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size[i], name="fc%i"%(i+1), kernel_initializer=hidden_W_init))
+                self.vpred = tf.layers.dense(last_out, 1, name='final', kernel_initializer=hidden_W_init)[:,0]
 
         #Actor
         with tf.variable_scope('pol'):
             last_out = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
             for i in range(num_hid_layers):
-                last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
+                last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size[i],
                                                       name='fc%i'%(i+1),
-                                                      kernel_initializer=U.normc_initializer(1.0),use_bias=use_bias))
+                                                      kernel_initializer=hidden_W_init,use_bias=use_bias))
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
                 self.mean = mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
                                        name='final',
-                                       kernel_initializer=U.normc_initializer(0.01),
+                                       kernel_initializer=output_W_init,
                                        use_bias=use_bias)
-                self.logstd = logstd = tf.get_variable(name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=tf.zeros_initializer())
+                self.logstd = logstd = tf.get_variable(name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=output_b_init)
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
                 pdparam = tf.layers.dense(last_out, pdtype.param_shape()[0],
                                           name='final',
-                                          kernel_initializer=U.normc_initializer(0.01))
+                                          kernel_initializer=output_W_init)
 
         #Acting
         self.pd = pdtype.pdfromflat(pdparam)
@@ -98,8 +106,7 @@ class MlpPolicy(object):
         self.fisher = tf.einsum('i,j->ij', score, score)        
       
         #Performance graph initializations
-        self._setting = [] 
-        
+        self._setting = []
 
     #Acting    
     def act(self, stochastic, ob):
@@ -115,37 +122,29 @@ class MlpPolicy(object):
     
 
     #Divergence
-    def eval_renyi(self, states, other, order=2., exponentiate=False):
-        """Renyi divergence exp(Renyi(self, other)) for each state
+    def eval_renyi(self, states, other, order=2):
+        """Exponentiated Renyi divergence exp(Renyi(self, other)) for each state
         
         Params:
             states: flat list of states
             other: other policy
             order: order \alpha of the divergence
         """
-        result = self.pd.renyi(other.pd, alpha=order)
-        if exponentiate:
-            result = tf.exp(result)
-        fun = U.function([self.ob], [result])
-        return fun(states)[0]
-        
-        """Check this!
         if order<2:
             raise NotImplementedError('Only order>=2 is currently supported')
-        to_check = order/tf.exp(2*self.logstd) + (1 - order)/tf.exp(2*other.logstd)
+        to_check = order/tf.exp(self.logstd) + (1 - order)/tf.exp(other.logstd)
         if not (U.function([self.ob],[to_check])(states)[0] > 0).all():
-            print('Conditions not met!')
-            #raise ValueError('Conditions on standard deviations are not met')
-        detSigma = tf.exp(2*tf.reduce_sum(self.logstd))
-        detOtherSigma = tf.exp(tf.reduce_sum(2*other.logstd))
-        mixSigma = order*tf.exp(2*self.logstd) + (1 - order) * tf.exp(2*other.logstd)
+            raise ValueError('Conditions on standard deviations are not met')
+        detSigma = tf.exp(tf.reduce_sum(self.logstd))
+        detOtherSigma = tf.exp(tf.reduce_sum(other.logstd))
+        mixSigma = order*tf.exp(self.logstd) + (1 - order) * tf.exp(other.logstd)
         detMixSigma = tf.reduce_prod(mixSigma)
-        renyi = order/2 * tf.reduce_sum((self.mean - other.mean)/mixSigma*(self.mean - other.mean), axis=-1) - \
+        renyi = order/2 * (self.mean - other.mean)/mixSigma*(self.mean - other.mean) - \
             1./(2*(order - 1))*(tf.log(detMixSigma) - (1-order)*tf.log(detSigma) - order*tf.log(detOtherSigma))
         e_renyi = tf.exp(renyi)
         fun = U.function([self.ob],[e_renyi])
         return fun(states)[0]
-        """
+        
     
     #Performance evaluation
     def eval_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, behavioral=None, per_decision=False, 
@@ -201,14 +200,6 @@ class MlpPolicy(object):
         #Evaluate performance stats
         result = self._get_var_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.asscalar(result)
-
-    def eval_simple_iw(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
-                       behavioral=None):
-        batch_size, horizon, _states, _actions, _rewards, _mask = (
-        self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon))
-        self._build(batch_size, horizon, behavioral)
-        result = self._get_simple_iw(_states, _actions, _rewards, gamma, _mask)[0]
-        return np.ravel(result) 
 
     def eval_iw_stats(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
                       behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):
@@ -393,7 +384,7 @@ class MlpPolicy(object):
             resized.append(v)
         return tuple(resized)
 
-    def _build(self, batch_size, horizon, behavioral, per_decision=False, normalize=False, truncate_at=np.infty):
+    def _build(self, batch_size, horizon, behavioral, per_decision, normalize=False, truncate_at=np.infty):
         if [batch_size, horizon, behavioral, per_decision, normalize,
             truncate_at]!=self._setting:
 
@@ -417,20 +408,14 @@ class MlpPolicy(object):
                 avg_iw = tf.constant(1)
                 var_iw = tf.constant(0)
                 max_iw = tf.constant(1)
-                simple_iw = tf.ones(batch_size)
                 ess = batch_size
             else:
-                
                 #Off policy -> importance weighting :(
                 log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
                 log_ratios = tf.expand_dims(log_ratios, axis=1)
                 log_ratios = tf.multiply(log_ratios, self.mask)
                 log_ratios_by_episode = tf.split(log_ratios, batch_size)
                 log_ratios_by_episode = tf.stack(log_ratios_by_episode)
-                
-                simple_iw = tf.exp(tf.reduce_sum(log_ratios_by_episode, axis=1))
-
-                
                 if per_decision:
                     #Per-decision
                     iw = tf.exp(tf.cumsum(log_ratios_by_episode, axis=1))
@@ -499,7 +484,6 @@ class MlpPolicy(object):
                                                                       max_iw,
                                                                       ess])
             self._get_ret_stats = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [avg_ret, var_ret, max_ret])
-            self._get_simple_iw = U.function([self.ob, self.ac_in, self.rew, self.gamma, self.mask], [simple_iw])
             #print('Recompile time:', time.time() - checkpoint)
 
 
@@ -533,32 +517,27 @@ class MlpPolicy(object):
         fisher_samples = np.array([fun(s, a)[0] for (s,a) in zip(_states, _actions)]) #one call per EPISODE
         return np.mean(fisher_samples, axis=0)
 
+    def _prepare_getsetters(self):
+        with tf.variable_scope('pol') as vs:
+            self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=vs.name)
+
+        logstd = tf.get_default_session().run(self.logstd)
+        self.get_parameter = U.GetFlat(self.var_list)
+        self.set_parameter = U.SetFromFlat(self.var_list)
+
 
     #Weight manipulation
     def eval_param(self):
         """"Policy parameters (numeric,flat)"""
-        with tf.variable_scope(self.scope+'/pol') as vs:
-            var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
-                                         scope=vs.name)
-        logstd = tf.get_default_session().run(self.logstd)
-        return U.GetFlat(var_list)()    
+        return self.get_parameter()
     
     def get_param(self):
-        """Policy parameters (symbolic, nested)"""
-        """
-        with tf.variable_scope(self.scope+'/pol') as vs:
-            return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
-                                         scope=vs.name)
-        """
         return self.weights
 
     def set_param(self,param):
         """Set policy parameters to (flat) param"""
-
-        with tf.variable_scope(self.scope+'/pol') as vs:
-            var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
-                                         scope=vs.name)
-            U.SetFromFlat(var_list)(param)
+        self.set_parameter(param)
 
 
     #Used by original implementation
