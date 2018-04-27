@@ -27,7 +27,7 @@ algos = {'poisnpe': poisnpe,
         }
 
 horizons = {'cartpole': 200,
-            'lqg': 500,
+            'lqg': 200,
             }
 
 rews = {'cartpole': 10,
@@ -40,7 +40,7 @@ iters = {'cartpole': 100,
 
 #Seeds: 107, 583, 850, 730, 808
 
-def train(seed, env_name, algo_name, stop_sigma, gamma):
+def train(seed, env_name, algo_name, normalize, gamma):
     DIR = 'temp/'
     #DIR = '../results/' + algo_name + '/z/' + env_name + '/seed_' + str(seed)
     import os
@@ -59,7 +59,6 @@ def train(seed, env_name, algo_name, stop_sigma, gamma):
                       hid_layers=[],
                       diagonal=True,
                       use_bias=False,
-                      standardize_input=True,
                       seed=seed)
     
     algos[algo_name].learn(env,
@@ -72,8 +71,7 @@ def train(seed, env_name, algo_name, stop_sigma, gamma):
               verbose=2,
               feature_fun=np.ravel,
               correct_ess=True,
-              normalize=True,
-              stop_sigma=stop_sigma,
+              normalize=normalize,
               max_offline_ite=100,
               max_search_ite=30,
               bound_name='z',
@@ -83,9 +81,9 @@ if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
-    parser.add_argument('--stop', help='Stop sigma?', type=int, default=0)
-    parser.add_argument('--gamma', help='Stop sigma?', type=float, default=0.99)
+    parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
+    parser.add_argument('--gamma', help='Discount', type=float, default=1.)
     parser.add_argument('--algo', help='Algorithm', type=str, default='poisnpe')
-    parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
+    parser.add_argument('--env', help='Environment (RL task)', type=str, default='lqg')
     args = parser.parse_args()
-    train(args.seed, args.env, args.algo, args.stop, args.gamma)
+    train(args.seed, args.env, args.algo, args.normalize, args.gamma)
