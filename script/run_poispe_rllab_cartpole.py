@@ -4,19 +4,27 @@ import sys
 sys.path.append('/home/alberto/rllab')
 
 from baselines.policy.pemlp_policy import PeMlpPolicy
+import baselines.pgpe.poispe as poispe
+import baselines.pgpe.poispe_par as poispe_par
 import baselines.pgpe.poisnpe as poisnpe
+import baselines.pgpe.poisnpe_par as poisnpe_par
 import baselines.common.tf_util as U
 import numpy as np
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from rllab.envs.box2d.cartpole_env import CartpoleEnv
 
+algos = {'poisnpe': poisnpe,
+         'poisnpe_par': poisnpe_par,
+         'poispe': poispe,
+         'poispe_par': poispe_par,
+         }
 
-def train(num_episodes, horizon, seed):
+def train(num_episodes, horizon, seed, algo):
 
     sess = U.single_threaded_session()
     sess.__enter__()
 
-    DIR = '../results/poisnpe/rllab_cartpole/seed_' + str(seed)
+    DIR = '../results/'+ algo +'/rllab_cartpole/seed_' + str(seed)
     gamma = 1.
     env = CartpoleEnv()
     env = Rllab2GymWrapper(env)
@@ -32,7 +40,7 @@ def train(num_episodes, horizon, seed):
                       standardize_input=False,
                       seed=seed)
     
-    poisnpe.learn(env,
+    algos[algo].learn(env,
               pol_maker,
               gamma=gamma,
               batch_size=100,
@@ -56,11 +64,13 @@ def main():
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--num_episodes', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
+    parser.add_argument('--algo', type=str, default='poisnpe_par')
     args = parser.parse_args()
 
     train(num_episodes=args.num_episodes,
           horizon=args.horizon,
-          seed=args.seed)
+          seed=args.seed,
+          algo=args.algo)
 
 
 if __name__ == '__main__':

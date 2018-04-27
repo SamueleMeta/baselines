@@ -11,7 +11,7 @@ import baselines.pgpe.poisnpe_par as poisnpe_par
 import baselines.common.tf_util as U
 import numpy as np
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
-from rllab.envs.mujoco.swimmer_env import SwimmerEnv
+from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
 
 algos = {'poisnpe': poisnpe,
          'poisnpe_par': poisnpe_par,
@@ -24,9 +24,9 @@ def train(num_episodes, horizon, seed, algo):
     sess = U.single_threaded_session()
     sess.__enter__()
 
-    DIR = '../results/'+ algo +'/swimmer/seed_' + str(seed)
+    DIR = '../results/'+ algo +'/cheetah/seed_' + str(seed)
     gamma = 1.
-    env = SwimmerEnv()
+    env = HalfCheetahEnv()
     env = Rllab2GymWrapper(env)
 
     rmax = None #Empirical
