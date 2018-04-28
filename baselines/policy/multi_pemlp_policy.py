@@ -78,18 +78,23 @@ class PerWeightPePolicy(object):
             batch_length = None
         
             #Gaussian Hyperpolicy
-            self.mean = tf.get_variable(name='mean', shape=[1], dtype=tf.float32, initializer=tf.initializers.random_normal(0,1))    
-            self.logstd = tf.get_variable(name='logstd', shape=[1], dtype=tf.float32, initializer=tf.initializers.zeros)
-            self.params = tf.concat([self.mean, self.logstd], axis=0)
-            pdtype = DiagGaussianPdType(1) 
-            self.pd = pd = pdtype.pdfromflat(self.params)
-            
+            with tf.variable_scope('higher_params') as scope:
+                self.mean = tf.get_variable(name='mean', shape=[1], dtype=tf.float32, initializer=tf.initializers.random_normal(0,1))    
+                self.logstd = tf.get_variable(name='logstd', shape=[1], dtype=tf.float32, initializer=tf.initializers.zeros)
+                pdparam = tf.concat([self.mean, self.logstd], axis=0)
+                pdtype = DiagGaussianPdType(1) 
+                self.pd = pd = pdtype.pdfromflat(pdparam)
+                
             #Sample weight
             sampled_weight = pd.sample()
             self._sample_weight = U.function([], [sampled_weight])
             
             #Hyperpolicy params
-            self._n_params = self.params.shape[0]
+            self.params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
+                                         scope=scope.name) 
+            self.flat_params = tf.concat([tf.reshape(w, [-1]) for w in \
+                                        self.params], axis=0)
+            self._n_params = self.flat_params.shape[0]
             self._set_params = U.SetFromFlat(self.params)
             self._get_params = U.GetFlat(self.params)
     
@@ -200,7 +205,7 @@ class PerWeightPePolicy(object):
             bound = self._get_unn_z_bound(weights, rets, batch_size, ppf, rmax)[0]    
         return bound
     
-    def eval_bound_and_grad(self, weights, rets, behavioral, delta=0.2, correct=True, normalize=True,
+    def eval_bound_and_grad(self, weights, rets, behavioral, delta=0.2, normalize=True,
                             rmax=None):
         if behavioral is not self._behavioral:
                 self._build_iw_graph(behavioral)
@@ -246,12 +251,12 @@ class PerWeightPePolicy(object):
         self._rmax = tf.placeholder(name='R_max', dtype=tf.float32, shape=[])
         z_std = self._rmax * tf.exp(0.5*renyi) / tf.sqrt(self._batch_size)
         z_bound = ret_mean - self._ppf * z_std
-        z_bound_grad = U.flatgrad(z_bound, self._params)
+        z_bound_grad = U.flatgrad(z_bound, self.params)
         unn_z_bound = unn_ret_mean - self._ppf * z_std
-        unn_z_bound_grad = U.flatgrad(unn_z_bound, self._params)
+        unn_z_bound_grad = U.flatgrad(unn_z_bound, self.params)
         self._get_z_bound = U.function([self._weights_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
                                        [z_bound])
-        self._get_z_bound_grad = U.function([self.weights_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
+        self._get_z_bound_grad = U.function([self._weights_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
                                             [z_bound, z_bound_grad])
         self._get_unn_z_bound = U.function([self._weights_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
                                        [unn_z_bound])
@@ -295,7 +300,7 @@ class MultiPeMlpPolicy(object):
             actor_params = self.resample()
             
         action =  self.actor.act(ob)
-        return action, actor_params if resample else action
+        return (action, actor_params) if resample else action
     
     def resample(self):
         """Resample actor params
@@ -309,7 +314,7 @@ class MultiPeMlpPolicy(object):
     
     def eval_params(self):
         """Get current params of the higher order policy"""
-        return np.array([agent.eval_params() for agent in self.agents()])
+        return np.array([agent.eval_params() for agent in self.agents])
 
     def set_params(self, new_higher_params):
         """Set higher order policy parameters from flat sequence"""
@@ -339,5 +344,5 @@ class MultiPeMlpPolicy(object):
     def eval_bound_and_grad(self, actor_params, rets, behavioral, delta=0.2, normalize=True,
                    rmax=None):
         actor_params = np.array(actor_params)
-        return np.array([agent.eval_bound_and_grad(self, actor_params[i, :], rets, behavioral, delta, normalize,
-                   rmax) for agent, i in enumerate(self.agents)])
+        return np.array([agent.eval_bound_and_grad(actor_params[i, :], rets, behavioral.agents[i], delta, normalize,
+                   rmax) for i, agent in enumerate(self.agents)])

@@ -101,8 +101,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         newpol.set_params(rho)
         
         #Bound with gradient
-        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, behavioral=pol, correct=correct_ess, normalize=normalize,
-                                                 bound_name=bound_name, rmax=rmax)
+        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, behavioral=pol, normalize=normalize, rmax=rmax)
         if np.any(np.isnan(grad)):
             warnings.warn('Got NaN gradient! Stopping!')
             return rho, improvement
@@ -179,7 +178,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
             actor_params = []
             rets, disc_rets, lens, max_rets = [], [], [], []
             for ep in range(batch_size):
-                frozen_pol = pol.freeze()
+                frozen_pol = pol
                 theta = frozen_pol.resample()
                 actor_params.append(theta)
                 ret, disc_ret, ep_len, max_ret = eval_trajectory(env, frozen_pol, gamma, task_horizon, feature_fun)

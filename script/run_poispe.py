@@ -40,9 +40,12 @@ iters = {'cartpole': 100,
 
 #Seeds: 107, 583, 850, 730, 808
 
-def train(seed, env_name, algo_name, normalize, gamma):
+gamma = 1.
+
+def train(seed, env_name, algo_name, normalize, use_rmax, use_renyi):
     DIR = 'temp/'
-    #DIR = '../results/' + algo_name + '/z/' + env_name + '/seed_' + str(seed)
+    index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
+    DIR = '../results/' + algo_name + '/bound_' + str(index) + '/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
@@ -66,15 +69,15 @@ def train(seed, env_name, algo_name, normalize, gamma):
               gamma=gamma,
               batch_size=100,
               task_horizon=horizon,
-              max_iterations=100,
+              max_iterations=2,
               save_to=DIR,
               verbose=2,
               feature_fun=np.ravel,
-              correct_ess=True,
               normalize=normalize,
+              use_rmax=use_rmax,
+              use_renyi=use_renyi,
               max_offline_ite=100,
               max_search_ite=30,
-              bound_name='z',
               rmax=rmax)
 
 if __name__=='__main__':
@@ -82,8 +85,11 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
-    parser.add_argument('--gamma', help='Discount', type=float, default=1.)
+    parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
+    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
     parser.add_argument('--algo', help='Algorithm', type=str, default='poisnpe')
     parser.add_argument('--env', help='Environment (RL task)', type=str, default='lqg')
     args = parser.parse_args()
-    train(args.seed, args.env, args.algo, args.normalize, args.gamma)
+    train(args.seed, args.env, args.algo, args.normalize, 
+          args.use_rmax,
+          args.use_renyi)

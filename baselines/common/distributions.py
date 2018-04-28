@@ -203,6 +203,10 @@ class DiagGaussianPd(Pd):
         return 0.5 * tf.reduce_sum(tf.square((x - self.mean) / self.std), axis=-1) \
                + 0.5 * np.log(2.0 * np.pi) * tf.to_float(tf.shape(x)[-1]) \
                + tf.reduce_sum(self.logstd, axis=-1)
+    def independent_logps(self, x):
+        return - (0.5 * tf.square((x- self.mean) / self.std)
+                  + 0.5 * np.log(2. * np.pi)
+                  + self.logstd)
     def kl(self, other):
         assert isinstance(other, DiagGaussianPd)
         return tf.reduce_sum(other.logstd - self.logstd + (tf.square(self.std) + tf.square(self.mean - other.mean)) / (2.0 * tf.square(other.std)) - 0.5, axis=-1)

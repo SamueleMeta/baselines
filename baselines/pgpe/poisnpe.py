@@ -43,13 +43,16 @@ def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
     return ret, disc_ret, t, max_ret
 
 #BINARY line search
-def line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, normalize=True, max_search_ite=30,
-                bound_name='t', rmax=None):
+def line_search(pol, newpol, actor_params, rets, alpha, natgrad, 
+                normalize=True,
+                use_rmax=True,
+                use_renyi=True,
+                max_search_ite=30, rmax=None):
     rho_init = newpol.eval_params()
     low = 0.
     high = None
-    bound_init = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct, normalize=normalize, 
-                                   bound_name=bound_name, rmax=rmax)
+    bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi)
     #old_delta_bound = 0.
     rho_opt = rho_init
     i_opt = 0.
@@ -60,8 +63,8 @@ def line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, n
     for i in range(max_search_ite):
         rho = rho_init + epsilon * natgrad * alpha
         newpol.set_params(rho)
-        bound = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct, normalize=normalize, 
-                                  bound_name=bound_name, rmax=rmax)
+        bound = newpol.eval_bound(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi)
         delta_bound = bound - bound_init        
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -85,8 +88,11 @@ def line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, n
     return rho_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
 def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
-                     correct_ess=True, normalize=True, max_search_ite=30,
-                     stop_sigma=False, bound_name='t', rmax=None):
+                     normalize=True, 
+                     use_rmax=True,
+                     use_renyi=True,
+                     max_search_ite=30,
+                     rmax=None):
     improvement = 0.
     rho = pol.eval_params()
     
@@ -96,28 +102,30 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
     print(titlestr % ("iter", "epsilon", "step size", "num line search", 
                       "gradient norm", "delta bound ite", "delta bound tot"))
     
+    natgrad = None
+    
     for i in range(max_offline_ite):
         #Candidate policy
         newpol.set_params(rho)
         
         #Bound with gradient
-        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, behavioral=pol, correct=correct_ess, normalize=normalize,
-                                                 bound_name=bound_name, rmax=rmax)
+        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi)
         if np.any(np.isnan(grad)):
             warnings.warn('Got NaN gradient! Stopping!')
             return rho, improvement
         if np.isnan(bound):
             warnings.warn('Got NaN bound! Stopping!')
             return rho, improvement     
-        
+
+            
         #Natural gradient
         if newpol.diagonal: 
             natgrad = grad/(newpol.eval_fisher() + 1e-24)
         else:
             raise NotImplementedError
         assert np.dot(grad, natgrad) >= 0
-        if i>0 and newpol.diagonal and stop_sigma:
-            natgrad[len(natgrad)//2:] = 0
+
         grad_norm = np.sqrt(np.dot(grad, natgrad))
         if grad_norm < grad_tol:
             print("stopping - gradient norm < gradient_tol")
@@ -132,10 +140,10 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
                                                                  rets, 
                                                                  alpha, 
                                                                  natgrad, 
-                                                                 correct=correct_ess,
                                                                  normalize=normalize,
+                                                                 use_rmax=use_rmax,
+                                                                 use_renyi=use_renyi,
                                                                  max_search_ite=max_search_ite,
-                                                                 bound_name=bound_name,
                                                                  rmax=rmax)
         newpol.set_params(rho)
         improvement+=delta_bound
@@ -149,8 +157,13 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
 
 
 def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations, 
-          feature_fun=None, max_offline_ite=100, correct_ess=True, normalize=True,
-          max_search_ite=30, stop_sigma=False, bound_name='t', rmax=None,
+          feature_fun=None, 
+          rmax=None,
+          normalize=True, 
+          use_rmax=True, 
+          use_renyi=True,
+          max_offline_ite=100, 
+          max_search_ite=30,
           verbose=True, 
           save_to=None):
     
@@ -168,6 +181,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
     for it in range(max_iterations):
         logger.log('\n********** Iteration %i ************' % it)
         rho = pol.eval_params() #Higher-order-policy parameters
+        print(rho)
         if verbose>1:
             logger.log('Higher-order parameters: ', rho)
             print(len(rho))
@@ -198,12 +212,12 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
             else:
                 _rmax = rmax
                 if verbose: print('Using empirical maxRet %f' % _rmax)
-            rho, improvement = optimize_offline(pol, newpol, actor_params, rets, correct_ess=correct_ess,
+            rho, improvement = optimize_offline(pol, newpol, actor_params, rets,
                                                 normalize=normalize,
-                                                max_offline_ite=100,
+                                                use_rmax=use_rmax,
+                                                use_renyi=use_renyi,
+                                                max_offline_ite=max_offline_ite,
                                                 max_search_ite=max_search_ite,
-                                                stop_sigma=stop_sigma,
-                                                bound_name=bound_name,
                                                 rmax=_rmax)
             newpol.set_params(rho)
             assert(improvement>=0.)
@@ -215,8 +229,8 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         J, varJ = newpol.eval_performance(actor_params, disc_rets, behavioral=pol)
         eRenyi = np.exp(newpol.eval_renyi(pol))
         
-        logger.record_tabular('Bound', newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct_ess, 
-                                                         normalize=normalize, bound_name=bound_name, rmax=_rmax))
+        logger.record_tabular('Bound', newpol.eval_bound(actor_params, rets, pol, _rmax,
+                                                         normalize, use_rmax, use_renyi))
         logger.record_tabular('ESSClassic', ess)
         logger.record_tabular('ESSRenyi', batch_size/eRenyi)
         logger.record_tabular('MaxVanillaIw', np.max(unn_iws))

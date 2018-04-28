@@ -205,7 +205,7 @@ class PeMlpPolicy(object):
             actor_param = self.resample()
 
         action =  self._act(np.atleast_2d(ob))[0]
-        return action, actor_param if resample else action
+        return (action, actor_param) if resample else action
     
     class _FrozenLinearActor(object):
         def __init__(self, higher_params, ob_dim, ac_dim, use_bias):
@@ -237,7 +237,7 @@ class PeMlpPolicy(object):
 
     def freeze(self):
         if not self.linear:
-            raise NotImplementedError
+            return self
             
         return self._FrozenLinearActor(self.eval_params(),
                                   self.ob_dim,
@@ -280,7 +280,7 @@ class PeMlpPolicy(object):
 
     def eval_actor_params(self):
         """Get actor params as last assigned"""
-        self._get_actor_params()
+        return self._get_actor_params()
 
     def set_actor_params(self, new_actor_params):
         """Manually set actor policy parameters from flat sequence"""
@@ -472,67 +472,48 @@ class PeMlpPolicy(object):
         else:
             return self._get_unn_iws(actor_params)[0]
     
-    def eval_bound(self, actor_params, rets, behavioral, delta=0.2, correct=True, normalize=True,
-                   bound_name='t', rmax=None):
+    def eval_bound(self, actor_params, rets, behavioral, rmax, normalize=True,
+                   use_rmax = True, use_renyi=True, delta=0.2):
         if behavioral is not self._behavioral:
                 self._build_iw_graph(behavioral)
                 self._behavioral = behavioral
         batch_size = len(rets)
         
-        if bound_name=='t':
-            ppf = sts.t.ppf(1 - delta, batch_size - 1)
-            if normalize:
-                if correct:
-                    bound = self._get_corr_bound(actor_params, rets, batch_size, ppf)[0]
-                else:
-                    bound = self._get_bound(actor_params, rets, batch_size, ppf)[0]
-            else:
-                if correct:
-                    bound = self._get_unn_corr_bound(actor_params, rets, batch_size, ppf)[0]
-                else: 
-                    raise NotImplementedError
-        elif bound_name=='z':
+        if use_rmax:
             ppf = sts.norm.ppf(1 - delta)
-            if normalize:
-                bound = self._get_z_bound(actor_params, rets, batch_size, ppf, rmax)[0]
-            else:
-                bound = self._get_unn_z_bound(actor_params, rets, batch_size, ppf, rmax)[0]    
-        else: raise ValueError
+        else:
+            ppf = sts.t.ppf(1 - delta, batch_size - 1)
         
-        return bound
+        index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
+        bound_getter = self._get_bound[index]
+        
+        return bound_getter(actor_params, rets, batch_size, ppf, rmax)[0]
     
-    def eval_bound_and_grad(self, actor_params, rets, behavioral, delta=0.2, correct=True, normalize=True,
-                            bound_name='t', rmax=None):
+    def eval_bound_and_grad(self, actor_params, rets, behavioral, rmax, normalize=True,
+                   use_rmax=True, use_renyi=True, delta=0.2):
         if behavioral is not self._behavioral:
                 self._build_iw_graph(behavioral)
                 self._behavioral = behavioral
         batch_size = len(rets)
-        if bound_name=='t':
-            ppf = sts.t.ppf(1 - delta, batch_size - 1)
-            if normalize:
-                if correct:
-                    bound, grad = self._get_corr_bound_grad(actor_params, rets, batch_size, ppf)
-                else:
-                    bound, grad = self._get_bound_grad(actor_params, rets, batch_size, ppf)
-            else:
-                if correct:
-                    bound, grad = self._get_unn_corr_bound_grad(actor_params, rets, batch_size, ppf)
-                else:
-                    raise NotImplementedError
-        elif bound_name=='z':
+        
+        if use_rmax:
             ppf = sts.norm.ppf(1 - delta)
-            if normalize:
-                bound, grad = self._get_z_bound_grad(actor_params, rets, batch_size, ppf, rmax)
-            else:
-                bound, grad = self._get_unn_z_bound_grad(actor_params, rets, batch_size, ppf, rmax)
-        return bound, grad
+        else:
+            ppf = sts.t.ppf(1 - delta, batch_size - 1)
+        
+        index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
+        bound_and_grad_getter = self._get_bound_grad[index]
+        
+        return bound_and_grad_getter(actor_params, rets, batch_size, ppf, rmax)
     
     def _build_iw_graph(self, behavioral):
         print('EXTENDING!!')
         self._batch_size = batch_size = tf.placeholder(name='batchsize', dtype=tf.float32, shape=[])
         
         #Self-normalized importance weights
-        unn_iws = self._probs/behavioral._probs
+        #unn_iws = self._probs/behavioral._probs
+        unn_iws = tf.exp(tf.reduce_sum(self.pd.independent_logps(self._actor_params_in) - 
+                    behavioral.pd.independent_logps(self._actor_params_in), axis=-1))
         iws = unn_iws/tf.reduce_sum(unn_iws)
         self._get_unn_iws = U.function([self._actor_params_in], [unn_iws])
         self._get_iws = U.function([self._actor_params_in], [iws])
@@ -541,6 +522,8 @@ class PeMlpPolicy(object):
         ret_mean = tf.reduce_sum(self._rets_in * iws)
         unn_ret_mean = tf.reduce_mean(self._rets_in*unn_iws)
         self._get_off_ret_mean = U.function([self._rets_in, self._actor_params_in], [ret_mean])
+        ret_std = tf.sqrt(tf.reduce_sum(iws ** 2 * (self._rets_in - ret_mean) ** 2) * batch_size)
+        self._get_off_ret_std = U.function([self._rets_in, self._actor_params_in, self._batch_size], [ret_std])
         
         #Offline gradient
         off_pgpe_times_n = U.flatgrad((tf.stop_gradient(iws) * 
@@ -552,51 +535,35 @@ class PeMlpPolicy(object):
                                                 self._rets_in],
                                                 [off_pgpe_times_n])
         
-        #Bounds
+        #Renyi
         renyi = self.pd.renyi(behavioral.pd)
         renyi = tf.cond(tf.is_nan(renyi), lambda: tf.constant(np.inf), lambda: renyi)
         renyi = tf.cond(renyi<0., lambda: tf.constant(np.inf), lambda: renyi)
-        ret_std = tf.sqrt(tf.reduce_sum(iws ** 2 * (self._rets_in - ret_mean) ** 2) * batch_size)
-        self._get_off_ret_std = U.function([self._rets_in, self._actor_params_in, self._batch_size], [ret_std])
-        corr_ret_std = tf.sqrt(tf.multiply(
-                tf.reduce_sum(iws * (self._rets_in - ret_mean) ** 2), tf.exp(renyi)))
-        unn_corr_ret_std = tf.sqrt(tf.reduce_sum((self._rets_in*unn_iws - unn_ret_mean)**2)/(batch_size-1)/tf.exp(renyi))
-        self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
-        #Student t bound
-        bound = ret_mean - ret_std * self._ppf
-        bound_grad = U.flatgrad(bound, self._higher_params)
-        self._get_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
-                                     [bound])
-        self._get_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
-                                     [bound, bound_grad])
-        #POIS corrected bound
-        corr_bound = ret_mean - corr_ret_std * self._ppf  
-        corr_bound_grad = U.flatgrad(corr_bound, self._higher_params)
-        self._get_corr_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
-                                          [corr_bound])
-        self._get_corr_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
-                                          [corr_bound, corr_bound_grad])
         
-        #POIS corrected bound (unnormalized)
-        unn_corr_bound = unn_ret_mean - unn_corr_ret_std * self._ppf  
-        unn_corr_bound_grad = U.flatgrad(unn_corr_bound, self._higher_params)
-        self._get_unn_corr_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
-                                          [unn_corr_bound])
-        self._get_unn_corr_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf],
-                                          [unn_corr_bound, unn_corr_bound_grad])
+        #Weight norm
+        iws2norm = tf.norm(iws)
         
-        #Z-bound
+        #Return properties
         self._rmax = tf.placeholder(name='R_max', dtype=tf.float32, shape=[])
-        z_std = self._rmax * tf.exp(0.5*renyi) / tf.sqrt(self._batch_size)
-        z_bound = ret_mean - self._ppf * z_std
-        z_bound_grad = U.flatgrad(z_bound, self._higher_params)
-        unn_z_bound = unn_ret_mean - self._ppf * z_std
-        unn_z_bound_grad = U.flatgrad(unn_z_bound, self._higher_params)
-        self._get_z_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
-                                       [z_bound])
-        self._get_z_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
-                                            [z_bound, z_bound_grad])
-        self._get_unn_z_bound = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
-                                       [unn_z_bound])
-        self._get_unn_z_bound_grad = U.function([self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax], 
-                                            [unn_z_bound, unn_z_bound_grad])
+        on_ret_mean, on_ret_var = tf.nn.moments(self._rets_in, axes=[0])
+        
+        #Penalization coefficient
+        self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
+        
+        #All the bounds
+        bounds = []
+        bounds.append(unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #000
+        bounds.append(unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #001
+        bounds.append(unn_ret_mean - self._ppf * self._rmax * iws2norm) #010
+        bounds.append(unn_ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #011
+        bounds.append(ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #100
+        bounds.append(ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #101
+        bounds.append(ret_mean - self._ppf * self._rmax * iws2norm) #110
+        bounds.append(ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #111
+        
+        inputs = [self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax]
+        self._get_bound = [U.function(inputs, [bounds[i]]) for i in range(len(bounds))]
+        self._get_bound_grad = [U.function(inputs, [bounds[i], 
+                                                    U.flatgrad(bounds[i], self._higher_params)]) for i in range(len(bounds))]
+    
+    
