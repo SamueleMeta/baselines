@@ -43,7 +43,7 @@ iters = {'cartpole': 100,
 gamma = 1.
 
 def train(seed, env_name, algo_name, normalize, use_rmax, use_renyi):
-    DIR = 'temp/'
+    #DIR = 'temp/'
     index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
     DIR = '../results/' + algo_name + '/bound_' + str(index) + '/' + env_name + '/seed_' + str(seed)
     import os
@@ -69,7 +69,7 @@ def train(seed, env_name, algo_name, normalize, use_rmax, use_renyi):
               gamma=gamma,
               batch_size=100,
               task_horizon=horizon,
-              max_iterations=2,
+              max_iterations=100,
               save_to=DIR,
               verbose=2,
               feature_fun=np.ravel,

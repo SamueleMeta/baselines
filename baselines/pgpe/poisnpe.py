@@ -27,7 +27,6 @@ def timed(msg):
 
 def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
     ret = disc_ret = 0
-    max_ret = 0
     t = 0
     ob = env.reset()
     done = False
@@ -37,10 +36,9 @@ def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
         ob, r, done, _ = env.step(a)
         ret += r
         disc_ret += gamma**t * r
-        max_ret = max(abs(r), max_ret)
         t+=1
         
-    return ret, disc_ret, t, max_ret
+    return ret, disc_ret, t
 
 #BINARY line search
 def line_search(pol, newpol, actor_params, rets, alpha, natgrad, 
@@ -191,34 +189,33 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         #TODO: try symmetric sampling
         with timed('Sampling'):
             actor_params = []
-            rets, disc_rets, lens, max_rets = [], [], [], []
+            rets, disc_rets, lens = [], [], []
             for ep in range(batch_size):
                 frozen_pol = pol.freeze()
                 theta = frozen_pol.resample()
                 actor_params.append(theta)
-                ret, disc_ret, ep_len, max_ret = eval_trajectory(env, frozen_pol, gamma, task_horizon, feature_fun)
+                ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, task_horizon, feature_fun)
                 rets.append(ret)
                 disc_rets.append(disc_ret)
                 lens.append(ep_len)
-                max_rets.append(max_ret)
         logger.log('Performance: ', np.mean(rets))
         #if save_to: np.save(save_to + '/rets_' + str(it), rets)
             
+
+        disc_rets = np.array(disc_rets) - np.mean(disc_rets)
+        vanilla_rets = rets
+        rets = np.array(rets) - np.mean(rets)
+        rmax = np.max(disc_rets)
         
         #Offline optimization
         with timed('Optimizing offline'):
-            if rmax is None:
-                _rmax = sum(max(max_rets)*gamma**i for i in range(task_horizon)) 
-            else:
-                _rmax = rmax
-                if verbose: print('Using empirical maxRet %f' % _rmax)
             rho, improvement = optimize_offline(pol, newpol, actor_params, rets,
                                                 normalize=normalize,
                                                 use_rmax=use_rmax,
                                                 use_renyi=use_renyi,
                                                 max_offline_ite=max_offline_ite,
                                                 max_search_ite=max_search_ite,
-                                                rmax=_rmax)
+                                                rmax=rmax)
             newpol.set_params(rho)
             assert(improvement>=0.)
         
@@ -229,7 +226,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         J, varJ = newpol.eval_performance(actor_params, disc_rets, behavioral=pol)
         eRenyi = np.exp(newpol.eval_renyi(pol))
         
-        logger.record_tabular('Bound', newpol.eval_bound(actor_params, rets, pol, _rmax,
+        logger.record_tabular('Bound', newpol.eval_bound(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi))
         logger.record_tabular('ESSClassic', ess)
         logger.record_tabular('ESSRenyi', batch_size/eRenyi)
@@ -243,6 +240,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         logger.record_tabular('VarNormIw', np.var(iws, ddof=1))
         logger.record_tabular('eRenyi2', eRenyi)
         logger.record_tabular('AvgRet', np.mean(rets))
+        logger.record_tabular('VanillaAvgRet', np.mean(vanilla_rets))
         logger.record_tabular('VarRet', np.var(rets, ddof=1))
         logger.record_tabular('VarDiscRet', np.var(disc_rets, ddof=1))
         logger.record_tabular('AvgDiscRet', np.mean(disc_rets))
