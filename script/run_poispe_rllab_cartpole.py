@@ -1,34 +1,48 @@
 #!/usr/bin/env python3
-# noinspection PyUnresolvedReferences
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Apr  4 18:36:59 2018
+
+@author: matteo
+"""
+
 import sys
 sys.path.append('/home/alberto/rllab')
 
 from baselines.policy.pemlp_policy import PeMlpPolicy
-import baselines.pgpe.poispe as poispe
-import baselines.pgpe.poispe_par as poispe_par
 import baselines.pgpe.poisnpe as poisnpe
-import baselines.pgpe.poisnpe_par as poisnpe_par
-import baselines.common.tf_util as U
+import baselines.pgpe.poispe as poispe
 import numpy as np
+
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from rllab.envs.box2d.cartpole_env import CartpoleEnv
 
+import baselines.common.tf_util as U
+sess = U.single_threaded_session()
+sess.__enter__()
+
+
 algos = {'poisnpe': poisnpe,
-         'poisnpe_par': poisnpe_par,
          'poispe': poispe,
-         'poispe_par': poispe_par,
-         }
+        }
 
-def train(num_episodes, horizon, seed, algo):
+#Seeds: 107, 583, 850, 730, 808
 
-    sess = U.single_threaded_session()
-    sess.__enter__()
+gamma = 1.
 
-    DIR = '../results/'+ algo +'/rllab_cartpole/seed_' + str(seed)
-    gamma = 1.
+def train(seed, algo_name, normalize, use_rmax, use_renyi):
+    #DIR = 'temp/'
+    index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
+    DIR = '../results/' + algo_name + '/bound_' + str(index) + '/' + 'rllab_cartpole' + '/seed_' + str(seed)
+    import os
+    if not os.path.exists(DIR):
+        os.makedirs(DIR)
+    
     env = CartpoleEnv()
     env = Rllab2GymWrapper(env)
 
+    horizon = 500
+    #rmax = sum([rews[env_name]*gamma**i for i in range(horizon)])
     rmax = None #Empirical
     
     pol_maker = lambda name: PeMlpPolicy(name,
@@ -39,38 +53,31 @@ def train(num_episodes, horizon, seed, algo):
                       use_bias=False,
                       seed=seed)
     
-    algos[algo].learn(env,
+    algos[algo_name].learn(env,
               pol_maker,
               gamma=gamma,
               batch_size=100,
               task_horizon=horizon,
-              max_iterations=500,
+              max_iterations=100,
               save_to=DIR,
-              verbose=1,
+              verbose=2,
               feature_fun=np.ravel,
-              correct_ess=True,
-              normalize=True,
+              normalize=normalize,
+              use_rmax=use_rmax,
+              use_renyi=use_renyi,
               max_offline_ite=100,
               max_search_ite=30,
-              bound_name='z',
               rmax=rmax)
 
-    env.close()
-
-def main():
+if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
-    parser.add_argument('--num_episodes', type=int, default=100)
-    parser.add_argument('--horizon', type=int, default=500)
-    parser.add_argument('--algo', type=str, default='poisnpe_par')
+    parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
+    parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
+    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
+    parser.add_argument('--algo', help='Algorithm', type=str, default='poisnpe')
     args = parser.parse_args()
-
-    train(num_episodes=args.num_episodes,
-          horizon=args.horizon,
-          seed=args.seed,
-          algo=args.algo)
-
-
-if __name__ == '__main__':
-    main()
+    train(args.seed, args.algo, args.normalize, 
+          args.use_rmax,
+          args.use_renyi)
