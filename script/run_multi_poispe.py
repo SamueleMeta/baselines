@@ -9,7 +9,7 @@ Created on Wed Apr  4 18:36:59 2018
 import gym
 import baselines.envs.continuous_cartpole
 import baselines.envs.lqg1d
-from baselines.policy.multi_pemlp_policy import MultiPeMlpPolicy
+from baselines.policy.multi_pemlp_policy import PerWeightPeMlpPolicy
 import baselines.pgpe.multi_poisnpe as multipoisnpe
 import numpy as np
 
@@ -51,10 +51,10 @@ def train(seed, env_name, algo_name, stop_sigma, gamma):
     #rmax = sum([rews[env_name]*gamma**i for i in range(horizon)])
     rmax = None #Empirical
     
-    pol_maker = lambda name: MultiPeMlpPolicy(name,
+    pol_maker = lambda name: PerWeightPeMlpPolicy(name,
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[],
+                      hid_layers=[10, 5, 2],
                       use_bias=False,
                       seed=seed)
     
@@ -80,7 +80,7 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--stop', help='Stop sigma?', type=int, default=0)
-    parser.add_argument('--gamma', help='Stop sigma?', type=float, default=0.99)
+    parser.add_argument('--gamma', help='Stop sigma?', type=float, default=1.)
     parser.add_argument('--algo', help='Algorithm', type=str, default='multipoisnpe')
     parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
     args = parser.parse_args()
