@@ -65,7 +65,7 @@ def line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, n
         delta_bound = bound - bound_init        
         if (np.isnan(bound)).any():
             warnings.warn('Got NaN bound value: rolling back!')
-        if (np.isnan(bound)).any() or (delta_bound <= delta_bound_opt).any():
+        if (np.isnan(bound)).any() or delta_bound <= delta_bound_opt:
             high = epsilon
         else:
             low = epsilon
@@ -115,11 +115,11 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         grad_norm = np.sqrt(np.dot(grad, natgrad))
         if grad_norm < grad_tol:
             print("stopping - gradient norm < gradient_tol")
-            print(rho)
+            #print(rho)
             return rho, improvement
         
         #Step size search
-        alpha = 1. / grad_norm ** 2
+        alpha = 1. / natgrad ** 2
         rho, epsilon, delta_bound, num_line_search = line_search(pol, 
                                                                  newpol, 
                                                                  actor_params, 
@@ -133,10 +133,11 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
                                                                  rmax=rmax)
         newpol.set_params(rho)
         improvement+=delta_bound
-        print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, grad_norm, np.min(delta_bound), np.min(improvement)))
-        if np.min(delta_bound) < bound_tol:
+        print(fmtstr % (i+1, epsilon, np.linalg.norm(alpha)*epsilon, 
+                        num_line_search, grad_norm, np.min(delta_bound), np.min(improvement)))
+        if delta_bound < bound_tol:
             print("stopping - delta bound < bound_tol")
-            print(rho)
+            #print(rho)
             return rho, improvement
     
     return rho, improvement
@@ -163,8 +164,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         logger.log('\n********** Iteration %i ************' % it)
         rho = pol.eval_params() #Higher-order-policy parameters
         if verbose>1:
-            logger.log('Higher-order parameters: ', rho)
-            print(len(rho))
+            pass#logger.log('Higher-order parameters: ', rho)
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
             
         #Batch of episodes
@@ -184,7 +184,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         logger.log('Performance: ', np.mean(rets))
         #if save_to: np.save(save_to + '/rets_' + str(it), rets)
             
-        rmax = max(disc_rets)
+        rmax = max(abs(np.array(disc_rets)))
         
         #Offline optimization
         with timed('Optimizing offline'):

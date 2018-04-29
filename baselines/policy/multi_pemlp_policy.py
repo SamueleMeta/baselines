@@ -97,6 +97,14 @@ class PerWeightPeMlpPolicy(object):
             self.higher_means = np.random.normal(size=n_actor_params)
             self.higher_logstds = np.zeros(n_actor_params)
             
+            self._higher_param = tf.placeholder(name='higher_param', dtype=tf.float32, shape=[2])
+            self._actor_params_in = tf.placeholder(name='actor_params_in', dtype=tf.float32, shape=[None, 1])
+            pdtype = DiagGaussianPdType(1)
+            self.pd = pdtype.pdfromflat(self._higher_param)
+            logprobs = self.pd.logp(self._actor_params_in)
+            self.probs = tf.exp(logprobs)
+            
+            self.behavioral = None
             U.initialize()
             self.resample()
         
@@ -125,7 +133,7 @@ class PerWeightPeMlpPolicy(object):
         Returns:
             the sampled actor params
         """        
-        actor_params = np.random.multivariate_normal(self.higher_means, np.diag(self.higher_logstds))
+        actor_params = np.random.multivariate_normal(self.higher_means, np.diag(np.exp(2*self.higher_logstds)))
         self.actor.set_actor_params(actor_params)
         return actor_params
     
@@ -145,21 +153,61 @@ class PerWeightPeMlpPolicy(object):
 
     #TODO:
     
-    def eval_renyi(self, other, order=2):
-        """Renyi divergence"""
-        assert type(other) is PerWeightPeMlpPolicy
-        return 1.
-        
     def eval_fisher(self):
-        return 2*np.ones(self.size*2)
+        mean_fisher = np.exp(-2*self.higher_logstds)
+        logstd_fisher = 2*np.ones(self.size)
+        return np.concatenate((mean_fisher, logstd_fisher))
 
      
     def eval_bound(self, actor_params, rets, behavioral, delta=0.2, normalize=True,
                    rmax=None):
-        actor_params = np.array(actor_params)
-        return np.zeros(self.size)
+        batch_size = len(rets)
+        ppf = sts.norm.ppf(1 - delta)
+        if behavioral is not self.behavioral:
+            self.behavioral = behavioral
+            self._batch_size = tf.placeholder(name='batch_size', dtype=tf.float32, shape=[])
+            self._rmax = tf.placeholder(name='rmax', dtype=tf.float32, shape=[])
+            self._ppf = tf.placeholder(name='ppf', dtype=tf.float32, shape=[])
+            self._rets_in = tf.placeholder(name='rets_in', dtype=tf.float32, shape=[None])
+            renyi = self.pd.renyi(behavioral.pd)
+            unn_iws = self.probs/behavioral.probs
+            iws = unn_iws/tf.reduce_sum(unn_iws)
+            _bound = tf.reduce_sum(self._rets_in*iws) - self._ppf*tf.exp(0.5*renyi)*self._rmax/self._batch_size
+            self._get_bound = U.function([self._higher_param, behavioral._higher_param, self._actor_params_in,
+                                          behavioral._actor_params_in, self._rets_in,
+                                          self._batch_size, self._rmax, self._ppf], [_bound])
+            self._get_bound_grad = U.function([self._higher_param, behavioral._higher_param,
+                                               self._actor_params_in, behavioral._actor_params_in, self._rets_in,
+                                          self._batch_size, self._rmax, self._ppf], [tf.gradients(_bound, self._higher_param)])
+        
+        bound = []
+        for i in range(self.size):
+            higher_param = np.array([self.higher_means[i], self.higher_logstds[i]])
+            other_higher_param = np.array([behavioral.higher_means[i], behavioral.higher_logstds[i]])
+            actor_params_in = np.array(actor_params)[:, i]
+            actor_params_in = np.expand_dims(actor_params_in, -1)
+            bound.append(self._get_bound(higher_param, other_higher_param,
+                                         actor_params_in, actor_params_in, rets, batch_size, rmax, ppf)[0])
+        return np.max(bound)
+            
+    
+    
+            
     
     def eval_bound_and_grad(self, actor_params, rets, behavioral, delta=0.2, normalize=True,
                    rmax=None):
-        actor_params = np.array(actor_params)
-        return np.zeros(self.size), np.zeros(2*self.size)
+        batch_size = len(rets)
+        ppf = sts.norm.ppf(1 - delta)
+        bound = self.eval_bound(actor_params, rets, behavioral, delta, normalize,
+                   rmax)
+        mean_grads, logstd_grads = [], []
+        for i in range(self.size):
+            higher_param = np.array([self.higher_means[i], self.higher_logstds[i]])
+            other_higher_param = np.array([behavioral.higher_means[i], behavioral.higher_logstds[i]])
+            actor_params_in = np.array(actor_params)[:, i]
+            actor_params_in = np.expand_dims(actor_params_in, -1)
+            grad = self._get_bound_grad(higher_param, other_higher_param,
+                                         actor_params_in, actor_params_in, rets, batch_size, rmax, ppf)[0][0]
+            mean_grads.append(grad[0])
+            logstd_grads.append(grad[1])
+        return bound, np.concatenate((mean_grads, logstd_grads))
