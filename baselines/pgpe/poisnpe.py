@@ -204,9 +204,9 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         #if save_to: np.save(save_to + '/rets_' + str(it), rets)
             
 
-        disc_rets = np.array(disc_rets) - np.mean(disc_rets)
+        disc_rets = np.array(disc_rets)# - np.mean(disc_rets)
         vanilla_rets = rets
-        rets = np.array(rets) - np.mean(rets)
+        rets = np.array(rets)# - np.mean(rets)
         rmax = np.max(disc_rets)
         
         #Offline optimization

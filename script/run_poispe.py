@@ -59,7 +59,7 @@ def train(seed, env_name, algo_name, normalize, use_rmax, use_renyi):
     pol_maker = lambda name: PeMlpPolicy(name,
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[100,50,25],
+                      hid_layers=[],
                       diagonal=True,
                       use_bias=False,
                       seed=seed)
@@ -87,7 +87,7 @@ if __name__=='__main__':
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
-    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=0)
+    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
     parser.add_argument('--algo', help='Algorithm', type=str, default='poisnpe')
     parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
     args = parser.parse_args()
