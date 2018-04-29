@@ -33,7 +33,7 @@ gamma = 1.
 def train(seed, algo_name, normalize, use_rmax, use_renyi):
     #DIR = 'temp/'
     index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
-    DIR = '../results/' + algo_name + '/shift_fix/bound_' + str(index) + '/' + 'rllab_cartpole' + '/seed_' + str(seed)
+    DIR = '../results/' + algo_name + '/noshift_fix/bound_' + str(index) + '/' + 'rllab_cartpole' + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
@@ -68,7 +68,7 @@ def train(seed, algo_name, normalize, use_rmax, use_renyi):
               max_offline_ite=100,
               max_search_ite=30,
               rmax=rmax,
-              shift=True)
+              shift=False)
 
 if __name__=='__main__':
     import argparse
