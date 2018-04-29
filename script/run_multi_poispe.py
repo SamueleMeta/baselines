@@ -54,7 +54,7 @@ def train(seed, env_name, algo_name, stop_sigma, gamma):
     pol_maker = lambda name: PerWeightPeMlpPolicy(name,
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[100, 50, 25],
+                      hid_layers=[4],
                       use_bias=False,
                       seed=seed)
     

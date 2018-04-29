@@ -43,9 +43,9 @@ iters = {'cartpole': 100,
 gamma = 1.
 
 def train(seed, env_name, algo_name, normalize, use_rmax, use_renyi):
-    DIR = 'temp/'
+    #DIR = 'temp/'
     index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
-    #DIR = '../results/' + algo_name + '/bound_' + str(index) + '/' + env_name + '/seed_' + str(seed)
+    DIR = '../results/' + algo_name + '/shift_fix/bound_' + str(index) + '/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
@@ -79,7 +79,8 @@ def train(seed, env_name, algo_name, normalize, use_rmax, use_renyi):
               max_offline_ite=100,
               max_search_ite=30,
               rmax=rmax,
-              delta=0.5)
+              delta=0.2,
+              shift=True)
 
 if __name__=='__main__':
     import argparse
@@ -89,7 +90,7 @@ if __name__=='__main__':
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
     parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
     parser.add_argument('--algo', help='Algorithm', type=str, default='poisnpe')
-    parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
+    parser.add_argument('--env', help='Environment (RL task)', type=str, default='lqg')
     args = parser.parse_args()
     train(args.seed, args.env, args.algo, args.normalize, 
           args.use_rmax,
