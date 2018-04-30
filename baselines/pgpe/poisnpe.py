@@ -205,14 +205,14 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         #if save_to: np.save(save_to + '/rets_' + str(it), rets)
             
 
-        disc_rets = np.array(disc_rets)
+        norm_disc_rets = np.array(disc_rets)
         if shift:
-            disc_rets = disc_rets - np.mean(disc_rets)
-        rmax = np.max(abs(disc_rets))
+            norm_disc_rets = norm_disc_rets - np.mean(norm_disc_rets)
+        rmax = np.max(abs(norm_disc_rets))
         
         #Offline optimization
         with timed('Optimizing offline'):
-            rho, improvement = optimize_offline(pol, newpol, actor_params, disc_rets,
+            rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
                                                 normalize=normalize,
                                                 use_rmax=use_rmax,
                                                 use_renyi=use_renyi,
@@ -227,10 +227,10 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         unn_iws = newpol.eval_iws(actor_params, behavioral=pol, normalize=False)
         iws = unn_iws/np.sum(unn_iws)
         ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
-        J, varJ = newpol.eval_performance(actor_params, disc_rets, behavioral=pol)
+        J, varJ = newpol.eval_performance(actor_params, norm_disc_rets, behavioral=pol)
         eRenyi = np.exp(newpol.eval_renyi(pol))
         
-        logger.record_tabular('Bound', newpol.eval_bound(actor_params, disc_rets, pol, rmax,
+        logger.record_tabular('Bound', newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta))
         logger.record_tabular('ESSClassic', ess)
         logger.record_tabular('ESSRenyi', batch_size/eRenyi)
@@ -244,9 +244,10 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         logger.record_tabular('VarNormIw', np.var(iws, ddof=1))
         logger.record_tabular('eRenyi2', eRenyi)
         logger.record_tabular('AvgRet', np.mean(rets))
+        logger.record_tabular('VanillaAvgRet', np.mean(rets))
         logger.record_tabular('VarRet', np.var(rets, ddof=1))
-        logger.record_tabular('VarDiscRet', np.var(disc_rets, ddof=1))
-        logger.record_tabular('AvgDiscRet', np.mean(disc_rets))
+        logger.record_tabular('VarDiscRet', np.var(norm_disc_rets, ddof=1))
+        logger.record_tabular('AvgDiscRet', np.mean(norm_disc_rets))
         logger.record_tabular('J', J)
         logger.record_tabular('VarJ', varJ)
         logger.record_tabular('BatchSize', len(rets))
