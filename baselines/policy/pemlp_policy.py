@@ -88,7 +88,7 @@ class PeMlpPolicy(object):
         with tf.variable_scope('higher'):
             #Initial means sampled from a normal distribution N(0,1)
             higher_mean_init = tf.where(tf.not_equal(self.flat_actor_weights, tf.constant(0, dtype=tf.float32)),
-                        tf.random_normal(shape=[n_actor_weights.value]), tf.zeros(shape=[n_actor_weights]))
+                        tf.random_normal(shape=[n_actor_weights.value], stddev=0.01), tf.zeros(shape=[n_actor_weights]))
             self.higher_mean = higher_mean = tf.get_variable(name='higher_mean',
                                                initializer=higher_mean_init)
             
