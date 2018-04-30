@@ -261,9 +261,9 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         if improvement>0 or not reuse:
             actor_params, rets, disc_rets, lens = [], [], [], []
         if len(rets)>=5*batch_size:
-            actor_params = rets[batch_size//5:]
+            actor_params = actor_params[batch_size//5:]
             rets = rets[batch_size//5:]
-            disc_rets = rets[batch_size//5:]
-            lens = rets[batch_size//5:]
+            disc_rets = disc_rets[batch_size//5:]
+            lens = lens[batch_size//5:]
         
     
