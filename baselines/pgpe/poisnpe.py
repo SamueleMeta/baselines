@@ -166,7 +166,8 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
           verbose=True, 
           save_to=None,
           delta=0.2,
-          shift=False):
+          shift=False,
+          reuse=False):
     
     #Logging
     format_strs = []
@@ -179,6 +180,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
     newpol.set_params(pol.eval_params())
     
     #Learning iteration
+    actor_params, rets, disc_rets, lens = [], [], [], []
     for it in range(max_iterations):
         logger.log('\n********** Iteration %i ************' % it)
         rho = pol.eval_params() #Higher-order-policy parameters
@@ -191,8 +193,6 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         #Batch of episodes
         #TODO: try symmetric sampling
         with timed('Sampling'):
-            actor_params = []
-            rets, disc_rets, lens = [], [], []
             for ep in range(batch_size):
                 frozen_pol = pol.freeze()
                 theta = frozen_pol.resample()
@@ -249,12 +249,20 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         logger.record_tabular('AvgDiscRet', np.mean(disc_rets))
         logger.record_tabular('J', J)
         logger.record_tabular('VarJ', varJ)
-        logger.record_tabular('BatchSize', batch_size)
+        logger.record_tabular('BatchSize', len(rets))
         logger.record_tabular('AvgEpLen', np.mean(lens))
         logger.dump_tabular()
         
         
         #Update behavioral
         pol.set_params(newpol.eval_params()) 
+        
+        if improvement>0 or not reuse:
+            actor_params, rets, disc_rets, lens = [], [], [], []
+        if len(rets)>=5*batch_size:
+            actor_params = rets[batch_size//5:]
+            rets = rets[batch_size//5:]
+            disc_rets = rets[batch_size//5:]
+            lens = rets[batch_size//5:]
         
     
