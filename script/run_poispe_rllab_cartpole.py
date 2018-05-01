@@ -7,6 +7,7 @@ Created on Wed Apr  4 18:36:59 2018
 """
 import sys
 sys.path.append('/home/alberto/rllab')
+sys.path.append('/home/matteo/rllab')
 
 from baselines.policy.pemlp_policy import PeMlpPolicy
 import baselines.pgpe.poisnpe as poisnpe

@@ -479,7 +479,9 @@ class PeMlpPolicy(object):
                 self._behavioral = behavioral
         batch_size = len(rets)
         
-        if use_rmax:
+        if not self.linear:
+            ppf = np.sqrt(1./delta - 1)
+        elif use_rmax:
             ppf = sts.norm.ppf(1 - delta)
         else:
             ppf = sts.t.ppf(1 - delta, batch_size - 1)

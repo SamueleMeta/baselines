@@ -4,6 +4,7 @@ sys.path.append('/home/alberto/rllab')
 import rllab
 from rllab.envs.normalized_env import normalize
 import gym
+import gym.spaces
 
 def convert_rllab_space(space):
     if isinstance(space, rllab.spaces.Box):
