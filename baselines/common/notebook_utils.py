@@ -33,7 +33,14 @@ def compare(means, stds, conf, ylim=None):
         interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
         ax.fill_between(mean.index, interval[0], interval[1], alpha=0.3)
     if ylim: ax.set_ylim(ylim)
-    ax.legend(bounds)
+    return fig
+
+def plot_all(dfs, key='AvgRet', ylim=None):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for df in dfs:
+        value = df[key]
+        ax.plot(value.index, value)
     return fig
 
 def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None):
