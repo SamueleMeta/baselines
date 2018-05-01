@@ -31,8 +31,8 @@ iters = {'cartpole': 100,
 
 #Seeds: 107, 583, 850, 730, 808
 
-def train(seed, env_name, shift, normalize, use_rmax, use_renyi, path):
-    index = int(str(int(shift)) + str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
+def train(seed, env_name, shift, normalize, use_rmax, use_renyi, use_parabola, path):
+    index = int(str(int(use_parabola)) + str(int(shift)) + str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
     DIR = path + '/poisnpe/bound_' + str(index) + '/' + env_name + '/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
@@ -64,13 +64,15 @@ def train(seed, env_name, shift, normalize, use_rmax, use_renyi, path):
               max_offline_ite=100,
               max_search_ite=30,
               delta=0.2,
-              shift=shift)
+              shift=shift,
+              use_parabola=use_parabola)
 
 if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--path', help='save here', type=str, default='temp')
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
+    parser.add_argument('--use_parabola', help='Use parabolic line search (or binary)?', type=int, default=0)
     parser.add_argument('--shift', help='Normalize return?', type=int, default=0)
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
@@ -82,4 +84,5 @@ if __name__=='__main__':
           args.normalize, 
           args.use_rmax,
           args.use_renyi,
+          args.use_parabola,
           args.path)

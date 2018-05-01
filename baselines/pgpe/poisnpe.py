@@ -41,7 +41,7 @@ def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
     return ret, disc_ret, t
 
 #BINARY line search
-def line_search(pol, newpol, actor_params, rets, alpha, natgrad, 
+def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad, 
                 normalize=True,
                 use_rmax=True,
                 use_renyi=True,
@@ -85,12 +85,58 @@ def line_search(pol, newpol, actor_params, rets, alpha, natgrad,
     
     return rho_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
+def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad, 
+                normalize=True,
+                use_rmax=True,
+                use_renyi=True,
+                max_search_ite=30, rmax=None, delta=0.2):
+    epsilon = 1.
+    epsilon_old = 0.
+    max_increase=2. 
+    delta_bound_tol=1e-4
+    delta_bound_old = -np.inf
+    bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)
+    rho_old = rho_init = newpol.eval_params()
+
+    for i in range(max_search_ite):
+
+        rho = rho_init + epsilon * alpha * natgrad
+        newpol.set_params(rho)
+
+        bound = newpol.eval_bound(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)
+
+        if np.isnan(bound):
+            warnings.warn('Got NaN bound value: rolling back!')
+            return rho_old, epsilon_old, delta_bound_old, i + 1
+
+        delta_bound = bound - bound_init
+
+        epsilon_old = epsilon
+        
+        if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
+            epsilon = epsilon_old * max_increase
+        else:
+            epsilon = epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
+        
+        if delta_bound <= delta_bound_old + delta_bound_tol:
+            if delta_bound_old < 0.:
+                return rho_init, 0., 0., i+1
+            else:
+                return rho_old, epsilon_old, delta_bound_old, i+1
+
+        delta_bound_old = delta_bound
+        rho_old = rho
+
+    return rho_old, epsilon_old, delta_bound_old, i+1
+
 def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
                      normalize=True, 
                      use_rmax=True,
                      use_renyi=True,
                      max_search_ite=30,
-                     rmax=None, delta=0.2):
+                     rmax=None, delta=0.2, use_parabola=False):
     improvement = 0.
     rho = pol.eval_params()
     
@@ -132,6 +178,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         
         #Step size search
         alpha = 1. / grad_norm ** 2
+        line_search = line_search_parabola if use_parabola else line_search_binary
         rho, epsilon, delta_bound, num_line_search = line_search(pol, 
                                                                  newpol, 
                                                                  actor_params, 
@@ -167,7 +214,8 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
           save_to=None,
           delta=0.2,
           shift=False,
-          reuse=False):
+          reuse=False,
+          use_parabola=False):
     
     #Logging
     format_strs = []
@@ -219,7 +267,8 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
                                                 max_offline_ite=max_offline_ite,
                                                 max_search_ite=max_search_ite,
                                                 rmax=rmax,
-                                                delta=delta)
+                                                delta=delta,
+                                                use_parabola=use_parabola)
             newpol.set_params(rho)
             assert(improvement>=0.)
         
