@@ -18,18 +18,18 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
     ob = env.reset()
 
     cur_ep_ret = 0
-    cur_ep_disc_ret = 0
+    cur_disc_ep_ret = 0
     cur_ep_len = 0
     ep_rets = []
     disc_ep_rets = []
     ep_lens = []
-    actor_params = [theta]
+    actor_params = []
 
     # Initialize history arrays
     i = 0
     j = 0
     while True:
-        ac, vpred = pol.act(ob)
+        ac = pol.act(ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
@@ -42,7 +42,7 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
 
         cur_ep_ret += rew
         cur_ep_len += 1
-        cur_ep_disc_ret += rew * gamma**cur_ep_len
+        cur_disc_ep_ret += rew * gamma**cur_ep_len
         j += 1
         if new or j == task_horizon:
             new = True
@@ -50,12 +50,13 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
 
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
+            disc_ep_rets.append(cur_disc_ep_ret)
+            actor_params.append(theta)
 
             cur_ep_ret = 0
             cur_ep_disc_ret = 0
             cur_ep_len = 0
             theta = pol.resample()
-            actor_params.append(theta)
             ob = env.reset()
 
             next_t = (i+1) * task_horizon
@@ -131,7 +132,7 @@ class ParallelSampler(object):
         remainder = batch_size % self.n_workers
 
         f = lambda env, pol: traj_segment_function(env, pol, gamma, task_horizon, feature_fun, n_episodes_per_process)
-        f_rem = lambda env, pol: traj_segment_function(env, pol, gamma, task_horizon, feature_fun, n_episodes_per_process)
+        f_rem = lambda env, pol: traj_segment_function(env, pol, gamma, task_horizon, feature_fun, n_episodes_per_process+1)
         fun = [f] * (self.n_workers - remainder) + [f_rem] * remainder
         self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], env_maker, pol_maker, fun[i], seed + i) for i in range(self.n_workers)]
 
