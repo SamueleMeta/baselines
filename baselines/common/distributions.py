@@ -81,6 +81,18 @@ class DiagGaussianPdType(PdType):
         return [self.size]
     def sample_dtype(self):
         return tf.float32
+    
+class GaussianVectorPdType(PdType):
+    def __init__(self, size):
+        self.size = size
+    def pdclass(self):
+        return GaussianVectorPd
+    def param_shape(self):
+        return [2*self.size]
+    def sample_shape(self):
+        return [self.size]
+    def sample_dtype(self):
+        return tf.float32
 
 class CholeskyGaussianPdType(PdType):
     def __init__(self, size):
@@ -226,8 +238,48 @@ class DiagGaussianPd(Pd):
                1./(2*(alpha - 1)) * (tf.log(tf.reduce_prod(var_alpha, axis=-1) + tol) - 
                    tf.log(tf.reduce_prod(tf.square(self.std), axis=-1) + tol) * (1-alpha) 
                                 - tf.log(tf.reduce_prod(tf.square(other.std), axis=-1) + tol) * alpha)
-
-
+               
+    @classmethod
+    def fromflat(cls, flat):
+        return cls(flat)
+    
+    
+class GaussianVectorPd(Pd):
+    def __init__(self, flat):
+        self.flat = flat
+        mean, logstd = tf.split(axis=len(flat.shape)-1, num_or_size_splits=2, value=flat)
+        self.mean = mean
+        self.logstd = logstd
+        self.std = tf.exp(logstd)
+    def flatparam(self):
+        return self.flat
+    def mode(self):
+        return self.mean
+    def neglogp(self, x):
+        return 0.5 * tf.square((x - self.mean) / self.std) \
+               + 0.5 * np.log(2.0 * np.pi)  \
+               + self.logstd
+    def independent_logps(self, x):
+        return - (0.5 * tf.square((x- self.mean) / self.std)
+                  + 0.5 * np.log(2. * np.pi)
+                  + self.logstd)
+    def kl(self, other):
+        assert isinstance(other, DiagGaussianPd)
+        return other.logstd - self.logstd + (tf.square(self.std) + tf.square(self.mean - other.mean)) / (2.0 * tf.square(other.std)) - 0.5
+    def entropy(self):
+        return self.logstd + .5 * np.log(2.0 * np.pi * np.e)
+    def sample(self):
+        return self.mean + self.std * tf.random_normal(tf.shape(self.mean))
+    def sample_symmetric(self):
+        noise = tf.random_normal(tf.shape(self.mean))
+        return (self.mean + self.std * noise, self.mean - self.std * noise)
+    def renyi(self, other, alpha=2.):
+        tol = 1e-45
+        assert isinstance(other, GaussianVectorPd)
+        var_alpha = alpha * tf.square(other.std) + (1. - alpha) * tf.square(self.std)
+        return alpha/2. * tf.square(self.mean - other.mean) / (var_alpha + tol) + \
+            other.logstd - self.logstd + \
+            0.5/(alpha - 1)*(2*other.logstd - tf.log(var_alpha + tol))
     @classmethod
     def fromflat(cls, flat):
         return cls(flat)
