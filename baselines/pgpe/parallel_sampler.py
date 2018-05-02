@@ -5,6 +5,7 @@ import time
 from mpi4py import MPI
 from baselines.common import set_global_seeds
 import tensorflow as tf
+import numpy as np
 
 def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size):
     '''
@@ -39,6 +40,7 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
                     "actor_params": actor_params}
 
         ob, rew, new, _ = env.step(ac)
+        ob = feature_fun(ob) if feature_fun else ob
 
         cur_ep_ret += rew
         cur_disc_ep_ret += rew * gamma**cur_ep_len
@@ -52,7 +54,7 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             disc_ep_rets.append(cur_disc_ep_ret)
-            actor_params.append(theta)
+            actor_params.append(np.array(theta))
 
             cur_ep_ret = 0
             cur_disc_ep_ret = 0
@@ -89,7 +91,7 @@ class Worker(Process):
         sess.__enter__()
 
         env = self.make_env()
-        workerseed = self.seed + 10000 * MPI.COMM_WORLD.Get_rank()
+        workerseed = self.seed + 10000 * (MPI.COMM_WORLD.Get_rank() + 1)
         set_global_seeds(workerseed)
         env.seed(workerseed)
 

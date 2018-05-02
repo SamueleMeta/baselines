@@ -229,7 +229,6 @@ def learn(env_maker, pol_maker, sampler,
         with timed('sampling'):
             seg = sampler.collect(rho)
         lens, rets, disc_rets, actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
-        print(disc_rets)
 
         logger.log('Performance: ', np.mean(rets))
         #if save_to: np.save(save_to + '/rets_' + str(it), rets)

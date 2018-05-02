@@ -251,7 +251,6 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
                 lens.append(ep_len)
         logger.log('Performance: ', np.mean(rets))
         #if save_to: np.save(save_to + '/rets_' + str(it), rets)
-            
 
         norm_disc_rets = np.array(disc_rets)
         if shift:
