@@ -202,7 +202,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
     return rho, improvement
 
 
-def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations, 
+def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iterations, 
           feature_fun=None, 
           rmax=None,
           normalize=True, 
@@ -214,6 +214,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
           save_to=None,
           delta=0.2,
           shift=False,
+          reuse=False,
           use_parabola=False):
     
     #Logging
@@ -225,9 +226,11 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
     pol = pol_maker('pol')
     newpol = pol_maker('oldpol')
     newpol.set_params(pol.eval_params())
+    batch_size = initial_batch_size
     
     #Learning iteration
     actor_params, rets, disc_rets, lens = [], [], [], []
+    old_perf = -np.inf
     for it in range(max_iterations):
         logger.log('\n********** Iteration %i ************' % it)
         rho = pol.eval_params() #Higher-order-policy parameters
@@ -240,7 +243,7 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         #Batch of episodes
         #TODO: try symmetric sampling
         with timed('Sampling'):
-            for ep in range(batch_size):
+            while len(rets)<batch_size:
                 frozen_pol = pol.freeze()
                 theta = frozen_pol.resample()
                 actor_params.append(theta)
@@ -248,8 +251,17 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
                 rets.append(ret)
                 disc_rets.append(disc_ret)
                 lens.append(ep_len)
-        logger.log('Performance: ', np.mean(rets))
+        perf = np.mean(disc_rets)
+        logger.log('Performance: ', np.mean(perf))
         #if save_to: np.save(save_to + '/rets_' + str(it), rets)
+        if perf<old_perf and batch_size<5*initial_batch_size:
+            #Try with more trajectories
+            if verbose: logger.log('Performance loss! Adding more trajectories')
+            batch_size+=initial_batch_size
+            old_perf = -np.inf #After adding 100, go on anyway
+            continue
+        #Go on
+
 
         norm_disc_rets = np.array(disc_rets)
         if shift:
@@ -304,4 +316,9 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         
         #Update behavioral
         pol.set_params(newpol.eval_params()) 
+        
+        old_perf = perf
         actor_params, rets, disc_rets, lens = [], [], [], []
+
+        
+    
