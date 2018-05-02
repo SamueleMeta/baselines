@@ -15,7 +15,6 @@ import numpy as np
 from baselines.pgpe.parallel_sampler import ParallelSampler
 from baselines.common import set_global_seeds
 import baselines.common.tf_util as U
-import tensorflow as tf
 
 envs = {'cartpole': 'ContCartPole-v0',
         'lqg': 'LQG1D-v0',
