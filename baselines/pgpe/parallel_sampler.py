@@ -41,8 +41,9 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
         ob, rew, new, _ = env.step(ac)
 
         cur_ep_ret += rew
-        cur_ep_len += 1
         cur_disc_ep_ret += rew * gamma**cur_ep_len
+        cur_ep_len += 1
+        
         j += 1
         if new or j == task_horizon:
             new = True
@@ -54,7 +55,7 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
             actor_params.append(theta)
 
             cur_ep_ret = 0
-            cur_ep_disc_ret = 0
+            cur_disc_ep_ret = 0
             cur_ep_len = 0
             theta = pol.resample()
             ob = env.reset()
