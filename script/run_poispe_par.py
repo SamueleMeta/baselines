@@ -10,7 +10,7 @@ import gym
 import baselines.envs.continuous_cartpole
 import baselines.envs.lqg1d
 from baselines.policy.pemlp_policy import PeMlpPolicy
-import baselines.pgpe.poisnpe as poisnpe
+import baselines.pgpe.poisnpe_par as poisnpe
 import numpy as np
 from baselines.pgpe.parallel_sampler import ParallelSampler
 from baselines.common import set_global_seeds
@@ -64,7 +64,6 @@ def train(seed, env_name, shift, normalize, use_rmax, use_renyi, use_parabola, p
     poisnpe.learn(env_maker,
               pol_maker,
               sampler,
-              gamma=gamma,
               batch_size=batch_size,
               task_horizon=horizons[env_name],
               max_iterations=iters[env_name],
@@ -79,6 +78,8 @@ def train(seed, env_name, shift, normalize, use_rmax, use_renyi, use_parabola, p
               delta=0.2,
               shift=shift,
               use_parabola=use_parabola)
+
+    sampler.close()
 
 if __name__=='__main__':
     import argparse
