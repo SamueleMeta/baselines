@@ -2,16 +2,15 @@ from multiprocessing import Process, Queue, Event
 import os
 import baselines.common.tf_util as U
 import time
-import sys
 from mpi4py import MPI
-from baselines.common import set_global_seeds as set_all_seeds
-import numpy as np
+from baselines.common import set_global_seeds
+import tensorflow as tf
 
-def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
+def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size):
     '''
     Collects trajectories
     '''
-
+    theta = pol.resample()
     # Initialize state variables
     t = 0
     ac = env.action_space.sample()
@@ -19,46 +18,33 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
     ob = env.reset()
 
     cur_ep_ret = 0
+    cur_ep_disc_ret = 0
     cur_ep_len = 0
     ep_rets = []
+    disc_ep_rets = []
     ep_lens = []
+    actor_params = [theta]
 
     # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon * n_episodes)])
-    rews = np.zeros(horizon * n_episodes, 'float32')
-    vpreds = np.zeros(horizon * n_episodes, 'float32')
-    news = np.zeros(horizon * n_episodes, 'int32')
-    acs = np.array([ac for _ in range(horizon * n_episodes)])
-    prevacs = acs.copy()
-    mask = np.ones(horizon * n_episodes, 'float32')
-
     i = 0
     j = 0
     while True:
-        prevac = ac
-        ac, vpred = pi.act(stochastic, ob)
+        ac, vpred = pol.act(ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         #if t > 0 and t % horizon == 0:
-        if i == n_episodes:
-            return {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
-                    "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
-
-        obs[t] = ob
-        vpreds[t] = vpred
-        news[t] = new
-        acs[t] = ac
-        prevacs[t] = prevac
+        if i == batch_size:
+            return {"rets" : ep_rets, "disc_rets": disc_ep_rets, "lens" : ep_lens,
+                    "actor_params": actor_params}
 
         ob, rew, new, _ = env.step(ac)
-        rews[t] = rew
 
         cur_ep_ret += rew
         cur_ep_len += 1
+        cur_ep_disc_ret += rew * gamma**cur_ep_len
         j += 1
-        if new or j == horizon:
+        if new or j == task_horizon:
             new = True
             env.done = True
 
@@ -66,14 +52,13 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
             ep_lens.append(cur_ep_len)
 
             cur_ep_ret = 0
+            cur_ep_disc_ret = 0
             cur_ep_len = 0
+            theta = pol.resample()
+            actor_params.append(theta)
             ob = env.reset()
 
-            next_t = (i+1) * horizon
-
-            mask[t+1:next_t] = 0.
-            acs[t+1:next_t] = acs[t]
-            obs[t+1:next_t] = obs[t]
+            next_t = (i+1) * task_horizon
 
             t = next_t - 1
             i += 1
@@ -98,13 +83,12 @@ class Worker(Process):
         self.seed = seed
 
     def run(self):
-
         sess = U.single_threaded_session()
         sess.__enter__()
 
         env = self.make_env()
         workerseed = self.seed + 10000 * MPI.COMM_WORLD.Get_rank()
-        set_all_seeds(workerseed)
+        set_global_seeds(workerseed)
         env.seed(workerseed)
 
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
@@ -116,7 +100,7 @@ class Worker(Process):
             command, weights = self.input.get()
             if command == 'collect':
                 #print('Worker %s - Collecting...' % os.getpid())
-                pi.set_parameter(weights)
+                pi.set_params(weights)
                 samples = self.traj_segment_generator(pi, env)
                 self.output.put((os.getpid(), samples))
             elif command == 'exit':
@@ -127,7 +111,7 @@ class Worker(Process):
 
 class ParallelSampler(object):
 
-    def __init__(self, make_pi, make_env, n_episodes, horizon, stochastic, n_workers=-1, seed=0):
+    def __init__(self, pol_maker, env_maker, gamma, task_horizon, feature_fun, batch_size, n_workers=-1, seed=0):
         affinity = len(os.sched_getaffinity(0))
         if n_workers == -1:
             self.n_workers = affinity
@@ -143,21 +127,21 @@ class ParallelSampler(object):
         self.input_queues = [Queue() for _ in range(self.n_workers)]
         self.events = [Event() for _ in range(self.n_workers)]
 
-        n_episodes_per_process = n_episodes // self.n_workers
-        remainder = n_episodes % self.n_workers
+        n_episodes_per_process = batch_size // self.n_workers
+        remainder = batch_size % self.n_workers
 
-        f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
-        f_rem = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process+1, horizon, stochastic)
+        f = lambda env, pol: traj_segment_function(env, pol, gamma, task_horizon, feature_fun, n_episodes_per_process)
+        f_rem = lambda env, pol: traj_segment_function(env, pol, gamma, task_horizon, feature_fun, n_episodes_per_process)
         fun = [f] * (self.n_workers - remainder) + [f_rem] * remainder
-        self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed + i) for i in range(self.n_workers)]
+        self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], env_maker, pol_maker, fun[i], seed + i) for i in range(self.n_workers)]
 
         for w in self.workers:
             w.start()
 
 
-    def collect(self, actor_weights):
+    def collect(self, weights):
         for i in range(self.n_workers):
-            self.input_queues[i].put(('collect', actor_weights[i]))
+            self.input_queues[i].put(('collect', weights))
 
         for e in self.events:
             e.set()
@@ -170,22 +154,12 @@ class ParallelSampler(object):
         return self._merge_sample_batches(sample_batches)
 
     def _merge_sample_batches(self, sample_batches):
-        '''
-        {"ob": obs, "rew": rews, "vpred": vpreds, "new": news,
-         "ac": acs, "prevac": prevacs, "nextvpred": vpred * (1 - new),
-         "ep_rets": ep_rets, "ep_lens": ep_lens, "mask": mask}
-         '''
-        np_fields = ['ob', 'rew', 'vpred', 'new', 'ac', 'prevac', 'mask']
-        list_fields = ['ep_rets', 'ep_lens']
+        list_fields = ['rets', 'disc_rets', 'lens', 'actor_params']
 
-        new_dict = list(zip(np_fields, map(lambda f: sample_batches[0][f], np_fields))) + \
-                   list(zip(list_fields,map(lambda f: sample_batches[0][f], list_fields))) + \
-                   [('nextvpred', sample_batches[-1]['nextvpred'])]
+        new_dict = list(zip(list_fields,map(lambda f: sample_batches[0][f], list_fields)))
         new_dict = dict(new_dict)
 
         for batch in sample_batches[1:]:
-            for f in np_fields:
-                new_dict[f] = np.concatenate((new_dict[f], batch[f]))
             for f in list_fields:
                 new_dict[f].extend(batch[f])
 

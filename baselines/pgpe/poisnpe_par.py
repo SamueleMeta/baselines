@@ -17,10 +17,6 @@ import warnings
 from contextlib import contextmanager
 import time
 from baselines.common import colorize
-from joblib import Parallel, delayed
-import random
-
-N_JOBS = 4
 
 @contextmanager
 def timed(msg):
@@ -29,34 +25,17 @@ def timed(msg):
     yield
     print(colorize("done in %.3f seconds"%(time.time() - tstart), color='magenta'))
 
-def eval_trajectory(env, pol, gamma, task_horizon, feature_fun, seed):
-    pol.seed(seed)
-    env.seed(seed)
-    theta = pol.resample()
-    ret = disc_ret = 0
-    max_ret = 0
-    t = 0
-    ob = env.reset()
-    done = False
-    while not done and t<task_horizon:
-        s = feature_fun(ob) if feature_fun else ob
-        a = pol.act(s)
-        ob, r, done, _ = env.step(a)
-        ret += r
-        disc_ret += gamma**t * r
-        max_ret = max(abs(r), max_ret)
-        t+=1
-        
-    return ret, disc_ret, t, max_ret, theta
-
 #BINARY line search
-def line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, normalize=True, max_search_ite=30,
-                bound_name='t', rmax=None):
+def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad, 
+                normalize=True,
+                use_rmax=True,
+                use_renyi=True,
+                max_search_ite=30, rmax=None, delta=0.2):
     rho_init = newpol.eval_params()
     low = 0.
     high = None
-    bound_init = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct, normalize=normalize, 
-                                   bound_name=bound_name, rmax=rmax)
+    bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)
     #old_delta_bound = 0.
     rho_opt = rho_init
     i_opt = 0.
@@ -67,8 +46,8 @@ def line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, n
     for i in range(max_search_ite):
         rho = rho_init + epsilon * natgrad * alpha
         newpol.set_params(rho)
-        bound = newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct, normalize=normalize, 
-                                  bound_name=bound_name, rmax=rmax)
+        bound = newpol.eval_bound(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)
         delta_bound = bound - bound_init        
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -91,9 +70,58 @@ def line_search(pol, newpol, actor_params, rets, alpha, natgrad, correct=True, n
     
     return rho_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
+def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad, 
+                normalize=True,
+                use_rmax=True,
+                use_renyi=True,
+                max_search_ite=30, rmax=None, delta=0.2):
+    epsilon = 1.
+    epsilon_old = 0.
+    max_increase=2. 
+    delta_bound_tol=1e-4
+    delta_bound_old = -np.inf
+    bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)
+    rho_old = rho_init = newpol.eval_params()
+
+    for i in range(max_search_ite):
+
+        rho = rho_init + epsilon * alpha * natgrad
+        newpol.set_params(rho)
+
+        bound = newpol.eval_bound(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)
+
+        if np.isnan(bound):
+            warnings.warn('Got NaN bound value: rolling back!')
+            return rho_old, epsilon_old, delta_bound_old, i + 1
+
+        delta_bound = bound - bound_init
+
+        epsilon_old = epsilon
+        
+        if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
+            epsilon = epsilon_old * max_increase
+        else:
+            epsilon = epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
+        
+        if delta_bound <= delta_bound_old + delta_bound_tol:
+            if delta_bound_old < 0.:
+                return rho_init, 0., 0., i+1
+            else:
+                return rho_old, epsilon_old, delta_bound_old, i+1
+
+        delta_bound_old = delta_bound
+        rho_old = rho
+
+    return rho_old, epsilon_old, delta_bound_old, i+1
+
 def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
-                     correct_ess=True, normalize=True, max_search_ite=30,
-                     stop_sigma=False, bound_name='t', rmax=None):
+                     normalize=True, 
+                     use_rmax=True,
+                     use_renyi=True,
+                     max_search_ite=30,
+                     rmax=None, delta=0.2, use_parabola=False):
     improvement = 0.
     rho = pol.eval_params()
     
@@ -103,28 +131,30 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
     print(titlestr % ("iter", "epsilon", "step size", "num line search", 
                       "gradient norm", "delta bound ite", "delta bound tot"))
     
+    natgrad = None
+    
     for i in range(max_offline_ite):
         #Candidate policy
         newpol.set_params(rho)
         
         #Bound with gradient
-        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, behavioral=pol, correct=correct_ess, normalize=normalize,
-                                                 bound_name=bound_name, rmax=rmax)
+        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)
         if np.any(np.isnan(grad)):
             warnings.warn('Got NaN gradient! Stopping!')
             return rho, improvement
         if np.isnan(bound):
             warnings.warn('Got NaN bound! Stopping!')
             return rho, improvement     
-        
+
+            
         #Natural gradient
         if newpol.diagonal: 
             natgrad = grad/(newpol.eval_fisher() + 1e-24)
         else:
             raise NotImplementedError
         assert np.dot(grad, natgrad) >= 0
-        if i>0 and newpol.diagonal and stop_sigma:
-            natgrad[len(natgrad)//2:] = 0
+
         grad_norm = np.sqrt(np.dot(grad, natgrad))
         if grad_norm < grad_tol:
             print("stopping - gradient norm < gradient_tol")
@@ -133,17 +163,19 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         
         #Step size search
         alpha = 1. / grad_norm ** 2
+        line_search = line_search_parabola if use_parabola else line_search_binary
         rho, epsilon, delta_bound, num_line_search = line_search(pol, 
                                                                  newpol, 
                                                                  actor_params, 
                                                                  rets, 
                                                                  alpha, 
                                                                  natgrad, 
-                                                                 correct=correct_ess,
                                                                  normalize=normalize,
+                                                                 use_rmax=use_rmax,
+                                                                 use_renyi=use_renyi,
                                                                  max_search_ite=max_search_ite,
-                                                                 bound_name=bound_name,
-                                                                 rmax=rmax)
+                                                                 rmax=rmax,
+                                                                 delta=delta)
         newpol.set_params(rho)
         improvement+=delta_bound
         print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, grad_norm, delta_bound, improvement))
@@ -155,11 +187,21 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
     return rho, improvement
 
 
-def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations, 
-          feature_fun=None, max_offline_ite=100, correct_ess=True, normalize=True,
-          max_search_ite=30, stop_sigma=False, bound_name='t', rmax=None,
+def learn(env_maker, pol_maker, sampler, 
+          gamma, batch_size, task_horizon, max_iterations,
+          feature_fun=None, 
+          rmax=None,
+          normalize=True, 
+          use_rmax=True, 
+          use_renyi=True,
+          max_offline_ite=100, 
+          max_search_ite=30,
           verbose=True, 
-          save_to=None):
+          save_to=None,
+          delta=0.2,
+          shift=False,
+          reuse=False,
+          use_parabola=False):
     
     #Logging
     format_strs = []
@@ -167,45 +209,47 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
     if save_to: format_strs.append('csv')
     logger.configure(dir=save_to, format_strs=format_strs)
 
-    pol = pol_maker('pol')
-    newpol = pol_maker('oldpol')
+    env = env_maker()
+    pol = pol_maker('pol', env.observation_space, env.action_space)
+    newpol = pol_maker('oldpol', env.observation_space, env.action_space)
     newpol.set_params(pol.eval_params())
     
     #Learning iteration
+    actor_params, rets, disc_rets, lens = [], [], [], []
     for it in range(max_iterations):
         logger.log('\n********** Iteration %i ************' % it)
         rho = pol.eval_params() #Higher-order-policy parameters
+        print(rho)
         if verbose>1:
             logger.log('Higher-order parameters: ', rho)
             print(len(rho))
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
             
         #Batch of episodes
-        #TODO: try symmetric sampling
-        with timed('Sampling'):
-            frozen_pol = pol.freeze()
-            traj_seeds = [random.randint(0,10**5) for _ in range(batch_size)]
-            rets, disc_rets, ep_lens, max_rets, actor_params = map(list, zip(*Parallel(n_jobs=N_JOBS)(delayed(eval_trajectory)(env, frozen_pol, gamma, task_horizon, feature_fun, traj_seed)
-                for traj_seed in traj_seeds)))
-            
+        with timed('sampling'):
+            seg = sampler.collect(rho)
+        lens, rets, disc_rets, actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
+        
         logger.log('Performance: ', np.mean(rets))
         #if save_to: np.save(save_to + '/rets_' + str(it), rets)
             
+
+        norm_disc_rets = np.array(disc_rets)
+        if shift:
+            norm_disc_rets = norm_disc_rets - np.mean(norm_disc_rets)
+        rmax = np.max(abs(norm_disc_rets))
         
         #Offline optimization
         with timed('Optimizing offline'):
-            if rmax is None:
-                _rmax = sum(max(max_rets)*gamma**i for i in range(task_horizon)) 
-            else:
-                _rmax = rmax
-                if verbose: print('Using empirical maxRet %f' % _rmax)
-            rho, improvement = optimize_offline(pol, newpol, actor_params, rets, correct_ess=correct_ess,
+            rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
                                                 normalize=normalize,
-                                                max_offline_ite=100,
+                                                use_rmax=use_rmax,
+                                                use_renyi=use_renyi,
+                                                max_offline_ite=max_offline_ite,
                                                 max_search_ite=max_search_ite,
-                                                stop_sigma=stop_sigma,
-                                                bound_name=bound_name,
-                                                rmax=_rmax)
+                                                rmax=rmax,
+                                                delta=delta,
+                                                use_parabola=use_parabola)
             newpol.set_params(rho)
             assert(improvement>=0.)
         
@@ -213,11 +257,11 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         unn_iws = newpol.eval_iws(actor_params, behavioral=pol, normalize=False)
         iws = unn_iws/np.sum(unn_iws)
         ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
-        J, varJ = newpol.eval_performance(actor_params, disc_rets, behavioral=pol)
+        J, varJ = newpol.eval_performance(actor_params, norm_disc_rets, behavioral=pol)
         eRenyi = np.exp(newpol.eval_renyi(pol))
         
-        logger.record_tabular('Bound', newpol.eval_bound(actor_params, rets, behavioral=pol, correct=correct_ess, 
-                                                         normalize=normalize, bound_name=bound_name, rmax=_rmax))
+        logger.record_tabular('Bound', newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta))
         logger.record_tabular('ESSClassic', ess)
         logger.record_tabular('ESSRenyi', batch_size/eRenyi)
         logger.record_tabular('MaxVanillaIw', np.max(unn_iws))
@@ -230,15 +274,26 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         logger.record_tabular('VarNormIw', np.var(iws, ddof=1))
         logger.record_tabular('eRenyi2', eRenyi)
         logger.record_tabular('AvgRet', np.mean(rets))
+        logger.record_tabular('VanillaAvgRet', np.mean(rets))
         logger.record_tabular('VarRet', np.var(rets, ddof=1))
-        logger.record_tabular('VarDiscRet', np.var(disc_rets, ddof=1))
-        logger.record_tabular('AvgDiscRet', np.mean(disc_rets))
+        logger.record_tabular('VarDiscRet', np.var(norm_disc_rets, ddof=1))
+        logger.record_tabular('AvgDiscRet', np.mean(norm_disc_rets))
         logger.record_tabular('J', J)
         logger.record_tabular('VarJ', varJ)
-        logger.record_tabular('BatchSize', batch_size)
-        logger.record_tabular('AvgEpLen', np.mean(ep_lens))
+        logger.record_tabular('BatchSize', len(rets))
+        logger.record_tabular('AvgEpLen', np.mean(lens))
         logger.dump_tabular()
         
         
         #Update behavioral
         pol.set_params(newpol.eval_params()) 
+        
+        if improvement>0 or not reuse:
+            actor_params, rets, disc_rets, lens = [], [], [], []
+        if len(rets)>=5*batch_size:
+            actor_params = actor_params[batch_size:]
+            rets = rets[batch_size:]
+            disc_rets = disc_rets[batch_size:]
+            lens = lens[batch_size:]
+        
+    

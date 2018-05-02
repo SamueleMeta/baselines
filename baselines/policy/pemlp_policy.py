@@ -15,7 +15,6 @@ Berlin, Heidelberg, 2008.
 class PeMlpPolicy(object):
     """Multi-layer-perceptron policy with Gaussian parameter-based exploration"""
     def __init__(self, name, *args, **kwargs):
-        #with tf.device('/cpu:0'):
         with tf.variable_scope(name):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name

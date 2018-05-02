@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # noinspection PyUnresolvedReferences
 import sys
-sys.path.remove('/home/alberto/baselines')
-sys.path.append('/home/alberto/baselines_ours')
+#sys.path.remove('/home/alberto/baselines')
+#sys.path.append('/home/alberto/baselines_ours')
 sys.path.append('/home/alberto/rllab')
+sys.path.append('/home/matteo/rllab')
 
 from baselines.common import set_global_seeds
 import gym
