@@ -24,17 +24,6 @@ def moments(dfs):
     std_df = pd.concat(dfs, axis=1).groupby(by=concat_df.columns, axis=1).std()
     return mean_df, std_df
 
-def compare(means, stds, conf, ylim=None):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    for mean, std in zip(means, stds):
-        n_runs = len(mean)
-        ax.plot(mean.index, mean)
-        interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
-        ax.fill_between(mean.index, interval[0], interval[1], alpha=0.3)
-    if ylim: ax.set_ylim(ylim)
-    return fig
-
 def plot_all(dfs, key='AvgRet', ylim=None):
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -54,6 +43,25 @@ def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None):
     interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
     ax.fill_between(mean.index, interval[0], interval[1], alpha=0.3)
     if ylim: ax.set_ylim(ylim)
+    return fig
+
+def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    entries = []
+    for candidate_name in candidates:
+        entries.append(candidate_name)
+        dfs = candidates[candidate_name]
+        n_runs = len(dfs)
+        mean_df, std_df = moments(dfs)
+        mean = mean_df[key]
+        std = std_df[key]
+        ax.plot(mean.index, mean)
+        interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
+        ax.fill_between(mean.index, interval[0], interval[1], alpha=0.3)
+    ax.legend(entries)
+    if ylim: ax.set_ylim(ylim)
+    if xlim: ax.set_xlim(xlim)
     return fig
 
 def plot_data(path, key='VanillaAvgRet'):
