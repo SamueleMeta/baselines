@@ -2,11 +2,10 @@ from multiprocessing import Process, Queue, Event
 import os
 import baselines.common.tf_util as U
 import time
-import numpy as np
 import sys
 from mpi4py import MPI
-from baselines.common import set_global_seeds
-
+from baselines.common import set_all_seeds
+import numpy as np
 
 def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
     '''
@@ -99,14 +98,15 @@ class Worker(Process):
         self.seed = seed
 
     def run(self):
+
         sess = U.single_threaded_session()
         sess.__enter__()
+
         env = self.make_env()
-
         workerseed = self.seed + 10000 * MPI.COMM_WORLD.Get_rank()
-        set_global_seeds(workerseed)
-
+        set_all_seeds(workerseed)
         env.seed(workerseed)
+
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
         print('Worker %s - Running with seed %s' % (os.getpid(), workerseed))
 
@@ -115,16 +115,17 @@ class Worker(Process):
             self.event.clear()
             command, weights = self.input.get()
             if command == 'collect':
-                print('Worker %s - Collecting...' % os.getpid())
+                #print('Worker %s - Collecting...' % os.getpid())
                 pi.set_parameter(weights)
                 samples = self.traj_segment_generator(pi, env)
                 self.output.put((os.getpid(), samples))
             elif command == 'exit':
                 print('Worker %s - Exiting...' % os.getpid())
                 env.close()
+                sess.close()
                 break
 
-class traj_segment_generator(object):
+class ParallelSampler(object):
 
     def __init__(self, make_pi, make_env, n_episodes, horizon, stochastic, n_workers=-1, seed=0):
         affinity = len(os.sched_getaffinity(0))
@@ -145,12 +146,10 @@ class traj_segment_generator(object):
         n_episodes_per_process = n_episodes // self.n_workers
         remainder = n_episodes % self.n_workers
 
-        print(n_episodes_per_process)
-        print(horizon)
         f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
         f_rem = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process+1, horizon, stochastic)
         fun = [f] * (self.n_workers - remainder) + [f_rem] * remainder
-        self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed+i) for i in range(self.n_workers)]
+        self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed + i) for i in range(self.n_workers)]
 
         for w in self.workers:
             w.start()
@@ -202,3 +201,4 @@ class traj_segment_generator(object):
 
         for w in self.workers:
             w.join()
+
