@@ -101,7 +101,7 @@ class Worker(Process):
             if command == 'collect':
                 #print('Worker %s - Collecting...' % os.getpid())
                 pi.set_params(weights)
-                samples = self.traj_segment_generator(pi, env)
+                samples = self.traj_segment_generator(env, pi)
                 self.output.put((os.getpid(), samples))
             elif command == 'exit':
                 print('Worker %s - Exiting...' % os.getpid())
@@ -111,7 +111,7 @@ class Worker(Process):
 
 class ParallelSampler(object):
 
-    def __init__(self, pol_maker, env_maker, gamma, task_horizon, feature_fun, batch_size, n_workers=-1, seed=0):
+    def __init__(self, env_maker, pol_maker, gamma, task_horizon, feature_fun, batch_size, n_workers=-1, seed=0):
         affinity = len(os.sched_getaffinity(0))
         if n_workers == -1:
             self.n_workers = affinity

@@ -54,7 +54,7 @@ def train(seed, env_name, shift, normalize, use_rmax, use_renyi, use_parabola, p
                       seed=seed)
     
     batch_size = 100
-    sampler = ParallelSampler(pol_maker, env_maker, gamma, horizons[env_name], np.ravel, batch_size, njobs, seed)
+    sampler = ParallelSampler(env_maker, pol_maker, gamma, horizons[env_name], np.ravel, batch_size, njobs, seed)
     
     sess = U.make_session()
     sess.__enter__()
