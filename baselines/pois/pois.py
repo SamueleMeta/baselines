@@ -1,20 +1,20 @@
-from baselines.common import Dataset, explained_variance, zipsame, dataset
-from baselines import logger
-import baselines.common.tf_util as U
-import tensorflow as tf, numpy as np
-import time
-from baselines.common import colorize
-from mpi4py import MPI
-from collections import deque
-from baselines.common.mpi_adam import MpiAdam
-from baselines.common.cg import cg
-from contextlib import contextmanager
-import scipy.stats as sts
-import numpy.linalg as la
-import scipy.sparse.linalg as scila
+import numpy as np
 import warnings
-import os
-import multiprocessing
+import baselines.common.tf_util as U
+import tensorflow as tf
+import time
+from baselines.common import zipsame, colorize
+from contextlib import contextmanager
+from collections import deque
+from baselines import logger
+from baselines.common.cg import cg
+
+@contextmanager
+def timed(msg):
+    print(colorize(msg, color='magenta'))
+    tstart = time.time()
+    yield
+    print(colorize('done in %.3f seconds'%(time.time() - tstart), color='magenta'))
 
 def traj_segment_generator(pi, env, n_episodes, horizon, stochastic):
     # Initialize state variables
@@ -50,7 +50,7 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic):
             yield {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
                     "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
-            _, vpred = pi.act(stochastic, ob)            
+            _, vpred = pi.act(stochastic, ob)
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
@@ -93,7 +93,7 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic):
             j = 0
         t += 1
 
-def add_vtarg_and_adv(seg, gamma, iw_method='pdis'):
+def add_disc_rew(seg, gamma):
     new = np.append(seg['new'], 1)
     rew = seg['rew']
 
@@ -124,12 +124,11 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
     else:
         return epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
 
-
-def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, evaluate_loss, delta_bound_tol=1e-4, max_line_search_ite=20):
+def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4, max_line_search_ite=30):
     epsilon = 1.
     epsilon_old = 0.
     delta_bound_old = -np.inf
-    bound_init = evaluate_loss()
+    bound_init = evaluate_bound()
     theta_old = theta_init
 
     for i in range(max_line_search_ite):
@@ -137,7 +136,7 @@ def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, eva
         theta = theta_init + epsilon * alpha * natural_gradient
         set_parameter(theta)
 
-        bound = evaluate_loss()
+        bound = evaluate_bound()
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -158,7 +157,6 @@ def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, eva
 
     return theta_old, epsilon_old, delta_bound_old, i+1
 
-
 def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evaluate_loss, delta_bound_tol=1e-4, max_line_search_ite=30):
     low = 0.
     high = None
@@ -171,7 +169,6 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
 
     epsilon = 1.
 
-
     for i in range(max_line_search_ite):
 
         theta = theta_init + epsilon * natural_gradient * alpha
@@ -179,12 +176,6 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
 
         bound = evaluate_loss()
         delta_bound = bound - bound_init
-
-        #print('constraint %s' % evaluate_constraint())
-        #print('bound %s - init %s' % (bound, bound_init))
-        #print(epsilon)
-        #print(delta_bound)
-        #print(delta_bound <= delta_bound_opt or not evaluate_constraint()[0])
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -205,338 +196,330 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
         else:
             epsilon = (low + high) / 2.
 
-        #print(epsilon)
-
-        if abs(epsilon_old - epsilon) < 1e-6:
+        if abs(epsilon_old - epsilon) < 1e-12:
             break
 
     return theta_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
 
 def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
-    theta = theta_init
-    improvement = 0.
+    theta = theta_old = theta_init
+    improvement = improvement_old = 0.
     set_parameter(theta)
 
-    fmtstr = "%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g"
-    titlestr = "%6s %10s %10s %18s %18s %18s %18s"
-    print(titlestr % ("iter", "epsilon", "step size", "num line search", "gradient norm", "delta bound ite", "delta bound tot"))
+
+    '''
+    bound_init = evaluate_loss()
+    import scipy.optimize as opt
+
+    def func(x):
+        set_parameter(x)
+        return -evaluate_loss()
+
+    def grad(x):
+        set_parameter(x)
+        return -evaluate_gradient().astype(np.float64)
+
+    theta, bound, d = opt.fmin_l_bfgs_b(func=func,
+                                        fprime=grad,
+                                x0=theta_init.astype(np.float64),
+                                maxiter=100,
+                                    )
+    print(bound_init, bound)
+
+    print(d)
+    
+    set_parameter(theta)
+    improvement = bound_init + bound
+    return theta, improvement
+
+    '''
+
+    fmtstr = '%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g'
+    titlestr = '%6s %10s %10s %18s %18s %18s %18s'
+    print(titlestr % ('iter', 'epsilon', 'step size', 'num line search', 'gradient norm', 'delta bound ite', 'delta bound tot'))
 
     for i in range(max_offline_ite):
-        gradient, bound = evaluate_gradient()
+        bound = evaluate_loss()
+        gradient = evaluate_gradient()
 
         if np.any(np.isnan(gradient)):
             warnings.warn('Got NaN gradient! Stopping!')
-            return theta, improvement
+            set_parameter(theta_old)
+            return theta_old, improvement
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound! Stopping!')
-            return theta, improvement
+            set_parameter(theta_old)
+            return theta_old, improvement_old
 
         if evaluate_natural_gradient is not None:
             natural_gradient = evaluate_natural_gradient(gradient)
         else:
             natural_gradient = gradient
 
-        assert np.dot(gradient, natural_gradient) >= 0
+        if np.dot(gradient, natural_gradient) < 0:
+            warnings.warn('NatGradient dot Gradient < 0! Using vanilla gradient')
+            natural_gradient = gradient
 
         gradient_norm = np.sqrt(np.dot(gradient, natural_gradient))
 
         if gradient_norm < gradient_tol:
-            print("stopping - gradient norm < gradient_tol")
-            print(theta)
+            print('stopping - gradient norm < gradient_tol')
             return theta, improvement
 
         alpha = 1. / gradient_norm ** 2
+
+        theta_old = theta
+        improvement_old = improvement
         theta, epsilon, delta_bound, num_line_search = line_search(theta, alpha, natural_gradient, set_parameter, evaluate_loss)
-
-        #assert not np.any(np.isnan(theta))
-        #assert not np.isnan(epsilon)
-        #assert not np.isnan(delta_bound)
-
         set_parameter(theta)
 
         improvement += delta_bound
         print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, gradient_norm, delta_bound, improvement))
 
         if delta_bound < bound_tol:
-            print("stopping - delta bound < bound_tol")
-            print(theta)
+            print('stopping - delta bound < bound_tol')
             return theta, improvement
 
     return theta, improvement
 
+def render(env, pi, horizon):
 
-def learn(env, policy_func, *,
-          num_episodes,
+    t = 0
+    ob = env.reset()
+    env.render()
+
+    done = False
+    while not done and t < horizon:
+        ac, _ = pi.act(True, ob)
+        ob, _, done, _ = env.step(ac)
+        time.sleep(0.1)
+        env.render()
+        t += 1
+
+
+def learn(make_env, make_policy, *,
+          n_episodes,
           horizon,
           delta,
           gamma,
-          iters,
+          max_iters,
+          sampler=None,
           use_natural_gradient=False, #can be 'exact', 'approximate'
           fisher_reg=1e-2,
           iw_method='is',
           iw_norm='none',
-          bound='student',
-          ess_correction=False,
-          line_search_type='binary',
+          bound='J',
+          line_search_type='parabola',
           save_weights=False,
+          improvement_tol=0.,
+          center_return=False,
+          render_after=None,
+          max_offline_iters=100,
           callback=None):
 
-    nworkers = MPI.COMM_WORLD.Get_size()
-    rank = MPI.COMM_WORLD.Get_rank()
     np.set_printoptions(precision=3)
-
-    # Setup losses and stuff
-    # ----------------------------------------
+    max_samples = horizon * n_episodes
 
     if line_search_type == 'binary':
         line_search = line_search_binary
-    else:
+    elif line_search_type == 'parabola':
         line_search = line_search_parabola
+    else:
+        raise ValueError()
 
+    # Building the environment
+    env = make_env()
     ob_space = env.observation_space
     ac_space = env.action_space
 
-    pi = policy_func("pi", ob_space, ac_space)
-    oldpi = policy_func("oldpi", ob_space, ac_space)
+    # Building the policy
+    pi = make_policy('pi', ob_space, ac_space)
+    oldpi = make_policy('oldpi', ob_space, ac_space)
 
     all_var_list = pi.get_trainable_variables()
-    var_list = [v for v in all_var_list if v.name.split("/")[1].startswith("pol")]
-    old_all_var_list = oldpi.get_trainable_variables()
-    old_var_list = [v for v in old_all_var_list if v.name.split("/")[1].startswith("pol")]
+    var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
 
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
     n_parameters = sum(shapes)
 
-    mask = tf.placeholder(dtype=tf.float32, shape=[None])
-    disc_rew = tf.placeholder(dtype=tf.float32, shape=[None])
-    gradient_ = tf.placeholder(dtype=tf.float32, shape=[None, None])
+    # Placeholders
+    ob_ = ob = U.get_placeholder_cached(name='ob')
+    ac_ = pi.pdtype.sample_placeholder([max_samples], name='ac')
+    mask_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='mask')
+    disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='disc_rew')
+    gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
 
-    ob = U.get_placeholder_cached(name="ob")
-    ac = pi.pdtype.sample_placeholder([None])
+    # Policy densities
+    target_log_pdf = pi.pd.logp(ac_)
+    behavioral_log_pdf = oldpi.pd.logp(ac_)
+    log_ratio = target_log_pdf - behavioral_log_pdf
+    
+    # Split operations
+    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes))
+    log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
+    target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes))
+    mask_split = tf.stack(tf.split(mask_, n_episodes))
+    
+    # Renyi divergence
+    emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
+    emp_d2_cum_split = tf.reduce_sum(emp_d2_split, axis=1)
+    empirical_d2 = tf.reduce_mean(tf.exp(emp_d2_cum_split))
 
-    #Policy functions
-    target_logpdf = pi.pd.logp(ac)
-    behavioral_logpdf = oldpi.pd.logp(ac)
-    logratio = target_logpdf - behavioral_logpdf
+    # Return
+    ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
+    if center_return:
+        ep_return = ep_return - tf.reduce_mean(ep_return)
 
-    disc_rew_split = tf.stack(tf.split(disc_rew, num_episodes))
-    logratio_split = tf.stack(tf.split(logratio * mask, num_episodes))
-
-    target_logpdf_split = tf.split(target_logpdf * mask, num_episodes)
-    mask_split = tf.stack(tf.split(mask, num_episodes))
-
+    return_mean = tf.reduce_mean(ep_return)
+    return_std = U.reduce_std(ep_return)
+    return_max = tf.reduce_max(ep_return)
+    return_min = tf.reduce_min(ep_return)
+    return_abs_max = tf.reduce_max(tf.abs(ep_return))
+    
     if iw_method == 'pdis':
-        iw_split = tf.exp(tf.cumsum(logratio_split, axis=1))
+        raise NotImplementedError()
     elif iw_method == 'is':
-        iw_split = tf.expand_dims(tf.exp(tf.reduce_sum(logratio_split * mask_split, axis=1)), -1)
-        #tf.tile(tf.expand_dims(tf.exp(tf.reduce_sum(logratio_split, axis=1)), -1), (1, horizon))
+        iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
+        if iw_norm == 'none':
+            iwn = iw / n_episodes
+            w_return_mean = tf.reduce_sum(iwn * ep_return)
+        elif iw_norm == 'sn':
+            iwn = iw / tf.reduce_sum(iw)
+            w_return_mean = tf.reduce_sum(iwn * ep_return)
+        elif iw_norm == 'regression':
+            iwn = iw / n_episodes
+            mean_iw = tf.reduce_mean(iw)
+            beta = tf.reduce_sum((iw - mean_iw) * ep_return * iw) / (tf.reduce_sum((iw - mean_iw) ** 2) + 1e-24)
+            w_return_mean = tf.reduce_mean(iw * ep_return - beta * (iw - 1))
+        else:
+            raise NotImplementedError()
+        
+        ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
+        sqrt_ess_classic = tf.linalg.norm(iw, 1) / tf.linalg.norm(iw, 2)
+        ess_renyi = n_episodes / empirical_d2
+    else:
+        raise NotImplementedError()
+    
+    if bound == 'J':
+        bound_ = w_return_mean
+    elif bound == 'std-d2':
+        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_std
+    elif bound == 'max-d2':
+        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
+    elif bound == 'max-ess':
+        bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
+    elif bound == 'std-ess':
+        bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_std
     else:
         raise NotImplementedError()
 
-    empirical_d1 = tf.exp(tf.reduce_mean(pi.pd.renyi(oldpi.pd, 1.0001)))
-    empirical_d2 = tf.exp(tf.reduce_mean(pi.pd.renyi(oldpi.pd, 2.)))
-    empirical_d4 = tf.exp(tf.reduce_mean(pi.pd.renyi(oldpi.pd, 4.)))
+    losses = [bound_, return_mean, return_max, return_min, return_std, empirical_d2, w_return_mean,
+              tf.reduce_max(iwn), tf.reduce_min(iwn), tf.reduce_mean(iwn), U.reduce_std(iwn), tf.reduce_max(iw),
+              tf.reduce_min(iw), tf.reduce_mean(iw), U.reduce_std(iw), ess_classic, ess_renyi]
+    loss_names = ['Bound', 'InitialReturnMean', 'InitialReturnMax', 'InitialReturnMin', 'InitialReturnStd',
+                  'EmpiricalD2', 'ReturnMeanIW', 'MaxIWNorm', 'MinIWNorm', 'MeanIWNorm', 'StdIWNorm',
+                  'MaxIW', 'MinIW', 'MeanIW', 'StdIW', 'ESSClassic', 'ESSRenyi']
 
-    #cumulative_empirical_d2 = tf.reduce_mean(iw_split[:, -1])
-
-    cumulative_empirical_d2 = tf.split(pi.pd.renyi(oldpi.pd, 2.), num_episodes) * mask_split
-    cumulative_empirical_d2 = tf.reduce_sum(cumulative_empirical_d2, axis=1)
-    cumulative_empirical_d2 = tf.reduce_mean(tf.exp(cumulative_empirical_d2))
-
-    ess_classic = tf.linalg.norm(iw_split, 1) ** 2 / tf.linalg.norm(iw_split, 2) ** 2
-    ess_renyi = num_episodes / cumulative_empirical_d2
-
-    if ess_correction == True or ess_correction == 'classic':
-        ess = ess_classic
-    elif ess_correction == 'renyi':
-        ess = ess_renyi
-
-    if iw_norm == 'sn':
-        if iw_method == 'pdis':
-            raise NotImplementedError()
-        iwn_split = iw_split / tf.reduce_sum(iw_split, axis=0)
-        iwn_split = tf.squeeze(iwn_split)
-        ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
-        return_mean = tf.reduce_sum(ep_return * iwn_split)
-        if ess_correction:
-            return_std = tf.sqrt(tf.reduce_sum(iwn_split * (ep_return - return_mean) ** 2) * cumulative_empirical_d2)
-        else:
-            return_std = tf.sqrt(tf.reduce_sum(iwn_split ** 2 * (ep_return - return_mean) ** 2) * num_episodes)
-        third_central_moment = tf.reduce_sum(iwn_split ** 3 * (ep_return - return_mean) ** 3) * num_episodes
-    else:
-        iwn_split = iw_split / num_episodes
-        ep_return = tf.reduce_sum(iwn_split * mask_split * disc_rew_split, axis=1)
-        return_mean = tf.reduce_sum(ep_return)
-        if ess_correction:
-            return_std = tf.sqrt(tf.reduce_sum((ep_return - return_mean) ** 2) / (num_episodes - 1) * ess_classic / ess_renyi)
-        else:
-            return_std = tf.sqrt(tf.reduce_sum((ep_return - return_mean) ** 2) / (num_episodes - 1))
-        third_central_moment = tf.reduce_sum(ep_return - return_mean) ** 3 / (num_episodes - 1)
-
-    if bound == 'student':
-        if ess_correction:
-            bound_ = return_mean - sts.t.ppf(1 - delta, num_episodes - 1) / np.sqrt(num_episodes) * return_std
-        else:
-            bound_ = return_mean - sts.t.ppf(1 - delta, num_episodes - 1) / np.sqrt(num_episodes) * return_std
-    elif bound == 'ours':
-        bound_ = return_mean - np.sqrt(1. / delta - 1) / np.sqrt(num_episodes) * return_std
-    elif bound == 'johnson':
-        bound_ = return_mean - np.sqrt(1. / delta - 1) / np.sqrt(num_episodes) * return_std + third_central_moment / (6 * num_episodes * return_std ** 2)
-
-    if use_natural_gradient in ['approximate', 'approx', True]:
+    if use_natural_gradient:
         p = tf.placeholder(dtype=tf.float32, shape=[None])
-        iw_flat = tf.reshape(iw_split, [horizon * num_episodes])
-        grad_logprob = U.flatgrad(tf.stop_gradient(iw_flat) * target_logpdf * mask, var_list)
+        target_logpdf_episode = tf.reduce_sum(target_log_pdf_split * mask_split, axis=1)
+        grad_logprob = U.flatgrad(tf.stop_gradient(iwn) * target_logpdf_episode, var_list)
         dot_product = tf.reduce_sum(grad_logprob * p)
-        hess_logprob = U.flatgrad(dot_product, var_list) / num_episodes
-        compute_linear_operator = U.function([p, ob, ac, disc_rew, mask], [-hess_logprob])
-    elif use_natural_gradient == 'exact':
-        log_grads = tf.stack(
-            [U.flatgrad(target_logpdf_split[i] * mask_split[i], var_list) for i in range(len(target_logpdf_split))])
-        fisher = tf.matmul(tf.transpose(log_grads), tf.matmul(tf.diag(iwn_split[:, -1]), log_grads))
-        nat_grad = tf.squeeze(tf.linalg.solve(fisher + fisher_reg * np.eye(n_parameters), gradient_))
-        compute_natural_gradient = U.function([gradient_, ob, ac, disc_rew, mask], [nat_grad])
-
-    losses = [bound_, return_mean, return_std, cumulative_empirical_d2, empirical_d1, empirical_d2, empirical_d4, tf.reduce_max(iw_split), tf.reduce_min(iw_split), tf.reduce_mean(iw_split), U.reduce_std(iw_split),  tf.reduce_max(iwn_split), tf.reduce_min(iwn_split), tf.reduce_sum(iwn_split), tf.reduce_mean((iwn_split - 1./num_episodes)**2), ess_classic, ess_renyi]
-    loss_names = ['Bound', 'EpDiscRewMean', 'EpDiscRewStd', 'CumEmpD2', 'EmpD1', 'EmpD2', 'EmpD4', 'MaxIW', 'MinIW', 'MeanIW', 'StdIW', 'MaxIWNorm', 'MinIWNorm', 'MeanIWNorm', 'StdIWNorm', 'ESSClassic', 'ESSRenyi']
-
-    compute_lossandgrad = U.function([ob, ac, disc_rew, mask], losses + [U.flatgrad(bound_, var_list)])
-
-    assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
-        for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
-    compute_losses = U.function([ob, ac, disc_rew, mask], losses)
+        hess_logprob = U.flatgrad(dot_product, var_list)
+        compute_linear_operator = U.function([p, ob_, ac_, disc_rew_, mask_], [-hess_logprob])
 
 
-    @contextmanager
-    def timed(msg):
-        if rank == 0:
-            print(colorize(msg, color='magenta'))
-            tstart = time.time()
-            yield
-            print(colorize("done in %.3f seconds"%(time.time() - tstart), color='magenta'))
-        else:
-            yield
-
-    def allmean(x):
-        assert isinstance(x, np.ndarray)
-        out = np.empty_like(x)
-        MPI.COMM_WORLD.Allreduce(x, out, op=MPI.SUM)
-        out /= nworkers
-        return out
-
+    assign_old_eq_new = U.function([], [], updates=[tf.assign(oldv, newv)
+                for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
+    
+    compute_lossandgrad = U.function([ob_, ac_, disc_rew_, mask_], losses + [U.flatgrad(bound_, var_list)])
+    compute_grad = U.function([ob_, ac_, disc_rew_, mask_], [U.flatgrad(bound_, var_list)])
+    compute_bound = U.function([ob_, ac_, disc_rew_, mask_], [bound_])
+    compute_losses = U.function([ob_, ac_, disc_rew_, mask_], losses)
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
 
+    if sampler is None:
+        seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True)
+        sampler = type("SequentialSampler", (object,), {"collect": lambda self, _: seg_gen.__next__()})()
+
     U.initialize()
-
-    # Prepare for rollouts
-    # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, num_episodes, horizon, stochastic=True)
-
+    
+    # Starting optimizing
+    
     episodes_so_far = 0
     timesteps_so_far = 0
     iters_so_far = 0
     tstart = time.time()
-    lenbuffer = deque(maxlen=40) # rolling buffer for episode lengths
-    rewbuffer = deque(maxlen=40) # rolling buffer for episode rewards
-    ite = 0
-
-    def log_info(args, ite, lenbuffer, rewbuffer, lens, episodes_so_far, timesteps_so_far):
-        with tf.name_scope('summaries'):
-            logger.record_tabular("Itaration", ite)
-            meanlosses = allmean(np.array(compute_losses(*args)))
-            for (lossname, lossval) in zip(loss_names, meanlosses):
-                logger.record_tabular(lossname, lossval)
-
-            logger.record_tabular("EpLenMean", np.mean(lenbuffer))
-            logger.record_tabular("EpRewMean", np.mean(rewbuffer))
-            logger.record_tabular("EpThisIter", len(lens))
-
-            logger.record_tabular("EpisodesSoFar", episodes_so_far)
-            logger.record_tabular("TimestepsSoFar", timesteps_so_far)
-            logger.record_tabular("TimeElapsed", time.time() - tstart)
-            if save_weights:
-                logger.record_tabular('Weights', str(get_parameter()))
-
-            if rank == 0:
-                logger.dump_tabular()
-                print(get_parameter())
-
-    improvement_tol = 0.
-    theta = get_parameter()
-
-    assign_old_eq_new()
-
+    lenbuffer = deque(maxlen=n_episodes)
+    rewbuffer = deque(maxlen=n_episodes)
+    
     while True:
 
-        ite += 1
-
-        if callback: callback(locals(), globals())
-        if ite >= iters:
-            break
-
-        logger.log("********** Iteration %i ************"%iters_so_far)
-
-        with timed("sampling"):
-            seg = seg_gen.__next__()
-
-        add_vtarg_and_adv(seg, gamma)
-        #disc_rew_standard = seg["disc_rew"]  / (max(seg["disc_rew"]) - min(seg["disc_rew"]))
-        disc_rew_standard = (seg["disc_rew"] - np.mean(seg["disc_rew"])) / np.std(seg["disc_rew"])
-        #disc_rew_standard = seg['disc_rew']
-        args = seg["ob"], seg["ac"], disc_rew_standard, seg['mask']
-        args2 = seg["ob"], seg["ac"], seg["disc_rew"], seg['mask']
-
-        if hasattr(pi, "ob_rms"): pi.ob_rms.update(seg["ob"])
-
-        lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
-        listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-        lens, rews = map(flatten_lists, zip(*listoflrpairs))
-        lenbuffer.extend(lens)
-        rewbuffer.extend(rews)
-
-        episodes_so_far += len(lens)
-        timesteps_so_far += sum(lens)
         iters_so_far += 1
 
-        #log_info(args, ite, lenbuffer, rewbuffer, lens, episodes_so_far, timesteps_so_far)
+        if render_after is not None and iters_so_far % render_after == 0:
+            if hasattr(env, 'render'):
+                render(env, pi, horizon)
+
+        if callback:
+            callback(locals(), globals())
+
+        if iters_so_far >= max_iters:
+            print('Finised...')
+            break
+
+        logger.log('********** Iteration %i ************' % iters_so_far)
+        
+        theta = get_parameter()
+        print(theta)
+        with timed('sampling'):
+            seg = sampler.collect(theta)
+        
+        add_disc_rew(seg, gamma)
+
+        lens, rets = seg['ep_lens'], seg['ep_rets']
+        lenbuffer.extend(lens)
+        rewbuffer.extend(rets)
+        episodes_so_far += len(lens)
+        timesteps_so_far += sum(lens)
+
+        args = ob, ac, disc_rew, mask = seg['ob'], seg['ac'], seg['disc_rew'], seg['mask']
+
+        assign_old_eq_new()
 
         def evaluate_loss():
-            loss = allmean(np.array(compute_losses(*args)))
+            loss = compute_bound(*args)
             return loss[0]
 
         def evaluate_gradient():
-            *loss, gradient = compute_lossandgrad(*args)
-            loss = allmean(np.array(loss))
-            gradient = allmean(gradient)
-            return gradient, loss[0]
+            gradient = compute_grad(*args)
+            return gradient[0]
 
-
-        if use_natural_gradient in ['approximate', 'approx', True]:
+        if use_natural_gradient:
             def evaluate_fisher_vector_prod(x):
+                return compute_linear_operator(x, *args)[0] + fisher_reg * x
 
-                return allmean(compute_linear_operator(x, *args)[0]) + fisher_reg * x
-            A = scila.LinearOperator((n_parameters, n_parameters), matvec=evaluate_fisher_vector_prod)
-
-            def evaluate_natural_gradient(gradient):
-                x = scila.cg(A, gradient, x0=gradient, maxiter=30)
-                return x[0]
-        elif use_natural_gradient == 'exact':
-            def evaluate_natural_gradient(gradient):
-                return compute_natural_gradient(gradient[:, np.newaxis], *args)[0]
+            def evaluate_natural_gradient(g):
+                return cg(evaluate_fisher_vector_prod, g, cg_iters=10, verbose=0)
         else:
-            def evaluate_natural_gradient(gradient):
-                return gradient
+            evaluate_natural_gradient = None
 
-        meanlosses = allmean(np.array(compute_losses(*args2)))
-        for (lossname, lossval) in zip(loss_names[:3], meanlosses[:3]):
-            logger.record_tabular("Initial"+lossname, lossval)
+        with timed('summaries before'):
+            logger.record_tabular("Itaration", iters_so_far)
+            logger.record_tabular("InitialBound", evaluate_loss())
+            logger.record_tabular("EpLenMean", np.mean(lenbuffer))
+            logger.record_tabular("EpRewMean", np.mean(rewbuffer))
+            logger.record_tabular("EpThisIter", len(lens))
+            logger.record_tabular("EpisodesSoFar", episodes_so_far)
+            logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+            logger.record_tabular("TimeElapsed", time.time() - tstart)
 
-        with timed("computegrad"):
-            gradient, _ = evaluate_gradient()
+        if save_weights:
+            logger.record_tabular('Weights', str(get_parameter()))
 
         with timed("offline optimization"):
 
@@ -545,40 +528,16 @@ def learn(env, policy_func, *,
                                                   line_search,
                                                   evaluate_loss,
                                                   evaluate_gradient,
-                                                  evaluate_natural_gradient)
+                                                  evaluate_natural_gradient,
+                                                  max_offline_ite=max_offline_iters)
 
-            set_parameter(theta)
+        set_parameter(theta)
 
-        log_info(args2, ite, lenbuffer, rewbuffer, lens, episodes_so_far, timesteps_so_far)
+        with timed('summaries after'):
+            meanlosses = np.array(compute_losses(*args))
+            for (lossname, lossval) in zip(loss_names, meanlosses):
+                logger.record_tabular(lossname, lossval)
 
-        assign_old_eq_new()
+        logger.dump_tabular()
 
-        assert(improvement >= 0.)
-
-        if improvement < improvement_tol:
-            print("Stopping!")
-            break
-
-    logger.log("********** Final evaluation ************")
-
-    with timed("sampling"):
-        seg = seg_gen.__next__()
-
-    add_vtarg_and_adv(seg, gamma)
-    args = seg["ob"], seg["ac"], seg["disc_rew"], seg['mask']
-
-    lrlocal = (seg["ep_lens"], seg["ep_rets"])  # local values
-    listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal)  # list of tuples
-    lens, rews = map(flatten_lists, zip(*listoflrpairs))
-    lenbuffer.extend(lens)
-    rewbuffer.extend(rews)
-
-    episodes_so_far += len(lens)
-    timesteps_so_far += sum(lens)
-    iters_so_far += 1
-
-    log_info(args, ite, lenbuffer, rewbuffer, lens, episodes_so_far, timesteps_so_far)
-
-
-def flatten_lists(listoflists):
-    return [el for list_ in listoflists for el in list_]
+    env.close()
