@@ -12,10 +12,11 @@ import matplotlib.pyplot as plt
 import scipy.stats as sts
 
 
-def read_data(path):
+def read_data(path, iters=300):
     df = pd.read_csv(path, encoding='utf-8')
-    iterations = len(df)
-    df['CumAvgRet'] = np.cumsum(df['AvgRet'])/iterations
+    if iters: df = df.loc[:iters, :]
+    df['EpsSoFar'] = np.cumsum(df['BatchSize'])
+    df['CumAvgRet'] = np.cumsum(df['AvgRet']*df['BatchSize'])/np.sum(df['BatchSize'])
     return df
 
 def moments(dfs):
@@ -29,7 +30,7 @@ def plot_all(dfs, key='AvgRet', ylim=None):
     ax = fig.add_subplot(111)
     for df in dfs:
         value = df[key]
-        ax.plot(value.index, value)
+        ax.plot(df['EpsSoFar'], value)
     return fig
 
 def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None):
@@ -39,9 +40,9 @@ def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None):
     std = std_df[key]
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(mean.index, mean)
+    ax.plot(mean_df['EpsSoFar'], mean)
     interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
-    ax.fill_between(mean.index, interval[0], interval[1], alpha=0.3)
+    ax.fill_between(mean_df['EpsSoFar'], interval[0], interval[1], alpha=0.3)
     if ylim: ax.set_ylim(ylim)
     return fig
 
@@ -56,9 +57,9 @@ def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None):
         mean_df, std_df = moments(dfs)
         mean = mean_df[key]
         std = std_df[key]
-        ax.plot(mean.index, mean)
+        ax.plot(mean_df['EpsSoFar'], mean)
         interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
-        ax.fill_between(mean.index, interval[0], interval[1], alpha=0.3)
+        ax.fill_between(mean_df['EpsSoFar'], interval[0], interval[1], alpha=0.3)
     ax.legend(entries)
     if ylim: ax.set_ylim(ylim)
     if xlim: ax.set_xlim(xlim)
@@ -69,7 +70,7 @@ def plot_data(path, key='VanillaAvgRet'):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     mean = df[key]
-    ax.plot(mean.index, mean)
+    ax.plot(df['EpsSoFar'], mean)
     return fig
 
 def print_ci(dfs, conf=0.95, key='CumAvgRet'):

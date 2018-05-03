@@ -259,6 +259,7 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
             if verbose: logger.log('Performance loss! Adding more trajectories')
             batch_size+=initial_batch_size
             old_perf = -np.inf #After adding 100, go on anyway
+            it-=1
             continue
         #Go on
 

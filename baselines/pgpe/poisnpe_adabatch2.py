@@ -264,6 +264,7 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
             if verbose: logger.log('Faulty update (expected %f, got %f instead)!\nAdding more trajectories!' % (promise, perf))
             pol.set_params(old_rho)
             batch_size+=initial_batch_size
+            it-=1
             continue
             
         
