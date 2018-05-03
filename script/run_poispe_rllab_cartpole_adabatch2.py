@@ -22,7 +22,7 @@ sess.__enter__()
 
 
 def train(seed, shift, normalize, use_rmax, use_renyi, path):
-    print('ADABATCH 1')
+    print('ADABATCH 2')
     index = int(str(int(shift)) + str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
     DIR = path + '/poisnpe/bound_' + str(index) + '/cartpole_rllab/seed_' + str(seed)
     import os
