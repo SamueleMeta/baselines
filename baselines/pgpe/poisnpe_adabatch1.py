@@ -234,16 +234,14 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
     for it in range(max_iterations):
         logger.log('\n********** Iteration %i ************' % it)
         rho = pol.eval_params() #Higher-order-policy parameters
-        print(rho)
         if verbose>1:
             logger.log('Higher-order parameters: ', rho)
-            print(len(rho))
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
             
         #Batch of episodes
         #TODO: try symmetric sampling
         with timed('Sampling'):
-            while len(rets)<batch_size:
+            for ep in range(initial_batch_size):
                 frozen_pol = pol.freeze()
                 theta = frozen_pol.resample()
                 actor_params.append(theta)
@@ -251,37 +249,44 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
                 rets.append(ret)
                 disc_rets.append(disc_ret)
                 lens.append(ep_len)
-        perf = np.mean(disc_rets)
-        logger.log('Performance: ', np.mean(perf))
-        #if save_to: np.save(save_to + '/rets_' + str(it), rets)
-        if perf<old_perf and batch_size<5*initial_batch_size:
-            #Try with more trajectories
-            if verbose: logger.log('Performance loss! Adding more trajectories')
-            batch_size+=initial_batch_size
-            old_perf = -np.inf #After adding 100, go on anyway
-            it-=1
-            continue
-        #Go on
-
-
+        complete = len(rets)>=batch_size
         norm_disc_rets = np.array(disc_rets)
         if shift:
             norm_disc_rets = norm_disc_rets - np.mean(norm_disc_rets)
         rmax = np.max(abs(norm_disc_rets))
+        perf = np.mean(norm_disc_rets)
+        logger.log('Performance: ', np.mean(perf))
+        #if save_to: np.save(save_to + '/rets_' + str(it), rets)
         
-        #Offline optimization
-        with timed('Optimizing offline'):
-            rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
-                                                normalize=normalize,
-                                                use_rmax=use_rmax,
-                                                use_renyi=use_renyi,
-                                                max_offline_ite=max_offline_ite,
-                                                max_search_ite=max_search_ite,
-                                                rmax=rmax,
-                                                delta=delta,
-                                                use_parabola=use_parabola)
+        if complete and perf<old_perf and batch_size<5*initial_batch_size:
+            #Try with more trajectories
+            iter_type = 0
+            if verbose: logger.log('Performance loss! Adding more trajectories')
+            batch_size+=initial_batch_size
+            old_perf = -np.inf #After adding 100, go on anyway
+            newpol.set_params(rho)
+            complete = False #Policy does not change, so keep the trajectories
+        elif complete:
+            #When you have enough data, optimize
+            iter_type = 1
+            if verbose: logger.log('Optimizing')
+            with timed('Optimizing offline'):
+                rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
+                                                    normalize=normalize,
+                                                    use_rmax=use_rmax,
+                                                    use_renyi=use_renyi,
+                                                    max_offline_ite=max_offline_ite,
+                                                    max_search_ite=max_search_ite,
+                                                    rmax=rmax,
+                                                    delta=delta,
+                                                    use_parabola=use_parabola)
             newpol.set_params(rho)
             assert(improvement>=0.)
+            old_perf = perf
+        else:
+            iter_type = 2
+            if verbose: logger.log('Collecting more data (%d/%d)' % (len(rets), batch_size))
+            newpol.set_params(rho)
         
         logger.log('Recap of iteration %i' % it)
         unn_iws = newpol.eval_iws(actor_params, behavioral=pol, normalize=False)
@@ -289,7 +294,7 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
         ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
         J, varJ = newpol.eval_performance(actor_params, norm_disc_rets, behavioral=pol)
         eRenyi = np.exp(newpol.eval_renyi(pol))
-        
+        logger.record_tabular('IterType', iter_type)
         logger.record_tabular('Bound', newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta))
         logger.record_tabular('ESSClassic', ess)
@@ -310,16 +315,12 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
         logger.record_tabular('AvgDiscRet', np.mean(norm_disc_rets))
         logger.record_tabular('J', J)
         logger.record_tabular('VarJ', varJ)
-        logger.record_tabular('BatchSize', len(rets))
+        logger.record_tabular('BatchSize', batch_size)
+        logger.record_tabular('EpsThisIter', initial_batch_size)
         logger.record_tabular('AvgEpLen', np.mean(lens))
         logger.dump_tabular()
         
-        
-        #Update behavioral
+        #Update
         pol.set_params(newpol.eval_params()) 
-        
-        old_perf = perf
-        actor_params, rets, disc_rets, lens = [], [], [], []
-
-        
-    
+        if complete:
+            actor_params, rets, disc_rets, lens = [], [], [], []

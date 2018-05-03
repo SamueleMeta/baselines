@@ -216,34 +216,32 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
           shift=False,
           use_parabola=False):
     
-    #Logging
+    #Logger configuration
     format_strs = []
     if verbose: format_strs.append('stdout')
     if save_to: format_strs.append('csv')
     logger.configure(dir=save_to, format_strs=format_strs)
 
+    #Initialization
     pol = pol_maker('pol')
     newpol = pol_maker('oldpol')
     newpol.set_params(pol.eval_params())
     old_rho = pol.eval_params()
     batch_size = initial_batch_size
     promise = -np.inf
-    
-    #Learning iteration
     actor_params, rets, disc_rets, lens = [], [], [], []
+
+    #Learning
     for it in range(max_iterations):
         logger.log('\n********** Iteration %i ************' % it)
         rho = pol.eval_params() #Higher-order-policy parameters
-        print(rho)
         if verbose>1:
             logger.log('Higher-order parameters: ', rho)
-            print(len(rho))
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
             
-        #Batch of episodes
-        #TODO: try symmetric sampling
+        #Add 100 trajectories to the batch
         with timed('Sampling'):
-            while len(rets)<batch_size:
+            for ep in range(initial_batch_size):
                 frozen_pol = pol.freeze()
                 theta = frozen_pol.resample()
                 actor_params.append(theta)
@@ -251,46 +249,59 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
                 rets.append(ret)
                 disc_rets.append(disc_ret)
                 lens.append(ep_len)
-        logger.log('Performance: ', np.mean(rets))
-        #if save_to: np.save(save_to + '/rets_' + str(it), rets)
-
+        complete = len(rets)>=batch_size #Is the batch complete?
+        #Normalize reward
         norm_disc_rets = np.array(disc_rets)
         if shift:
             norm_disc_rets = norm_disc_rets - np.mean(norm_disc_rets)
         rmax = np.max(abs(norm_disc_rets))
-        
+        #Estimate online performance
         perf = np.mean(norm_disc_rets)
-        if perf < promise and batch_size < 5*initial_batch_size:
-            if verbose: logger.log('Faulty update (expected %f, got %f instead)!\nAdding more trajectories!' % (promise, perf))
-            pol.set_params(old_rho)
-            batch_size+=initial_batch_size
-            it-=1
-            continue
+        logger.log('Performance: ', perf)
+        
+        if complete and perf<promise and batch_size<5*initial_batch_size:
+            #The policy is rejected (unless batch size is already maximal)
+            iter_type = 0
+            if verbose: logger.log('Rejecting policy (expected at least %f, got %f instead)!\nIncreasing batch_size' % 
+                                   (promise, perf))
+            batch_size+=initial_batch_size #Increase batch size
+            newpol.set_params(old_rho) #Reset to last accepted policy
+            promise = -np.inf #No need to test last accepted policy
+        elif complete:
+            #The policy is accepted, optimization is performed
+            iter_type = 1
+            old_rho = rho #Save as last accepted policy
+            with timed('Optimizing offline'):
+                rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
+                                                    normalize=normalize,
+                                                    use_rmax=use_rmax,
+                                                    use_renyi=use_renyi,
+                                                    max_offline_ite=max_offline_ite,
+                                                    max_search_ite=max_search_ite,
+                                                    rmax=rmax,
+                                                    delta=delta,
+                                                    use_parabola=use_parabola)
+                newpol.set_params(rho)
+                assert(improvement>=0.)
+                #Expected performance
+                promise = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)
+        else:
+            #The batch is incomplete, more data will be collected
+            iter_type = 2
+            if verbose: logger.log('Must collect more data (have %d/%d)' % (len(rets), batch_size))
+            newpol.set_params(rho) #Policy stays the same
             
-        
-        #Offline optimization
-        with timed('Optimizing offline'):
-            rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
-                                                normalize=normalize,
-                                                use_rmax=use_rmax,
-                                                use_renyi=use_renyi,
-                                                max_offline_ite=max_offline_ite,
-                                                max_search_ite=max_search_ite,
-                                                rmax=rmax,
-                                                delta=delta,
-                                                use_parabola=use_parabola)
-            newpol.set_params(rho)
-            assert(improvement>=0.)
-        
+        #Save data
         logger.log('Recap of iteration %i' % it)
         unn_iws = newpol.eval_iws(actor_params, behavioral=pol, normalize=False)
         iws = unn_iws/np.sum(unn_iws)
         ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
         J, varJ = newpol.eval_performance(actor_params, norm_disc_rets, behavioral=pol)
         eRenyi = np.exp(newpol.eval_renyi(pol))
-        
         bound = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
+        logger.record_tabular('IterType', iter_type)
         logger.record_tabular('Bound', bound)
         logger.record_tabular('ESSClassic', ess)
         logger.record_tabular('ESSRenyi', batch_size/eRenyi)
@@ -310,13 +321,13 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
         logger.record_tabular('AvgDiscRet', np.mean(norm_disc_rets))
         logger.record_tabular('J', J)
         logger.record_tabular('VarJ', varJ)
-        logger.record_tabular('BatchSize', len(rets))
+        logger.record_tabular('EpsThisIter', initial_batch_size)
+        logger.record_tabular('BatchSize', batch_size)
         logger.record_tabular('AvgEpLen', np.mean(lens))
         logger.dump_tabular()
         
-        
         #Update behavioral
-        old_rho = pol.eval_params()
-        promise = bound
-        pol.set_params(newpol.eval_params()) 
-        actor_params, rets, disc_rets, lens = [], [], [], []
+        pol.set_params(newpol.eval_params())
+        if complete:
+            #Start new batch
+            actor_params, rets, disc_rets, lens = [], [], [], []
