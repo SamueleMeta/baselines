@@ -45,7 +45,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               gamma=1.,
               batch_size=100,
               task_horizon=500,
-              max_iterations=500,
+              max_iterations=200,
               save_to=DIR,
               verbose=2,
               feature_fun=np.ravel,

@@ -77,7 +77,7 @@ if __name__=='__main__':
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
     parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
-    parser.add_argument('--env', help='Environment (RL task)', type=str, default='cartpole')
+    parser.add_argument('--env', help='Environment (RL task)', type=str, default='lqg')
     args = parser.parse_args()
     train(args.seed, args.env, 
           args.shift,
