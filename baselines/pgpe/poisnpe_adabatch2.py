@@ -229,7 +229,8 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
     old_rho = pol.eval_params()
     batch_size = initial_batch_size
     promise = -np.inf
-    actor_params, rets, disc_rets, lens = [], [], [], []
+    actor_params, rets, disc_rets, lens = [], [], [], []    
+    old_actor_params, old_rets, old_disc_rets, old_lens = [], [], [], []
 
     #Learning
     for it in range(max_iterations):
@@ -267,10 +268,21 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
             batch_size+=initial_batch_size #Increase batch size
             newpol.set_params(old_rho) #Reset to last accepted policy
             promise = -np.inf #No need to test last accepted policy
+            #Reuse old trajectories
+            actor_params = old_actor_params
+            rets = old_rets
+            disc_rets = old_disc_rets
+            lens = old_lens
+            if verbose: logger.log('Must collect more data (have %d/%d)' % (len(rets), batch_size))
+            complete = False
         elif complete:
             #The policy is accepted, optimization is performed
             iter_type = 1
-            old_rho = rho #Save as last accepted policy
+            old_rho = rho #Save as last accepted policy (and its trajectories)
+            old_actor_params = actor_params
+            old_rets = rets
+            old_disc_rets = disc_rets
+            old_lens = lens
             with timed('Optimizing offline'):
                 rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
                                                     normalize=normalize,
