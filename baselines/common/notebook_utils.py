@@ -12,11 +12,14 @@ import matplotlib.pyplot as plt
 import scipy.stats as sts
 
 
-def read_data(path, iters=300):
+def read_data(path, iters=300, default_batchsize=100):
     df = pd.read_csv(path, encoding='utf-8')
     if iters: df = df.loc[:iters, :]
-    df['EpsSoFar'] = np.cumsum(df['BatchSize'])
-    df['CumAvgRet'] = np.cumsum(df['AvgRet']*df['BatchSize'])/np.sum(df['BatchSize'])
+    if not 'BatchSize' in df: df['BatchSize'] = default_batchsize
+    if not 'AvgRet' in df: df['AvgRet'] = df['AverageReturn']
+    if not 'EpsThisIter' in df: df['EpsThisIter'] = df['BatchSize'] 
+    df['EpsSoFar'] = np.cumsum(df['EpsThisIter'])
+    df['CumAvgRet'] = np.cumsum(df['AvgRet']*df['EpsThisIter'])/np.sum(df['EpsThisIter'])
     return df
 
 def moments(dfs):
