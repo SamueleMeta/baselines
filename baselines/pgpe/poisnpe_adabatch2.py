@@ -242,8 +242,8 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
             
         #Add 100 trajectories to the batch
         with timed('Sampling'):
+            frozen_pol = pol.freeze()
             for ep in range(initial_batch_size):
-                frozen_pol = pol.freeze()
                 theta = frozen_pol.resample()
                 actor_params.append(theta)
                 ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, task_horizon, feature_fun)
@@ -326,16 +326,16 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
         logger.record_tabular('AvgNormIw', np.mean(iws))
         logger.record_tabular('VarNormIw', np.var(iws, ddof=1))
         logger.record_tabular('eRenyi2', eRenyi)
-        logger.record_tabular('AvgRet', np.mean(rets))
-        logger.record_tabular('VanillaAvgRet', np.mean(rets))
-        logger.record_tabular('VarRet', np.var(rets, ddof=1))
-        logger.record_tabular('VarDiscRet', np.var(norm_disc_rets, ddof=1))
-        logger.record_tabular('AvgDiscRet', np.mean(norm_disc_rets))
+        logger.record_tabular('AvgRet', np.mean(rets[-initial_batch_size:]))
+        logger.record_tabular('VanillaAvgRet', np.mean(rets[-initial_batch_size:]))
+        logger.record_tabular('VarRet', np.var(rets[-initial_batch_size:], ddof=1))
+        logger.record_tabular('VarDiscRet', np.var(norm_disc_rets[-initial_batch_size:], ddof=1))
+        logger.record_tabular('AvgDiscRet', np.mean(norm_disc_rets[-initial_batch_size:]))
         logger.record_tabular('J', J)
         logger.record_tabular('VarJ', varJ)
         logger.record_tabular('EpsThisIter', initial_batch_size)
         logger.record_tabular('BatchSize', batch_size)
-        logger.record_tabular('AvgEpLen', np.mean(lens))
+        logger.record_tabular('AvgEpLen', np.mean(lens[-initial_batch_size:]))
         logger.dump_tabular()
         
         #Update behavioral

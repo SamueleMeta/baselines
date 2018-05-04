@@ -212,12 +212,12 @@ class PeMlpPolicy(object):
             self.ob_dim = ob_dim
             self.ac_dim = ac_dim
             self.use_bias = use_bias
+            self.higher_mean = self.higher_params[:len(self.higher_params)//2]
+            self.higher_cov = np.diag(np.exp(2*self.higher_params[len(self.higher_params)//2:]))
             self.resample()
         
         def resample(self):
-            higher_mean = self.higher_params[:len(self.higher_params)//2]
-            higher_cov = np.diag(np.exp(2*self.higher_params[len(self.higher_params)//2:]))
-            self.actor_params = np.random.multivariate_normal(higher_mean, higher_cov)
+            self.actor_params = np.random.multivariate_normal(self.higher_mean, self.higher_cov)
             return self.actor_params
         
         def act(self, ob, resample=False):

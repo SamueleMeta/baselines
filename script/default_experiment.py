@@ -12,9 +12,10 @@ import argparse
 
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--seeds', help='RNG seed', type=str, default='107 583 850 730 808')
-parser.add_argument('--script', help='experiment to run', type=str, default='no')
+parser.add_argument('--seeds', help='RNG seed', type=str, default='10 109 904 160 570')
+parser.add_argument('--script', help='experiment to run', type=str, default='run_poispe_rllab_basic')
 parser.add_argument('--path', help='where to save', type=str, default='../script/temp')
+parser.add_argument('--env', help='task name', type=str, default='cartpole')
 args = parser.parse_args()
 path = '../results/' + args.path
 
@@ -27,5 +28,5 @@ def execute(cmd):
 
 for seed in map(int, args.seeds.split(' ')):
     print('SEED %d' % seed)
-    for script in execute(['python3 ' + args.script + '.py --seed %d --path %s' % (seed, path)]):
+    for script in execute(['python3 ' + args.script + '.py --seed %d --path %s --env %s' % (seed, path, args.env)]):
         print(script, end='')
