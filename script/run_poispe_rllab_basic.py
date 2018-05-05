@@ -19,13 +19,13 @@ from rllab.envs.box2d.cartpole_env import CartpoleEnv
 from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv
 from rllab.envs.box2d.mountain_car_env import MountainCarEnv
 from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv
-#from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
+from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
 
 envs = {'cartpole': CartpoleEnv,
         'inverted_pendulum': CartpoleSwingupEnv,
         'mountain_car': MountainCarEnv,
         'acrobot': DoublePendulumEnv}
-#envs['double_inverted_pendulum'] = InvertedDoublePendulumEnv
+envs['double_inverted_pendulum'] = InvertedDoublePendulumEnv
 
 import baselines.common.tf_util as U
 sess = U.single_threaded_session()
