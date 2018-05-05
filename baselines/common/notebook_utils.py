@@ -82,4 +82,4 @@ def print_ci(dfs, conf=0.95, key='CumAvgRet'):
     mean = mean_df[key][len(mean_df)-1]
     std = std_df[key][len(mean_df)-1]
     interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
-    print('%f\t[%f, %f]' % (mean, interval[0], interval[1]))
+    print('%f \u00B1 %f\t[%f, %f]' % (mean, std, interval[0], interval[1]))
