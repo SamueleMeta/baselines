@@ -1,7 +1,7 @@
 import baselines.common.tf_util as U
 import tensorflow as tf
 import gym
-from baselines.common.distributions import MultiGaussianVectorPdType
+from baselines.common.distributions import GaussianVectorPdType
 import numpy as np
 from baselines.common import set_global_seeds
 import scipy.stats as sts
@@ -80,8 +80,6 @@ class MultiPeMlpPolicy(object):
         with tf.variable_scope('actor') as scope:
             self.actor_weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=scope.name)
-            self.layer_lens = [tf.reshape(w, [-1]).shape[0].value for w in self.actor_weights]
-            print(self.layer_lens)
             self.flat_actor_weights = tf.concat([tf.reshape(w, [-1]) for w in \
                                             self.actor_weights], axis=0) #flatten
             self._n_actor_weights = n_actor_weights = self.flat_actor_weights.shape[0]
@@ -99,10 +97,10 @@ class MultiPeMlpPolicy(object):
                                            initializer=tf.initializers.constant(0.))
             pdparam = tf.concat([higher_mean, higher_mean * 0. + 
                                higher_logstd], axis=0)
-            self.pdtype = pdtype = MultiGaussianVectorPdType(n_actor_weights.value) 
+            self.pdtype = pdtype = GaussianVectorPdType(n_actor_weights.value) 
 
         #Sample actor weights
-        self.pd = pdtype.pdfromflat(pdparam, self.layer_lens)
+        self.pd = pdtype.pdfromflat(pdparam)
         sampled_actor_params = self.pd.sample()
         symm_sampled_actor_params = self.pd.sample_symmetric()
         self._sample_symm_actor_params = U.function(
@@ -136,7 +134,7 @@ class MultiPeMlpPolicy(object):
             self._set_higher_params = U.SetFromFlat(self._higher_params)
 
         #Batch PGPE
-        self._actor_params_in = \
+        self._actor_params_in = actor_params_in = \
                 U.get_placeholder(name='actor_params_in',
                                   dtype=tf.float32,
                                   shape=[batch_length] + [n_actor_weights])
@@ -146,8 +144,13 @@ class MultiPeMlpPolicy(object):
         ret_mean, ret_std = tf.nn.moments(rets_in, axes=[0])
         self._get_ret_mean = U.function([self._rets_in], [ret_mean])
         self._get_ret_std = U.function([self._rets_in], [ret_std])
+        self._logprobs = logprobs = self.pd.logp(actor_params_in)
+        pgpe_times_n = U.flatgrad(logprobs*rets_in, higher_params)
+        self._get_pgpe_times_n = U.function([actor_params_in, rets_in],
+                                            [pgpe_times_n])
 
         #Batch off-policy PGPE
+        self._probs = tf.exp(logprobs) 
         self._behavioral = None
         self._renyi_other = None
     
@@ -183,12 +186,12 @@ class MultiPeMlpPolicy(object):
             self.ob_dim = ob_dim
             self.ac_dim = ac_dim
             self.use_bias = use_bias
-            self.higher_mean = self.higher_params[:len(self.higher_params)//2]
-            self.higher_cov = np.diag(np.exp(2*self.higher_params[len(self.higher_params)//2:]))
             self.resample()
         
         def resample(self):
-            self.actor_params = np.random.multivariate_normal(self.higher_mean, self.higher_cov)
+            higher_mean = self.higher_params[:len(self.higher_params)//2]
+            higher_cov = np.diag(np.exp(2*self.higher_params[len(self.higher_params)//2:]))
+            self.actor_params = np.random.multivariate_normal(higher_mean, higher_cov)
             return self.actor_params
         
         def act(self, ob, resample=False):
@@ -328,8 +331,8 @@ class MultiPeMlpPolicy(object):
         
         #Self-normalized importance weights
         #unn_iws = self._probs/behavioral._probs
-        unn_iws = tf.exp(self.pd.logp(self._actor_params_in) - 
-                    behavioral.pd.logp(self._actor_params_in))
+        unn_iws = tf.exp(self.pd.independent_logps(self._actor_params_in) - 
+                    behavioral.pd.independent_logps(self._actor_params_in))
         iws = unn_iws/tf.reduce_sum(unn_iws, axis=0)
         
         #Offline performance

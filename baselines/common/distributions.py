@@ -93,6 +93,20 @@ class GaussianVectorPdType(PdType):
         return [self.size]
     def sample_dtype(self):
         return tf.float32
+    
+class MultiGaussianVectorPdType(PdType):
+    def __init__(self, size):
+        self.size = size
+    def pdclass(self):
+        return MultiGaussianVectorPd
+    def param_shape(self):
+        return [2*self.size]
+    def sample_shape(self):
+        return [self.size]
+    def sample_dtype(self):
+        return tf.float32
+    def pdfromflat(self, flat, layer_lens):
+        return self.pdclass()(flat, layer_lens)
 
 class CholeskyGaussianPdType(PdType):
     def __init__(self, size):
@@ -283,6 +297,51 @@ class GaussianVectorPd(Pd):
     @classmethod
     def fromflat(cls, flat):
         return cls(flat)
+    
+class MultiGaussianVectorPd(Pd):
+    def __init__(self, flat, layer_lens):
+        self.flat = flat
+        self.layer_lens = layer_lens
+        mean, logstd = tf.split(axis=len(flat.shape)-1, num_or_size_splits=2, value=flat)
+        self.flat_mean = mean
+        self.flat_logstd = logstd
+        self.means = tf.split(mean, layer_lens)
+        self.logstds = tf.split(logstd, layer_lens)
+    def flatparam(self):
+        return self.flat
+    def mode(self):
+        return tf.concat(self.means, axis=0)
+    def neglogp(self, x_flat):
+        xs = tf.split(x_flat, self.layer_lens, axis=1)
+        return tf.stack([0.5 * tf.reduce_sum(tf.square((x - selfmean) / tf.exp(selflogstd)), axis=-1) \
+               + 0.5 * np.log(2.0 * np.pi) * tf.to_float(tf.shape(x)[-1]) \
+               + tf.reduce_sum(selflogstd, axis=-1) for selfmean, selflogstd, x 
+               in zip(self.means, self.logstds, xs)], axis=1)
+    def kl(self, other):
+        assert isinstance(other, MultiGaussianVectorPd)
+        return tf.stack([tf.reduce_sum(otherlogstd - selflogstd + (tf.exp(2*selflogstd) + tf.square(selfmean - othermean)) / (2.0 * tf.exp(2*otherlogstd)) - 0.5, axis=-1)
+                    for selfmean, selflogstd, othermean, otherlogstd in zip(self.means, self.logstds, other.means, other.logstds)],
+                    axis = 0)
+    def entropy(self):
+        return tf.stack([tf.reduce_sum(selflogstd + .5 * np.log(2.0 * np.pi * np.e), axis=-1) for selflogstd in self.logstds],
+                          axis=0)
+    def sample(self):
+        return self.flat_mean + tf.exp(self.flat_logstd) * tf.random_normal(tf.shape(self.flat_mean))
+    def sample_symmetric(self):
+        noise = tf.random_normal(tf.shape(self.flat_mean))
+        return (self.flat_mean + tf.exp(self.flat_logstd) * noise, self.flat_mean - tf.exp(self.flat_logstd) * noise)
+                
+    def renyi(self, other, alpha=2.):
+        tol = 1e-45
+        assert isinstance(other, MultiGaussianVectorPd)
+        renyis = []
+        for selfmean, selflogstd, othermean, otherlogstd in zip(self.means, self.logstds, other.means, other.logstds):
+            var_alpha = alpha * tf.exp(2*otherlogstd) + (1. - alpha) * tf.exp(2*selflogstd)
+            renyis.append(alpha/2. * tf.reduce_sum(tf.square(selfmean - othermean) / (var_alpha + tol), axis=-1) - \
+                   1./(2*(alpha - 1)) * (tf.log(tf.reduce_prod(var_alpha, axis=-1) + tol) - 
+                       tf.log(tf.reduce_prod(tf.exp(2*selflogstd), axis=-1) + tol) * (1-alpha) 
+                                    - tf.log(tf.reduce_prod(tf.exp(otherlogstd), axis=-1) + tol) * alpha))
+        return tf.stack(renyis, axis=0)
 
 #Single distribution: use for higher order policy or on single state
 class CholeskyGaussianPd(Pd):

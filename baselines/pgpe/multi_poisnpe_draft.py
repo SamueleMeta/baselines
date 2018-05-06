@@ -156,8 +156,6 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         #Bound with gradient
         bound, grad = newpol.eval_bound_and_grad(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
-
-        
         if np.any(np.isnan(grad)):
             warnings.warn('Got NaN gradient! Stopping!')
             return rho, improvement
@@ -168,19 +166,22 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
             
         #Natural gradient
         fisher = newpol.eval_fisher()
-        natgrad = grad/fisher
-        grad_norm = np.dot(grad, natgrad)
+        natgrad = grad/(fisher + 1e-24)
         assert np.dot(grad, natgrad) >= 0
         
         #Step size search
-        alpha = 1./grad_norm**2
-
+        alpha = np.zeros(len(grad))
+        max_grad_norm = -np.inf
+        for i in range(len(grad)//2):    
+            grad_norm = grad[i]*natgrad[i] + grad[2*i]*natgrad[2*i]
+            max_grad_norm = max(grad_norm, max_grad_norm)
+            alpha[i] = 1. / grad_norm**2
+            alpha[2*i] = 1./grad_norm**2
         
-        if grad_norm < grad_tol:
+        if max_grad_norm < grad_tol:
             print("stopping - max_gradient norm < gradient_tol")
             return rho, improvement
 
-        """
         line_search = line_search_parabola if use_parabola else line_search_binary
         rho, epsilon, delta_bound, num_line_search = line_search(pol, 
                                                                  newpol, 
@@ -194,14 +195,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
                                                                  max_search_ite=max_search_ite,
                                                                  rmax=rmax,
                                                                  delta=delta)
-        """
-        rho = newpol.eval_params() + alpha*natgrad
-        epsilon = 1.
         newpol.set_params(rho)
-        delta_bound = newpol.eval_bound(actor_params, rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta) - bound
-        num_line_search = 0
-        
         improvement+=delta_bound
         print(fmtstr % (i+1, epsilon, np.amax(alpha*epsilon), num_line_search, grad_norm, delta_bound, improvement))
         if delta_bound < bound_tol:
@@ -249,8 +243,8 @@ def learn(env, pol_maker, gamma, batch_size, task_horizon, max_iterations,
         #Batch of episodes
         #TODO: try symmetric sampling
         with timed('Sampling'):
-            frozen_pol = pol.freeze()
             for ep in range(batch_size):
+                frozen_pol = pol.freeze()
                 theta = frozen_pol.resample()
                 actor_params.append(theta)
                 ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, task_horizon, feature_fun)

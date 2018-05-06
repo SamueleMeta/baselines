@@ -36,7 +36,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
     pol_maker = lambda name: PeMlpPolicy(name,
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[],
+                      hid_layers=[32, 32],
                       diagonal=True,
                       use_bias=False,
                       seed=seed)
@@ -48,21 +48,21 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               task_horizon=500,
               max_iterations=200,
               save_to=DIR,
-              verbose=2,
+              verbose=1,
               feature_fun=np.ravel,
               normalize=normalize,
               use_rmax=use_rmax,
               use_renyi=use_renyi,
-              max_offline_ite=10,
+              max_offline_ite=100,
               max_search_ite=30,
-              delta=0.2,
+              delta=0.49,
               shift=shift)
 
 if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--path', help='save here', type=str, default='temp')
-    parser.add_argument('--seed', help='RNG seed', type=int, default=None)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--shift', help='Normalize return?', type=int, default=0)
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
