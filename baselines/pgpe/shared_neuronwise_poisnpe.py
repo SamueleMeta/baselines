@@ -146,8 +146,9 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
     layer_lens = newpol.layer_lens
     n_bounds = len(layer_lens)
     def reassign(v):
-        v = np.repeat(v, layer_lens)
-        return np.concatenate((v, v))
+        mean = np.repeat(v, layer_lens)
+        logstd = np.sum(mean)
+        return np.concatenate((mean, np.atleast_1d(logstd)))
     improvement = np.zeros(n_bounds)    
     
     fmtstr = "%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g"
@@ -192,6 +193,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         """
         cum_layer_lens = np.cumsum(layer_lens)[:-1]
         grad_norms2 = grad*natgrad
+        grad_norms2 = np.concatenate((grad_norms2[:-1], np.repeat(grad_norms2[-1], sum(layer_lens))))
         grad_norms2 = np.reshape(grad_norms2, (2, len(grad_norms2)//2))
         grad_norms2 = np.sum(grad_norms2, axis=0)
         grad_norms2 = np.split(grad_norms2, cum_layer_lens)        

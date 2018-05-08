@@ -197,8 +197,17 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         grad_norms2 = np.split(grad_norms2, cum_layer_lens)        
         grad_norms2 = list(map(np.sum, grad_norms2))
         grad_norms2 = list(map(np.atleast_1d, grad_norms2))
+        
+        #GCA
+        #"""
+        k = np.argmax(grad_norms2)
+        alpha = np.zeros(len(grad_norms2))
+        alpha[k] = 1./grad_norms2[k]
+        """
         grad_norms2 = reassign(grad_norms2)
-        alpha = 1. / grad_norms2
+        alpha = 1./grad_norms2
+        #"""
+        alpha = reassign(alpha)
         grad_norms = np.sqrt(grad_norms2)
         if np.sum(grad_norms) < grad_tol:
             print("stopping - gradient norm < gradient_tol")

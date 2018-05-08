@@ -80,7 +80,7 @@ class MultiPeMlpPolicy(object):
         with tf.variable_scope('actor') as scope:
             self.actor_weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=scope.name)
-            self.layers = [tf.reshape(w, [-1]) for w in self.actor_weights]
+            self.layers = [v for w in self.actor_weights for v in (tf.unstack(w, axis=1) if len(w.shape)>1 else [w])]
             self.layer_lens = [w.shape[0].value for w in self.layers]
             print('# Independent Gaussians:', len(self.layer_lens))
             self.flat_actor_weights = tf.concat([tf.reshape(w, [-1]) for w in \
@@ -96,9 +96,18 @@ class MultiPeMlpPolicy(object):
             
             if diagonal:
                 #Diagonal covariance matrix; all stds initialized to 0
-                self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
-                                                                     shape=[n_actor_weights],
-                                               initializer=tf.initializers.constant(0.))
+                if self.linear:
+                    self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
+                                                                         shape=[n_actor_weights],
+                                                   initializer=tf.initializers.constant(0.))
+                else:
+                    logstd_inner = tf.get_variable(name='logstd_inner',
+                                                       shape=[n_actor_weights - self.layer_lens[-1]],
+                                                   initializer=tf.initializers.constant(0.))
+                    logstd_outer = tf.get_variable(name='logstd_outer',
+                                                       shape=[self.layer_lens[-1]],
+                                                   initializer=tf.initializers.constant(0.))
+                    self.higher_logstd = higher_logstd = tf.concat([logstd_inner, logstd_outer], axis=0)
                 pdparam = tf.concat([higher_mean, higher_mean * 0. + 
                                    higher_logstd], axis=0)
                 self.pdtype = pdtype = MultiGaussianVectorPdType(n_actor_weights.value) 
@@ -199,7 +208,7 @@ class MultiPeMlpPolicy(object):
             
             ob = np.ravel(ob)
             if self.use_bias:
-                np.append(ob, 1)
+                ob = np.append(ob, 1)
             ob = ob.reshape((self.ob_dim + self.use_bias, 1))
             theta = self.actor_params.reshape((self.ac_dim, self.ob_dim + self.use_bias))
             return np.ravel(np.dot(theta, ob))
@@ -328,7 +337,7 @@ class MultiPeMlpPolicy(object):
         else:
             ppf = sts.t.ppf(1 - delta, batch_size - 1)
         """
-        ppf = np.sqrt(1./delta - 1)
+        ppf = delta#np.sqrt(1./delta - 1)
         #"""
         
         index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
@@ -350,11 +359,11 @@ class MultiPeMlpPolicy(object):
         else:
             ppf = sts.t.ppf(1 - delta, batch_size - 1)
         """
-        ppf = np.sqrt(1./delta - 1)
+        ppf = delta#np.sqrt(1./delta - 1)
         #"""
         
         index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
-        bound_and_grad_getter = self._get_bound_grad[index]
+        bound_and_grad_getter = self._get_bound_grad[0]#index]
         
         bound, grad = bound_and_grad_getter(actor_params, rets, batch_size, ppf, rmax)
         return bound, grad
@@ -395,18 +404,18 @@ class MultiPeMlpPolicy(object):
         
         #All the bounds
         bounds = []
-        bounds.append(unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #000
-        bounds.append(unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #001
-        bounds.append(unn_ret_mean - self._ppf * self._rmax * iws2norm) #010
-        bounds.append(unn_ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #011
-        bounds.append(ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #100
-        bounds.append(ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #101
+        bounds.append(0)#unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #000
+        bounds.append(0)#unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #001
+        bounds.append(0)#unn_ret_mean - self._ppf * self._rmax * iws2norm) #010
+        bounds.append(0)#unn_ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #011
+        bounds.append(0)#ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #100
+        bounds.append(0)#ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #101
         bounds.append(ret_mean - self._ppf * self._rmax * iws2norm) #110
-        bounds.append(ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #111
+        bounds.append(0)#ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #111
         
         inputs = [self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax]
         self._get_bound = [U.function(inputs, [bounds[i]]) for i in range(len(bounds))]
         self._get_bound_grad = [U.function(inputs, [bounds[i], 
-                                                    U.flatgrad(bounds[i], self._higher_params)]) for i in range(len(bounds))]
+                                                    U.flatgrad(bounds[i], self._higher_params)]) for i in [6]]#range(len(bounds))]
     
     

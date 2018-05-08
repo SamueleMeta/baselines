@@ -288,7 +288,7 @@ class GaussianVectorPd(Pd):
         noise = tf.random_normal(tf.shape(self.mean))
         return (self.mean + self.std * noise, self.mean - self.std * noise)
     def renyi(self, other, alpha=2.):
-        tol = 1e-45
+        tol = 1e-24
         assert isinstance(other, GaussianVectorPd)
         var_alpha = alpha * tf.square(other.std) + (1. - alpha) * tf.square(self.std)
         return alpha/2. * tf.square(self.mean - other.mean) / (var_alpha + tol) + \

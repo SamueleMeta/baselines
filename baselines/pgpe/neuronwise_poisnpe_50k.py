@@ -262,7 +262,8 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
           save_to=None,
           delta=0.2,
           shift=False,
-          use_parabola=False):
+          use_parabola=False,
+          adaptive_batch=False):
     
     #Logger configuration
     format_strs = []
@@ -288,16 +289,23 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
             logger.log('Higher-order parameters: ', rho)
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
             
-        #Add 100 trajectories to the batch
+        #Add 50k samples to the batch
+        samples_to_get = initial_batch_size*task_horizon
+        tot_samples = 0
+        eps_this_iter = 0
         with timed('Sampling'):
             frozen_pol = pol.freeze()
-            for ep in range(initial_batch_size):
+            while tot_samples<samples_to_get:
+                eps_this_iter+=1
                 theta = frozen_pol.resample()
                 actor_params.append(theta)
-                ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, task_horizon, feature_fun)
+                _horizon = min(task_horizon, samples_to_get - tot_samples)
+                ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, _horizon, feature_fun)
+                tot_samples+=ep_len
                 rets.append(ret)
                 disc_rets.append(disc_ret)
                 lens.append(ep_len)
+            
         complete = len(rets)>=batch_size #Is the batch complete?
         #Normalize reward
         norm_disc_rets = np.array(disc_rets)
@@ -308,7 +316,7 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
         perf = np.mean(norm_disc_rets)
         logger.log('Performance: ', perf)
         
-        if complete and perf<promise and batch_size<5*initial_batch_size:
+        if adaptive_batch and complete and perf<promise and batch_size<5*initial_batch_size:
             #The policy is rejected (unless batch size is already maximal)
             iter_type = 0
             if verbose: logger.log('Rejecting policy (expected at least %f, got %f instead)!\nIncreasing batch_size' % 
@@ -374,16 +382,16 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
         logger.record_tabular('AvgNormIw', np.mean(iws))
         logger.record_tabular('VarNormIw', np.var(iws, ddof=1))
         logger.record_tabular('eRenyi2', eRenyi)
-        logger.record_tabular('AvgRet', np.mean(rets[-initial_batch_size:]))
-        logger.record_tabular('VanillaAvgRet', np.mean(rets[-initial_batch_size:]))
-        logger.record_tabular('VarRet', np.var(rets[-initial_batch_size:], ddof=1))
-        logger.record_tabular('VarDiscRet', np.var(norm_disc_rets[-initial_batch_size:], ddof=1))
-        logger.record_tabular('AvgDiscRet', np.mean(norm_disc_rets[-initial_batch_size:]))
+        logger.record_tabular('AvgRet', np.mean(rets[-eps_this_iter:]))
+        logger.record_tabular('VanillaAvgRet', np.mean(rets[-eps_this_iter:]))
+        logger.record_tabular('VarRet', np.var(rets[-eps_this_iter:], ddof=1))
+        logger.record_tabular('VarDiscRet', np.var(norm_disc_rets[-eps_this_iter:], ddof=1))
+        logger.record_tabular('AvgDiscRet', np.mean(norm_disc_rets[-eps_this_iter:]))
         logger.record_tabular('J', J)
         logger.record_tabular('VarJ', varJ)
-        logger.record_tabular('EpsThisIter', initial_batch_size)
+        logger.record_tabular('EpsThisIter', eps_this_iter)
         logger.record_tabular('BatchSize', batch_size)
-        logger.record_tabular('AvgEpLen', np.mean(lens[-initial_batch_size:]))
+        logger.record_tabular('AvgEpLen', np.mean(lens[-eps_this_iter:]))
         logger.dump_tabular()
         
         #Update behavioral
