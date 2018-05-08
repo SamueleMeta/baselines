@@ -80,7 +80,7 @@ class MultiPeMlpPolicy(object):
         with tf.variable_scope('actor') as scope:
             self.actor_weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=scope.name)
-            self.layers = [tf.reshape(w, [-1]) for w in self.actor_weights]
+            self.layers = [v for w in self.actor_weights for v in tf.unstack(w, axis=1)]
             self.layer_lens = [w.shape[0].value for w in self.layers]
             print('# Independent Gaussians:', len(self.layer_lens))
             self.flat_actor_weights = tf.concat([tf.reshape(w, [-1]) for w in \
@@ -96,9 +96,18 @@ class MultiPeMlpPolicy(object):
             
             if diagonal:
                 #Diagonal covariance matrix; all stds initialized to 0
-                self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
-                                                                     shape=[n_actor_weights],
-                                               initializer=tf.initializers.constant(0.))
+                if self.linear:
+                    self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
+                                                                         shape=[n_actor_weights],
+                                                   initializer=tf.initializers.constant(0.))
+                else:
+                    logstd_inner = tf.get_variable(name='logstd_inner',
+                                                       shape=[n_actor_weights - self.layer_lens[-1]],
+                                                   initializer=tf.initializers.constant(0.))
+                    logstd_outer = tf.get_variable(name='logstd_outer',
+                                                       shape=[self.layer_lens[-1]],
+                                                   initializer=tf.initializers.constant(0.))
+                    self.higher_logstd = higher_logstd = tf.concat([logstd_inner, logstd_outer], axis=0)
                 pdparam = tf.concat([higher_mean, higher_mean * 0. + 
                                    higher_logstd], axis=0)
                 self.pdtype = pdtype = MultiGaussianVectorPdType(n_actor_weights.value) 

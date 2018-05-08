@@ -9,8 +9,8 @@ import sys
 sys.path.append('/home/alberto/rllab')
 sys.path.append('/home/matteo/rllab')
 
-from baselines.policy.multi_pemlp_policy import MultiPeMlpPolicy
-import baselines.pgpe.multi_poisnpe as multipoisnpe
+from baselines.policy.shared_neuronwise_pemlp_policy import MultiPeMlpPolicy
+import baselines.pgpe.shared_neuronwise_poisnpe as multipoisnpe
 import numpy as np
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
@@ -35,14 +35,14 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
     pol_maker = lambda name: MultiPeMlpPolicy(name,
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[],
+                      hid_layers=[32],
                       use_bias=False,
                       seed=seed)
     
     multipoisnpe.learn(env,
               pol_maker,
               gamma=1.,
-              batch_size=100,
+              initial_batch_size=100,
               task_horizon=500,
               max_iterations=500,
               save_to=DIR,

@@ -45,7 +45,7 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
                 normalize=True,
                 use_rmax=True,
                 use_renyi=True,
-                max_search_ite=30, rmax=None, delta=0.2, reassign=None):
+                max_search_ite=30, rmax=None, delta=0.2):
     rho_init = newpol.eval_params()
     bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
@@ -61,7 +61,7 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
     epsilon = np.ones(n_bounds)
     
     for i in range(max_search_ite):
-        rho = rho_init + reassign(epsilon) * natgrad * alpha
+        rho = rho_init + np.concatenate((epsilon, epsilon)) * natgrad * alpha
         newpol.set_params(rho)
         bound = newpol.eval_bound(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
@@ -73,7 +73,7 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
 
         high = np.where(cond, high, epsilon)
         low = np.where(cond, epsilon, low)
-        rho_opt = np.where(reassign(cond), rho, rho_opt)
+        rho_opt = np.where(np.concatenate((cond, cond)), rho, rho_opt)
         if np.any(delta_bound>delta_bound_opt):
             i_opt = i
         delta_bound_opt = np.where(cond, delta_bound, delta_bound_opt)
@@ -142,13 +142,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
                      rmax=None, delta=0.2, use_parabola=False):
 
     rho = pol.eval_params()
-
-    layer_lens = newpol.layer_lens
-    n_bounds = len(layer_lens)
-    def reassign(v):
-        v = np.repeat(v, layer_lens)
-        return np.concatenate((v, v))
-    improvement = np.zeros(n_bounds)    
+    improvement = np.zeros(len(rho)//2)    
     
     fmtstr = "%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g"
     titlestr = "%6s %10s %10s %18s %18s %18s %18s"
@@ -190,14 +184,11 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
             print(rho)
             return rho, improvement
         """
-        cum_layer_lens = np.cumsum(layer_lens)[:-1]
         grad_norms2 = grad*natgrad
         grad_norms2 = np.reshape(grad_norms2, (2, len(grad_norms2)//2))
         grad_norms2 = np.sum(grad_norms2, axis=0)
-        grad_norms2 = np.split(grad_norms2, cum_layer_lens)        
-        grad_norms2 = list(map(np.sum, grad_norms2))
-        grad_norms2 = list(map(np.atleast_1d, grad_norms2))
-        grad_norms2 = reassign(grad_norms2)
+        grad_norms2 = np.atleast_1d(grad_norms2)
+        grad_norms2 = np.concatenate((grad_norms2, grad_norms2))
         alpha = 1. / grad_norms2
         grad_norms = np.sqrt(grad_norms2)
         if np.sum(grad_norms) < grad_tol:
@@ -209,7 +200,6 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         
         
         #"""
-        
         line_search = line_search_parabola if use_parabola else line_search_binary
         rho, epsilon, delta_bound, num_line_search = line_search(pol, 
                                                                  newpol, 
@@ -222,8 +212,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
                                                                  use_renyi=use_renyi,
                                                                  max_search_ite=max_search_ite,
                                                                  rmax=rmax,
-                                                                 delta=delta,
-                                                                 reassign=reassign)
+                                                                 delta=delta)
         """
         #No search
         rho = newpol.eval_params() + alpha*natgrad
@@ -237,7 +226,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         improvement+=delta_bound
         print(fmtstr % (i+1, 
                         np.linalg.norm(epsilon), 
-                        np.linalg.norm(alpha*reassign(epsilon)), 
+                        np.linalg.norm(alpha*np.concatenate((epsilon, epsilon))), 
                         num_line_search, 
                         grad_norm, 
                         np.amax(delta_bound), 

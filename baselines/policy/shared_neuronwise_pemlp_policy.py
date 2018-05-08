@@ -80,7 +80,7 @@ class MultiPeMlpPolicy(object):
         with tf.variable_scope('actor') as scope:
             self.actor_weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=scope.name)
-            self.layers = [tf.reshape(w, [-1]) for w in self.actor_weights]
+            self.layers = [v for w in self.actor_weights for v in tf.unstack(w, axis=1)]
             self.layer_lens = [w.shape[0].value for w in self.layers]
             print('# Independent Gaussians:', len(self.layer_lens))
             self.flat_actor_weights = tf.concat([tf.reshape(w, [-1]) for w in \
@@ -96,9 +96,10 @@ class MultiPeMlpPolicy(object):
             
             if diagonal:
                 #Diagonal covariance matrix; all stds initialized to 0
-                self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
-                                                                     shape=[n_actor_weights],
-                                               initializer=tf.initializers.constant(0.))
+                shared_higher_logstd = tf.get_variable(name='higher_logstd',
+                                                                         shape=[1],
+                                                   initializer=tf.initializers.constant(0.))
+                self.higher_logstd = higher_logstd = tf.concat([shared_higher_logstd]*n_actor_weights, axis=0)
                 pdparam = tf.concat([higher_mean, higher_mean * 0. + 
                                    higher_logstd], axis=0)
                 self.pdtype = pdtype = MultiGaussianVectorPdType(n_actor_weights.value) 
@@ -155,7 +156,7 @@ class MultiPeMlpPolicy(object):
 
         #Fisher computation (diagonal case)
         mean_fisher_diag = tf.exp(-2*self.higher_logstd)
-        cov_fisher_diag = mean_fisher_diag*0 + 2
+        cov_fisher_diag = tf.constant(2., shape=[1])
         self._fisher_diag = tf.concat([mean_fisher_diag, cov_fisher_diag], axis=0)
         self._get_fisher_diag = U.function([], [self._fisher_diag])
         
@@ -185,8 +186,9 @@ class MultiPeMlpPolicy(object):
             self.ob_dim = ob_dim
             self.ac_dim = ac_dim
             self.use_bias = use_bias
-            self.higher_mean = self.higher_params[:len(self.higher_params)//2]
-            self.higher_cov = np.diag(np.exp(2*self.higher_params[len(self.higher_params)//2:]))
+            self.higher_mean = self.higher_params[:len(self.higher_params)-1]
+            self.higher_cov = np.diag(np.exp(2*np.repeat(self.higher_params[len(self.higher_params)-1], 
+                                                                            len(self.higher_params) -1)))
             self.resample()
         
         def resample(self):
