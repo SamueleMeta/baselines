@@ -9,8 +9,8 @@ import sys
 sys.path.append('/home/alberto/rllab')
 sys.path.append('/home/matteo/rllab')
 
-from baselines.policy.shared_neuronwise_pemlp_policy import MultiPeMlpPolicy
-import baselines.pgpe.shared_neuronwise_poisnpe as multipoisnpe
+from baselines.policy.neuronwise_pemlp_policy import MultiPeMlpPolicy
+import baselines.pgpe.neuronwise_poisnpe_50k as multipoisnpe
 import numpy as np
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
@@ -35,8 +35,8 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
     pol_maker = lambda name: MultiPeMlpPolicy(name,
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[32],
-                      use_bias=False,
+                      hid_layers=[100,50,25],
+                      use_bias=True,
                       seed=seed)
     
     multipoisnpe.learn(env,
@@ -51,9 +51,9 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               normalize=normalize,
               use_rmax=use_rmax,
               use_renyi=use_renyi,
-              max_offline_ite=10,
+              max_offline_ite=20,
               max_search_ite=30,
-              delta=0.2,
+              delta=1.5,
               shift=shift)
 
 if __name__=='__main__':
@@ -64,7 +64,7 @@ if __name__=='__main__':
     parser.add_argument('--shift', help='Normalize return?', type=int, default=0)
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
-    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
+    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=0)
     args = parser.parse_args()
     train(args.seed,
           args.shift,
