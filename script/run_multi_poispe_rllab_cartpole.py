@@ -51,7 +51,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               normalize=normalize,
               use_rmax=use_rmax,
               use_renyi=use_renyi,
-              max_offline_ite=100,
+              max_offline_ite=10,
               max_search_ite=30,
               delta=0.2,
               shift=shift)
@@ -60,11 +60,11 @@ if __name__=='__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--path', help='save here', type=str, default='temp')
-    parser.add_argument('--seed', help='RNG seed', type=int, default=None)
-    parser.add_argument('--shift', help='Normalize return?', type=int, default=1)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+    parser.add_argument('--shift', help='Normalize return?', type=int, default=0)
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
-    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=0)
+    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
     args = parser.parse_args()
     train(args.seed,
           args.shift,

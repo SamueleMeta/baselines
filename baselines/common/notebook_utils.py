@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as sts
 
 
-def read_data(path, iters=300, default_batchsize=100):
+def read_data(path, iters=None, default_batchsize=100):
     df = pd.read_csv(path, encoding='utf-8')
     if iters: df = df.loc[:iters, :]
     if not 'BatchSize' in df: df['BatchSize'] = default_batchsize
@@ -79,7 +79,8 @@ def plot_data(path, key='VanillaAvgRet'):
 def print_ci(dfs, conf=0.95, key='CumAvgRet'):
     n_runs = len(dfs)
     mean_df, std_df = moments(dfs)
+    total_horizon = np.sum(mean_df['AvgEpLen'])
     mean = mean_df[key][len(mean_df)-1]
     std = std_df[key][len(mean_df)-1]
     interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
-    print('%f \u00B1 %f\t[%f, %f]' % (mean, std, interval[0], interval[1]))
+    print('%f \u00B1 %f\t[%f, %f]\t total horizon: %d' % (mean, std, interval[0], interval[1], int(total_horizon)))
