@@ -39,11 +39,11 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
                       use_bias=False,
                       seed=seed)
     
-    batch_size = 10
+    batch_size = 100
     gamma = 1.
     horizon = 500
     njobs = -1
-    sampler = ParallelSampler(env_maker, pol_maker, gamma, horizon, np.ravel, batch_size, njobs, seed)
+    sampler = None#ParallelSampler(env_maker, pol_maker, gamma, horizon, np.ravel, batch_size, njobs, seed)
     
     sess = U.make_session()
     sess.__enter__()

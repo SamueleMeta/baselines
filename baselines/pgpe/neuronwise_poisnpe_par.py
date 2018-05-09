@@ -297,7 +297,7 @@ def learn(env_maker, pol_maker, sampler,
                 seg = sampler.collect(rho)
                 _lens, _rets, _disc_rets, _actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
                 lens.extend(_lens)
-                rets.exted(_rets)
+                rets.extend(_rets)
                 disc_rets.extend(_disc_rets)
                 actor_params.extend(_actor_params)
                 samples_this_iter = sum(_lens)    
@@ -317,6 +317,7 @@ def learn(env_maker, pol_maker, sampler,
                     rets.append(ret)
                     disc_rets.append(disc_ret)
                     lens.append(ep_len)
+                samples_this_iter = tot_samples
                     
         complete = len(rets)>=batch_size #Is the batch complete?
         #Normalize reward
