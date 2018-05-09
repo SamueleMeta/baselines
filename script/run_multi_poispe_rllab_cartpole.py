@@ -9,8 +9,8 @@ import sys
 sys.path.append('/home/alberto/rllab')
 sys.path.append('/home/matteo/rllab')
 
-from baselines.policy.neuronwise_pemlp_policy import MultiPeMlpPolicy
-import baselines.pgpe.neuronwise_poisnpe_par as multipoisnpe
+from baselines.policy.pemlp_policy import PeMlpPolicy as MultiPeMlpPolicy
+import baselines.pgpe.poisnpe_50k as multipoisnpe
 from baselines.pgpe.parallel_sampler import ParallelSampler
 import numpy as np
 
@@ -36,14 +36,14 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
                       observation_space,
                       action_space,
                       hid_layers=[10,5,2],
-                      use_bias=True,
+                      use_bias=False,
                       seed=seed)
     
     batch_size = 100
     gamma = 1.
     horizon = 500
     njobs = -1
-    sampler = ParallelSampler(env_maker, pol_maker, gamma, horizon, np.ravel, batch_size, njobs, seed)
+    sampler = None#ParallelSampler(env_maker, pol_maker, gamma, horizon, np.ravel, batch_size, njobs, seed)
     
     sess = U.make_session()
     sess.__enter__()
@@ -64,11 +64,11 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               normalize=normalize,
               use_rmax=use_rmax,
               use_renyi=use_renyi,
-              max_offline_ite=20,
-              max_search_ite=1,
-              delta=1.,
+              max_offline_ite=10,
+              max_search_ite=30,
+              delta=0.99,
               shift=shift,
-              use_parabola=False)
+              use_parabola=True)
 
 if __name__=='__main__':
     import argparse

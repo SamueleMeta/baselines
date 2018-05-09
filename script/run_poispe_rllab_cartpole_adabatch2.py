@@ -10,7 +10,7 @@ sys.path.append('/home/alberto/rllab')
 sys.path.append('/home/matteo/rllab')
 
 from baselines.policy.pemlp_policy import PeMlpPolicy
-import baselines.pgpe.poisnpe_adabatch2 as poisnpe
+import baselines.pgpe.poisnpe_50k as poisnpe
 import numpy as np
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
@@ -36,7 +36,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
     pol_maker = lambda name: PeMlpPolicy(name,
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[16],
+                      hid_layers=[10,5,2],
                       diagonal=True,
                       use_bias=False,
                       seed=seed)
@@ -55,7 +55,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               use_renyi=use_renyi,
               max_offline_ite=100,
               max_search_ite=30,
-              delta=0.2,
+              delta=0.9,
               shift=shift)
 
 if __name__=='__main__':
@@ -66,7 +66,7 @@ if __name__=='__main__':
     parser.add_argument('--shift', help='Normalize return?', type=int, default=0)
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
-    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=0)
+    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
     args = parser.parse_args()
     train(args.seed,
           args.shift,
