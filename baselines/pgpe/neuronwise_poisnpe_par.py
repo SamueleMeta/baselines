@@ -119,20 +119,21 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
             warnings.warn('Got NaN bound value!')
         if np.all(np.isnan(bound)):    
             return rho_old, epsilon_old, delta_bound_old, i + 1
-
+	
+        epsilon_old = epsilon
+        
         epsilon = np.where(np.isnan(bound), bound, epsilon)
         bound = np.where(np.isnan(bound), -np.inf * np.ones(n_bounds), bound)
         delta_bound = bound - bound_init
 
-        epsilon_old = epsilon
-        
         epsilon = np.where(delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old,
                            epsilon_old*max_increase,
                            epsilon_old ** 2 / (2 * (epsilon_old - delta_bound)))
         epsilon = np.where(np.isnan(epsilon), epsilon_old, epsilon)
         
-        if np.any(delta_bound <= delta_bound_old + delta_bound_tol):
-            if np.any(delta_bound_old < 0.):
+
+        if np.all(delta_bound <= delta_bound_old + delta_bound_tol):
+            if np.all(delta_bound_old < 0.):
                 return rho_init, np.zeros(n_bounds), np.zeros(n_bounds), i + 1
             else:
                 return rho_old, epsilon_old, delta_bound_old, i+1
@@ -218,7 +219,6 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         grad_norms = np.sqrt(grad_norms2)
         if np.sum(grad_norms) < grad_tol:
             print("stopping - gradient norm < gradient_tol")
-            print(rho)
             return rho, improvement
         grad_norm = np.max(grad_norms)
         #"""
@@ -252,15 +252,14 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         newpol.set_params(rho)
         improvement+=delta_bound
         print(fmtstr % (i+1, 
-                        np.linalg.norm(epsilon), 
-                        np.linalg.norm(alpha*reassign(epsilon)), 
+                        np.max(epsilon), 
+                        np.max(alpha*reassign(epsilon)), 
                         num_line_search, 
                         grad_norm, 
                         np.amax(delta_bound), 
                         np.amax(improvement)))
         if np.all(delta_bound < bound_tol):
             print("stopping - delta bound < bound_tol")
-            print(rho)
             return rho, improvement
     
     return rho, improvement
