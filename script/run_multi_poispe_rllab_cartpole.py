@@ -10,15 +10,14 @@ sys.path.append('/home/alberto/rllab')
 sys.path.append('/home/matteo/rllab')
 
 from baselines.policy.neuronwise_pemlp_policy import MultiPeMlpPolicy
-import baselines.pgpe.neuronwise_poisnpe_50k as multipoisnpe
+import baselines.pgpe.neuronwise_poisnpe_par as multipoisnpe
+from baselines.pgpe.parallel_sampler import ParallelSampler
 import numpy as np
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from rllab.envs.box2d.cartpole_env import CartpoleEnv
 
 import baselines.common.tf_util as U
-sess = U.single_threaded_session()
-sess.__enter__()
 
 
 def train(seed, shift, normalize, use_rmax, use_renyi, path):
@@ -28,22 +27,36 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
     if not os.path.exists(DIR):
         os.makedirs(DIR)
     
-    env = CartpoleEnv()
-    env = Rllab2GymWrapper(env)
-    env.seed(seed)
-    
-    pol_maker = lambda name: MultiPeMlpPolicy(name,
+    def env_maker():
+        env = CartpoleEnv()
+        env = Rllab2GymWrapper(env)
+        return env
+        
+    pol_maker = lambda name, env: MultiPeMlpPolicy(name,
                       env.observation_space,
                       env.action_space,
-                      hid_layers=[100,50,25],
+                      hid_layers=[],
                       use_bias=True,
                       seed=seed)
     
-    multipoisnpe.learn(env,
+    batch_size = 100
+    gamma = 1.
+    horizon = 500
+    njobs = -1
+    sampler = ParallelSampler(env_maker, pol_maker, gamma, horizon, np.ravel, batch_size, njobs, seed)
+    
+    sess = U.make_session()
+    sess.__enter__()
+
+    U.set_global_seeds(seed)
+ 
+    
+    multipoisnpe.learn(env_maker,
               pol_maker,
-              gamma=1.,
-              initial_batch_size=100,
-              task_horizon=500,
+              sampler,
+              gamma=gamma,
+              initial_batch_size=batch_size,
+              task_horizon=horizon,
               max_iterations=500,
               save_to=DIR,
               verbose=1,
