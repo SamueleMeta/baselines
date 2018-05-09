@@ -292,23 +292,15 @@ def learn(env_maker, pol_maker, sampler,
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
             
         #Add 50k samples to the batch
-        samples_to_get = initial_batch_size*task_horizon
-        tot_samples = 0
-        eps_this_iter = 0
         with timed('Sampling'):
-            while tot_samples<samples_to_get:
-                seg = sampler.collect(rho)
-                _lens, _rets, _disc_rets, _actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
-                i = 0
-                while tot_samples<samples_to_get and i<len(_lens):
-                    lens.append(_lens[i])
-                    rets.append(_rets[i])
-                    disc_rets.append(_disc_rets[i])
-                    actor_params.append(_actor_params[i])
-                    tot_samples+=lens[i]
-                    i+=1
-                eps_this_iter+=i
+            seg = sampler.collect(rho)
+            lens, rets, disc_rets, actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
+            samples_this_iter = sum(lens)    
+            eps_this_iter = len(lens)
             """
+            samples_to_get = initial_batch_size*task_horizon
+            tot_samples = 0
+            eps_this_iter = 0
             frozen_pol = pol.freeze()
             while tot_samples<samples_to_get:
                 eps_this_iter+=1
@@ -407,7 +399,7 @@ def learn(env_maker, pol_maker, sampler,
         logger.record_tabular('EpsThisIter', eps_this_iter)
         logger.record_tabular('BatchSize', batch_size)
         logger.record_tabular('AvgEpLen', np.mean(lens[-eps_this_iter:]))
-        logger.record_tabular('SamplesThisIter', sum(lens))
+        logger.record_tabular('SamplesThisIter', samples_this_iter)
         logger.dump_tabular()
         
         #Update behavioral
