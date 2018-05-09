@@ -18,7 +18,7 @@ from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from rllab.envs.box2d.cartpole_env import CartpoleEnv
 
 import baselines.common.tf_util as U
-
+from baselines.common import set_global_seeds
 
 def train(seed, shift, normalize, use_rmax, use_renyi, path):
     index = int(str(int(shift)) + str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
@@ -32,10 +32,10 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
         env = Rllab2GymWrapper(env)
         return env
         
-    pol_maker = lambda name, env: MultiPeMlpPolicy(name,
-                      env.observation_space,
-                      env.action_space,
-                      hid_layers=[],
+    pol_maker = lambda name, observation_space, action_space: MultiPeMlpPolicy(name,
+                      observation_space,
+                      action_space,
+                      hid_layers=[100,50,25],
                       use_bias=True,
                       seed=seed)
     
@@ -48,7 +48,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
     sess = U.make_session()
     sess.__enter__()
 
-    U.set_global_seeds(seed)
+    set_global_seeds(seed)
  
     
     multipoisnpe.learn(env_maker,
