@@ -25,7 +25,7 @@ class PeMlpPolicy(object):
     def _init(self, ob_space, ac_space, hid_layers=[],
               deterministic=True, diagonal=True,
               use_bias=True, use_critic=False, 
-              seed=None):
+              seed=None, verbose=True):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -45,6 +45,7 @@ class PeMlpPolicy(object):
         self.ac_dim = ac_space.shape[0]
         self.ob_dim = ob_space.shape[0]
         self.linear = not hid_layers
+        self.verbose = verbose
 
         if seed is not None:
             set_global_seeds(seed)
@@ -296,7 +297,7 @@ class PeMlpPolicy(object):
             exponentiate: if true, actually returns e^Renyi(self||other)
         """
         if other is not self._renyi_other:
-            print('EXTENDING!!')
+            if self.verbose: print('EXTENDING!!')
             self._renyi_order = tf.placeholder(name='renyi_order', dtype=tf.float32, shape=[])
             self._renyi_other = other
             if order<1:
@@ -478,12 +479,14 @@ class PeMlpPolicy(object):
                 self._behavioral = behavioral
         batch_size = len(rets)
         
-        if not self.linear:
-            ppf = np.sqrt(1./delta - 1)
-        elif use_rmax:
+        #"""
+        ppf = np.sqrt(1./delta - 1)
+        """
+        if use_rmax:
             ppf = sts.norm.ppf(1 - delta)
         else:
             ppf = sts.t.ppf(1 - delta, batch_size - 1)
+        #"""
         
         index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
         bound_getter = self._get_bound[index]
@@ -497,10 +500,14 @@ class PeMlpPolicy(object):
                 self._behavioral = behavioral
         batch_size = len(rets)
         
+        #"""
+        ppf = np.sqrt(1./delta - 1)
+        """
         if use_rmax:
             ppf = sts.norm.ppf(1 - delta)
         else:
             ppf = sts.t.ppf(1 - delta, batch_size - 1)
+        #"""
         
         index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
         bound_and_grad_getter = self._get_bound_grad[index]
@@ -508,7 +515,7 @@ class PeMlpPolicy(object):
         return bound_and_grad_getter(actor_params, rets, batch_size, ppf, rmax)
     
     def _build_iw_graph(self, behavioral):
-        print('EXTENDING!!')
+        if self.verbose: print('EXTENDING!!')
         self._batch_size = batch_size = tf.placeholder(name='batchsize', dtype=tf.float32, shape=[])
         
         #Self-normalized importance weights

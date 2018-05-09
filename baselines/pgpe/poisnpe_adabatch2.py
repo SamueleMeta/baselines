@@ -19,11 +19,11 @@ import time
 from baselines.common import colorize
 
 @contextmanager
-def timed(msg):
-    print(colorize(msg, color='magenta'))
+def timed(msg, verbose=True):
+    if verbose: print(colorize(msg, color='magenta'))
     tstart = time.time()
     yield
-    print(colorize("done in %.3f seconds"%(time.time() - tstart), color='magenta'))
+    if verbose: print(colorize("done in %.3f seconds"%(time.time() - tstart), color='magenta'))
 
 def eval_trajectory(env, pol, gamma, task_horizon, feature_fun):
     ret = disc_ret = 0
@@ -136,14 +136,14 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
                      use_rmax=True,
                      use_renyi=True,
                      max_search_ite=30,
-                     rmax=None, delta=0.2, use_parabola=False):
+                     rmax=None, delta=0.2, use_parabola=False, verbose=True):
     improvement = 0.
     rho = pol.eval_params()
     
     
     fmtstr = "%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g"
     titlestr = "%6s %10s %10s %18s %18s %18s %18s"
-    print(titlestr % ("iter", "epsilon", "step size", "num line search", 
+    if verbose: print(titlestr % ("iter", "epsilon", "step size", "num line search", 
                       "gradient norm", "delta bound ite", "delta bound tot"))
     
     natgrad = None
@@ -172,8 +172,8 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
 
         grad_norm = np.sqrt(np.dot(grad, natgrad))
         if grad_norm < grad_tol:
-            print("stopping - gradient norm < gradient_tol")
-            print(rho)
+            if verbose: print("stopping - gradient norm < gradient_tol")
+            if verbose>1: print(rho)
             return rho, improvement
         
         #Step size search
@@ -193,10 +193,10 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
                                                                  delta=delta)
         newpol.set_params(rho)
         improvement+=delta_bound
-        print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, grad_norm, delta_bound, improvement))
+        if verbose: print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, grad_norm, delta_bound, improvement))
         if delta_bound < bound_tol:
-            print("stopping - delta bound < bound_tol")
-            print(rho)
+            if verbose: print("stopping - delta bound < bound_tol")
+            if verbose>1: print(rho)
             return rho, improvement
     
     return rho, improvement
@@ -241,7 +241,7 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
         if save_to: np.save(save_to + '/weights_' + str(it), rho)
             
         #Add 100 trajectories to the batch
-        with timed('Sampling'):
+        with timed('Sampling', verbose):
             frozen_pol = pol.freeze()
             for ep in range(initial_batch_size):
                 theta = frozen_pol.resample()
@@ -258,7 +258,7 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
         rmax = np.max(abs(norm_disc_rets))
         #Estimate online performance
         perf = np.mean(norm_disc_rets)
-        logger.log('Performance: ', perf)
+        print('Performance: ', perf)
         
         if complete and perf<promise and batch_size<5*initial_batch_size:
             #The policy is rejected (unless batch size is already maximal)
@@ -283,7 +283,7 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
             old_rets = rets
             old_disc_rets = disc_rets
             old_lens = lens
-            with timed('Optimizing offline'):
+            with timed('Optimizing offline', verbose):
                 rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
                                                     normalize=normalize,
                                                     use_rmax=use_rmax,
@@ -292,7 +292,8 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
                                                     max_search_ite=max_search_ite,
                                                     rmax=rmax,
                                                     delta=delta,
-                                                    use_parabola=use_parabola)
+                                                    use_parabola=use_parabola,
+                                                    verbose=verbose)
                 newpol.set_params(rho)
                 assert(improvement>=0.)
                 #Expected performance
@@ -316,6 +317,7 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
         logger.record_tabular('IterType', iter_type)
         logger.record_tabular('Bound', bound)
         logger.record_tabular('ESSClassic', ess)
+        logger.record_tabular('Delta', delta)
         logger.record_tabular('ESSRenyi', batch_size/eRenyi)
         logger.record_tabular('MaxVanillaIw', np.max(unn_iws))
         logger.record_tabular('MinVanillaIw', np.min(unn_iws))
