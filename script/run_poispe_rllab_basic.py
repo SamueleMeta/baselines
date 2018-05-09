@@ -33,7 +33,7 @@ sess.__enter__()
 
 
 def train(seed, shift, normalize, use_rmax, use_renyi, path, env_name, delta):
-    DIR = path + '/adapoisnpe/' + env_name +'/seed_' + str(seed)
+    DIR = path + '/' + env_name +'/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
