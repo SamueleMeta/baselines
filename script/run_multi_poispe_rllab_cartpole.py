@@ -35,8 +35,8 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
     pol_maker = lambda name, observation_space, action_space: MultiPeMlpPolicy(name,
                       observation_space,
                       action_space,
-                      hid_layers=[100,50,25],
-                      use_bias=True,
+                      hid_layers=[],
+                      use_bias=False,
                       seed=seed)
     
     batch_size = 100
