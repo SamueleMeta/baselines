@@ -293,26 +293,31 @@ def learn(env_maker, pol_maker, sampler,
             
         #Add 50k samples to the batch
         with timed('Sampling'):
-            seg = sampler.collect(rho)
-            lens, rets, disc_rets, actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
-            samples_this_iter = sum(lens)    
-            eps_this_iter = len(lens)
-            """
-            samples_to_get = initial_batch_size*task_horizon
-            tot_samples = 0
-            eps_this_iter = 0
-            frozen_pol = pol.freeze()
-            while tot_samples<samples_to_get:
-                eps_this_iter+=1
-                theta = frozen_pol.resample()
-                actor_params.append(theta)
-                _horizon = min(task_horizon, samples_to_get - tot_samples)
-                ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, _horizon, feature_fun)
-                tot_samples+=ep_len
-                rets.append(ret)
-                disc_rets.append(disc_ret)
-                lens.append(ep_len)
-            """
+            if sampler:
+                seg = sampler.collect(rho)
+                _lens, _rets, _disc_rets, _actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
+                lens.extend(_lens)
+                rets.exted(_rets)
+                disc_rets.extend(_disc_rets)
+                actor_params.extend(_actor_params)
+                samples_this_iter = sum(_lens)    
+                eps_this_iter = len(_lens)
+            else:
+                samples_to_get = initial_batch_size*task_horizon
+                tot_samples = 0
+                eps_this_iter = 0
+                frozen_pol = pol.freeze()
+                while tot_samples<samples_to_get:
+                    eps_this_iter+=1
+                    theta = frozen_pol.resample()
+                    actor_params.append(theta)
+                    _horizon = min(task_horizon, samples_to_get - tot_samples)
+                    ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, _horizon, feature_fun)
+                    tot_samples+=ep_len
+                    rets.append(ret)
+                    disc_rets.append(disc_ret)
+                    lens.append(ep_len)
+                    
         complete = len(rets)>=batch_size #Is the batch complete?
         #Normalize reward
         norm_disc_rets = np.array(disc_rets)

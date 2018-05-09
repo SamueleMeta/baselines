@@ -39,7 +39,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
                       use_bias=False,
                       seed=seed)
     
-    batch_size = 100
+    batch_size = 10
     gamma = 1.
     horizon = 500
     njobs = -1

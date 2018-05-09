@@ -4,7 +4,6 @@ import gym
 from baselines.common.distributions import MultiGaussianVectorPdType
 import numpy as np
 from baselines.common import set_global_seeds
-import scipy.stats as sts
 
 """References
 PGPE: Sehnke, Frank, et al. "Policy gradients with parameter-based exploration for
@@ -45,6 +44,8 @@ class MultiPeMlpPolicy(object):
         self.ac_dim = ac_space.shape[0]
         self.ob_dim = ob_space.shape[0]
         self.linear = not hid_layers
+        
+        print('BUILDING!')
 
         if seed is not None:
             set_global_seeds(seed)
@@ -96,18 +97,9 @@ class MultiPeMlpPolicy(object):
             
             if diagonal:
                 #Diagonal covariance matrix; all stds initialized to 0
-                if self.linear:
-                    self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
+                self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
                                                                          shape=[n_actor_weights],
                                                    initializer=tf.initializers.constant(0.))
-                else:
-                    logstd_inner = tf.get_variable(name='logstd_inner',
-                                                       shape=[n_actor_weights - self.layer_lens[-1]],
-                                                   initializer=tf.initializers.constant(0.))
-                    logstd_outer = tf.get_variable(name='logstd_outer',
-                                                       shape=[self.layer_lens[-1]],
-                                                   initializer=tf.initializers.constant(0.))
-                    self.higher_logstd = higher_logstd = tf.concat([logstd_inner, logstd_outer], axis=0)
                 pdparam = tf.concat([higher_mean, higher_mean * 0. + 
                                    higher_logstd], axis=0)
                 self.pdtype = pdtype = MultiGaussianVectorPdType(n_actor_weights.value) 
@@ -117,9 +109,6 @@ class MultiPeMlpPolicy(object):
         #Sample actor weights
         self.pd = pdtype.pdfromflat(pdparam, self.layer_lens)
         sampled_actor_params = self.pd.sample()
-        symm_sampled_actor_params = self.pd.sample_symmetric()
-        self._sample_symm_actor_params = U.function(
-            [],list(symm_sampled_actor_params))
         self._sample_actor_params = U.function([], [sampled_actor_params])
             
         #Assign actor weights
@@ -224,11 +213,6 @@ class MultiPeMlpPolicy(object):
                                   self.ob_dim,
                                   self.ac_dim,
                                   self.use_bias)
-
-    def act_with(self, ob, actor_params):
-        self.set_actor_params(actor_params)
-        return self.act(ob)
-
     def resample(self):
         """Resample actor params
         
@@ -255,9 +239,6 @@ class MultiPeMlpPolicy(object):
         """Sample params for an actor (without using them)"""
         sampled_actor_params = self._sample_actor_params()[0]
         return sampled_actor_params
-
-    def draw_symmetric_actor_params(self):
-        return tuple(self._sample_symm_actor_params())
 
     def eval_actor_params(self):
         """Get actor params as last assigned"""
@@ -287,7 +268,7 @@ class MultiPeMlpPolicy(object):
                 renyi = self.pd.renyi(other.pd, alpha=self._renyi_order) 
                 self._get_renyi = U.function([self._renyi_order], [renyi])
 
-        return np.sum(self._get_renyi(order)[0])
+        return self._get_renyi(order)[0]
 
     def eval_fisher(self):
         if not self.diagonal:
@@ -325,55 +306,40 @@ class MultiPeMlpPolicy(object):
             return self._get_unn_iws(actor_params)[0]
     
     def eval_bound(self, actor_params, rets, behavioral, rmax, normalize=True,
-                   use_rmax = True, use_renyi=True, delta=0.2):
+                   use_rmax = True, use_renyi=True, lamb=2.):
+        index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
         if behavioral is not self._behavioral:
-                self._build_iw_graph(behavioral)
+                self._build_iw_graph(behavioral, index)
                 self._behavioral = behavioral
         batch_size = len(rets)
-        
-        """
-        if use_rmax:
-            ppf = sts.norm.ppf(1 - delta)
-        else:
-            ppf = sts.t.ppf(1 - delta, batch_size - 1)
-        """
-        ppf = delta#np.sqrt(1./delta - 1)
-        #"""
-        
-        index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
-        bound_getter = self._get_bound[index]
+        ppf = lamb
+        bound_getter = self._get_bound
         
         bound = bound_getter(actor_params, rets, batch_size, ppf, rmax)[0]
         return bound
     
     def eval_bound_and_grad(self, actor_params, rets, behavioral, rmax, normalize=True,
-                   use_rmax=True, use_renyi=True, delta=0.2):
+                   use_rmax=True, use_renyi=True, lamb=2.):
+        index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
         if behavioral is not self._behavioral:
-                self._build_iw_graph(behavioral)
+                self._build_iw_graph(behavioral, index)
                 self._behavioral = behavioral
         batch_size = len(rets)
+        ppf = lamb
+        bound_and_grad_getter = self._get_bound_grad
         
-        """
-        if use_rmax:
-            ppf = sts.norm.ppf(1 - delta)
-        else:
-            ppf = sts.t.ppf(1 - delta, batch_size - 1)
-        """
-        ppf = delta#np.sqrt(1./delta - 1)
-        #"""
-        
-        index = int(str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
-        bound_and_grad_getter = self._get_bound_grad[0]#index]
+        bound = self.eval_bound(actor_params, rets, behavioral, rmax, normalize,
+                   use_rmax, use_renyi, lamb)
+        print(bound)
         
         bound, grad = bound_and_grad_getter(actor_params, rets, batch_size, ppf, rmax)
         return bound, grad
     
-    def _build_iw_graph(self, behavioral):
+    def _build_iw_graph(self, behavioral, bound_index):
         print('EXTENDING!!')
         self._batch_size = batch_size = tf.placeholder(name='batchsize', dtype=tf.float32, shape=[])
         
         #Self-normalized importance weights
-        #unn_iws = self._probs/behavioral._probs
         unn_iws = tf.exp(self.pd.logp(self._actor_params_in) - 
                     behavioral.pd.logp(self._actor_params_in))
         iws = unn_iws/tf.reduce_sum(unn_iws, axis=0)
@@ -381,41 +347,57 @@ class MultiPeMlpPolicy(object):
         self._get_iws = U.function([self._actor_params_in], [iws])
         
         #Offline performance
-        ret_mean = tf.reduce_sum(tf.expand_dims(self._rets_in, -1) * iws, axis=0)
-        unn_ret_mean = tf.reduce_mean(tf.expand_dims(self._rets_in, -1) * unn_iws, axis=0)
-        self._get_off_ret_mean = U.function([self._rets_in, self._actor_params_in], [ret_mean])
-        ret_std = tf.sqrt(tf.reduce_sum(iws ** 2 * (tf.expand_dims(self._rets_in, -1) - ret_mean) ** 2) * batch_size)
-        self._get_off_ret_std = U.function([self._rets_in, self._actor_params_in, self._batch_size], [ret_std])
+        if bound_index>3:
+            ret_mean = tf.reduce_sum(tf.expand_dims(self._rets_in, -1) * iws, axis=0)
+            self._get_off_ret_mean = U.function([self._rets_in, self._actor_params_in], [ret_mean])    
+            ret_std = tf.sqrt(tf.reduce_sum(iws ** 2 * (tf.expand_dims(self._rets_in, -1) - ret_mean) ** 2) * batch_size)
+            self._get_off_ret_std = U.function([self._rets_in, self._actor_params_in, self._batch_size], [ret_std])
+        else:
+            unn_ret_mean = tf.reduce_mean(tf.expand_dims(self._rets_in, -1) * unn_iws, axis=0)
+            self._get_off_ret_mean = U.function([self._rets_in, self._actor_params_in], [unn_ret_mean])
+            unn_ret_std = tf.sqrt(tf.reduce_sum((unn_iws*tf.expand_dims(self._rets_in, -1) - ret_mean) ** 2) / (batch_size - 1))
+            self._get_off_ret_std = U.function([self._rets_in, self._actor_params_in, self._batch_size], [unn_ret_std])
                 
         #Renyi
-        renyi = self.pd.renyi(behavioral.pd)
-        renyi = tf.where(tf.is_nan(renyi), tf.constant(np.inf, shape=renyi.shape), renyi)
-        renyi = tf.where(renyi<0., tf.constant(np.inf, shape=renyi.shape), renyi)
-        
-        #Weight norm
-        iws2norm = tf.norm(iws, axis=0)
-        
+        if bound_index % 2 !=0:
+            renyi = self.pd.renyi(behavioral.pd)
+            renyi = tf.where(tf.is_nan(renyi), tf.constant(np.inf, shape=renyi.shape), renyi)
+            renyi = tf.where(renyi<0., tf.constant(np.inf, shape=renyi.shape), renyi)
+        else:            
+            #Weight norm
+            iws2norm = tf.norm(iws, axis=0)
+            
         #Return properties
-        self._rmax = tf.placeholder(name='R_max', dtype=tf.float32, shape=[])
-        on_ret_mean, on_ret_var = tf.nn.moments(self._rets_in, axes=[0])
+        if bound_index in [2, 3, 6, 7]:
+            self._rmax = tf.placeholder(name='R_max', dtype=tf.float32, shape=[])
+        else:
+            on_ret_mean, on_ret_var = tf.nn.moments(self._rets_in, axes=[0])
         
         #Penalization coefficient
         self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
         
         #All the bounds
-        bounds = []
-        bounds.append(0)#unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #000
-        bounds.append(0)#unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #001
-        bounds.append(0)#unn_ret_mean - self._ppf * self._rmax * iws2norm) #010
-        bounds.append(0)#unn_ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #011
-        bounds.append(0)#ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #100
-        bounds.append(0)#ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #101
-        bounds.append(ret_mean - self._ppf * self._rmax * iws2norm) #110
-        bounds.append(0)#ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #111
+        if bound_index==0:
+            bound = unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm
+        elif bound_index==1:
+            bound = unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)
+        elif bound_index==2:
+            bound = unn_ret_mean - self._ppf * self._rmax * iws2norm
+        elif bound_index==3:
+            bound = unn_ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)
+        elif bound_index==4:
+            bound = ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm
+        elif bound_index==5:
+            bound = ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)
+        elif bound_index==6:
+            bound = ret_mean - self._ppf * self._rmax * iws2norm
+        elif bound_index==7:
+            bound = ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)
+        else:
+            raise NotImplementedError
+        
+        bound_grad = U.flatgrad(bound, self._higher_params)
         
         inputs = [self._actor_params_in, self._rets_in, self._batch_size, self._ppf, self._rmax]
-        self._get_bound = [U.function(inputs, [bounds[i]]) for i in range(len(bounds))]
-        self._get_bound_grad = [U.function(inputs, [bounds[i], 
-                                                    U.flatgrad(bounds[i], self._higher_params)]) for i in [6]]#range(len(bounds))]
-    
-    
+        self._get_bound = U.function(inputs, [bound])
+        self._get_bound_grad = U.function(inputs, [bound, bound_grad])
