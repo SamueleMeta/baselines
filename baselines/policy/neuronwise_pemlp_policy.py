@@ -15,6 +15,7 @@ class MultiPeMlpPolicy(object):
     """Multi-layer-perceptron policy with Gaussian parameter-based exploration"""
     def __init__(self, name, *args, **kwargs):
         with tf.variable_scope(name):
+            self.name = name
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
             U.initialize()
@@ -45,7 +46,7 @@ class MultiPeMlpPolicy(object):
         self.ob_dim = ob_space.shape[0]
         self.linear = not hid_layers
         
-        print('BUILDING!')
+        print('Building graph for %s' % self.name)
 
         if seed is not None:
             set_global_seeds(seed)
@@ -157,8 +158,10 @@ class MultiPeMlpPolicy(object):
         self._fisher_diag = tf.concat([mean_fisher_diag, cov_fisher_diag], axis=0)
         self._get_fisher_diag = U.function([], [self._fisher_diag])
         
+        #Lazy initialization
         self._behavioral = None
         self._renyi_other = None
+        self._get_renyi = None
         
     #Black box usage
     def act(self, ob, resample=False):
@@ -249,26 +252,18 @@ class MultiPeMlpPolicy(object):
         self._set_actor_params(new_actor_params)
 
     #Distribution properties
-    def eval_renyi(self, other, order=2):
-        """Renyi divergence 
-            Special case: order=1 is kl divergence
+    def eval_renyi(self, other):
+        """Renyi-2 divergence 
         
         Params:
             other: policy to evaluate the distance from
-            order: order of the Renyi divergence
-            exponentiate: if true, actually returns e^Renyi(self||other)
         """
-        if other is not self._renyi_other:
-            print('EXTENDING!!')
-            self._renyi_order = tf.placeholder(name='renyi_order', dtype=tf.float32, shape=[])
+        if self._get_renyi is None or other is not self._renyi_other or other is not self._behavioral:
+            print('Extending the graph for Renyi computation (%s, %s)' % (self.name, other.name))
             self._renyi_other = other
-            if order<1:
-                raise ValueError('Order must be >= 1')
-            else:   
-                renyi = self.pd.renyi(other.pd, alpha=self._renyi_order) 
-                self._get_renyi = U.function([self._renyi_order], [renyi])
-
-        return self._get_renyi(order)[0]
+            renyi = self.pd.renyi(other.pd, alpha=2) 
+            self._get_renyi = U.function([], [renyi])
+        return self._get_renyi()[0]
 
     def eval_fisher(self):
         if not self.diagonal:
@@ -330,13 +325,12 @@ class MultiPeMlpPolicy(object):
         
         bound = self.eval_bound(actor_params, rets, behavioral, rmax, normalize,
                    use_rmax, use_renyi, lamb)
-        print(bound)
         
         bound, grad = bound_and_grad_getter(actor_params, rets, batch_size, ppf, rmax)
         return bound, grad
     
     def _build_iw_graph(self, behavioral, bound_index):
-        print('EXTENDING!!')
+        print('Extending the graph for off-policy stuff (%s, %s)' % (self.name, behavioral.name))
         self._batch_size = batch_size = tf.placeholder(name='batchsize', dtype=tf.float32, shape=[])
         
         #Self-normalized importance weights
@@ -363,8 +357,10 @@ class MultiPeMlpPolicy(object):
             renyi = self.pd.renyi(behavioral.pd)
             renyi = tf.where(tf.is_nan(renyi), tf.constant(np.inf, shape=renyi.shape), renyi)
             renyi = tf.where(renyi<0., tf.constant(np.inf, shape=renyi.shape), renyi)
+            self._get_renyi = U.function([],[renyi])
         else:            
             #Weight norm
+            self._get_renyi = None
             iws2norm = tf.norm(iws, axis=0)
             
         #Return properties

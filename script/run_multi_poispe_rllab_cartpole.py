@@ -35,15 +35,15 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
     pol_maker = lambda name, observation_space, action_space: MultiPeMlpPolicy(name,
                       observation_space,
                       action_space,
-                      hid_layers=[],
-                      use_bias=False,
+                      hid_layers=[10,5,2],
+                      use_bias=True,
                       seed=seed)
     
     batch_size = 100
     gamma = 1.
     horizon = 500
     njobs = -1
-    sampler = None#ParallelSampler(env_maker, pol_maker, gamma, horizon, np.ravel, batch_size, njobs, seed)
+    sampler = ParallelSampler(env_maker, pol_maker, gamma, horizon, np.ravel, batch_size, njobs, seed)
     
     sess = U.make_session()
     sess.__enter__()
@@ -66,8 +66,9 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               use_renyi=use_renyi,
               max_offline_ite=20,
               max_search_ite=30,
-              delta=1.5,
-              shift=shift)
+              delta=2.,
+              shift=shift,
+              use_parabola=True)
 
 if __name__=='__main__':
     import argparse
@@ -77,7 +78,7 @@ if __name__=='__main__':
     parser.add_argument('--shift', help='Normalize return?', type=int, default=0)
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
-    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=0)
+    parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
     args = parser.parse_args()
     train(args.seed,
           args.shift,

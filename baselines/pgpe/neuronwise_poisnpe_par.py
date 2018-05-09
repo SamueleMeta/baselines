@@ -51,7 +51,7 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
                                                          normalize, use_rmax, use_renyi, delta)
     n_bounds = len(bound_init)
     low = np.zeros(n_bounds)
-    high = np.array([np.nan]*n_bounds)
+    high = np.nan * np.ones(n_bounds)
 
     #old_delta_bound = 0.
     rho_opt = rho_init
@@ -70,6 +70,7 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
         cond = np.logical_not(cond)
         if np.any(np.isnan(bound)):
             warnings.warn('Got NaN bound value')
+        delta_bound = np.where(np.isnan(delta_bound), -np.inf*np.ones(n_bounds), delta_bound)
 
         high = np.where(cond, high, epsilon)
         low = np.where(cond, epsilon, low)
@@ -92,42 +93,57 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
                 normalize=True,
                 use_rmax=True,
                 use_renyi=True,
-                max_search_ite=30, rmax=None, delta=0.2):
-    epsilon = 1.
-    epsilon_old = 0.
-    max_increase=2. 
-    delta_bound_tol=1e-4
-    delta_bound_old = -np.inf
+                max_search_ite=30, rmax=None, delta=0.2, reassign=None):
+    
+    rho_init = newpol.eval_params()
     bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
-    rho_old = rho_init = newpol.eval_params()
+    n_bounds = len(bound_init)
+    epsilon = np.ones(n_bounds)
+    epsilon_old = np.zeros(n_bounds)
+    max_increase=2. 
+    delta_bound_tol=1e-4
+    delta_bound_old = -np.inf * np.ones(n_bounds)
+    
+    rho_old = rho_init
 
     for i in range(max_search_ite):
 
-        rho = rho_init + epsilon * alpha * natgrad
+        rho = rho_init + reassign(epsilon) * alpha * natgrad
         newpol.set_params(rho)
 
         bound = newpol.eval_bound(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
 
-        if np.isnan(bound):
-            warnings.warn('Got NaN bound value: rolling back!')
+        if np.any(np.isnan(bound)):
+            warnings.warn('Got NaN bound value!')
+        if np.all(np.isnan(bound)):    
             return rho_old, epsilon_old, delta_bound_old, i + 1
 
+        epsilon = np.where(np.isnan(bound), bound, epsilon)
+        bound = np.where(np.isnan(bound), -np.inf * np.ones(n_bounds), bound)
         delta_bound = bound - bound_init
 
         epsilon_old = epsilon
         
-        if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
-            epsilon = epsilon_old * max_increase
-        else:
-            epsilon = epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
+        epsilon = np.where(delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old,
+                           epsilon_old*max_increase,
+                           epsilon_old ** 2 / (2 * (epsilon_old - delta_bound)))
+        epsilon = np.where(np.isnan(epsilon), epsilon_old, epsilon)
         
-        if delta_bound <= delta_bound_old + delta_bound_tol:
-            if delta_bound_old < 0.:
-                return rho_init, 0., 0., i+1
+        if np.any(delta_bound <= delta_bound_old + delta_bound_tol):
+            if np.any(delta_bound_old < 0.):
+                return rho_init, np.zeros(n_bounds), np.zeros(n_bounds), i + 1
             else:
                 return rho_old, epsilon_old, delta_bound_old, i+1
+        epsilon = np.where(np.logical_and(delta_bound <= delta_bound_old + delta_bound_tol,
+                                              delta_bound_old < 0.),
+                           np.zeros(n_bounds),
+                           epsilon)
+        epsilon = np.where(np.logical_and(delta_bound <= delta_bound_old + delta_bound_tol,
+                                              delta_bound_old >= 0.),
+                           epsilon_old,
+                           epsilon)
 
         delta_bound_old = delta_bound
         rho_old = rho
@@ -379,13 +395,13 @@ def learn(env_maker, pol_maker, sampler,
         iws = unn_iws/np.sum(unn_iws)
         ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
         J, varJ = newpol.eval_performance(actor_params, norm_disc_rets, behavioral=pol)
-        eRenyi = np.exp(newpol.eval_renyi(pol))
+        renyi = np.max(newpol.eval_renyi(pol))
         bound = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
         logger.record_tabular('IterType', iter_type)
         logger.record_tabular('Bound', np.max(bound))
         logger.record_tabular('ESSClassic', ess)
-        logger.record_tabular('ESSRenyi', batch_size/eRenyi)
+        logger.record_tabular('ESSRenyi', batch_size/np.exp(renyi))
         logger.record_tabular('MaxVanillaIw', np.max(unn_iws))
         logger.record_tabular('MinVanillaIw', np.min(unn_iws))
         logger.record_tabular('AvgVanillaIw', np.mean(unn_iws))
@@ -394,7 +410,7 @@ def learn(env_maker, pol_maker, sampler,
         logger.record_tabular('MinNormIw', np.min(iws))
         logger.record_tabular('AvgNormIw', np.mean(iws))
         logger.record_tabular('VarNormIw', np.var(iws, ddof=1))
-        logger.record_tabular('eRenyi2', eRenyi)
+        logger.record_tabular('renyi2', renyi)
         logger.record_tabular('AvgRet', np.mean(rets[-eps_this_iter:]))
         logger.record_tabular('VanillaAvgRet', np.mean(rets[-eps_this_iter:]))
         logger.record_tabular('VarRet', np.var(rets[-eps_this_iter:], ddof=1))
