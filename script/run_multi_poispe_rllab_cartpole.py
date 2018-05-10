@@ -10,7 +10,7 @@ sys.path.append('/home/alberto/rllab')
 sys.path.append('/home/matteo/rllab')
 
 from baselines.policy.neuronwise_pemlp_policy import MultiPeMlpPolicy
-import baselines.pgpe.coordinate_poisnpe_par as multipoisnpe
+import baselines.pgpe.neuronwise_poisnpe_par as multipoisnpe
 from baselines.pgpe.parallel_sampler import ParallelSampler
 import numpy as np
 
@@ -35,8 +35,8 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
     pol_maker = lambda name, observation_space, action_space: MultiPeMlpPolicy(name,
                       observation_space,
                       action_space,
-                      hid_layers=[10,5,2],
-                      use_bias=False,
+                      hid_layers=[100,50,25],
+                      use_bias=True,
                       seed=seed)
     
     batch_size = 100
@@ -65,8 +65,8 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               use_rmax=use_rmax,
               use_renyi=use_renyi,
               max_offline_ite=10,
-              max_search_ite=30,
-              delta=0.5,
+              max_search_ite=0,
+              delta=0.1,
               shift=shift,
               use_parabola=True)
 

@@ -59,7 +59,14 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
     delta_bound_opt = np.zeros(n_bounds)
     epsilon_opt = np.zeros(n_bounds)
     epsilon = np.ones(n_bounds)
-    
+
+    if max_search_ite<=0:
+        rho = rho_init + alpha*natgrad
+        newpol.set_params(rho)
+        delta_bound = newpol.eval_bound(actor_params, rets, pol, rmax,
+                                      normalize, use_rmax, use_renyi, delta) - bound_init
+        return rho, np.ones(len(epsilon)), delta_bound, 0   
+
     for i in range(max_search_ite):
         rho = rho_init + reassign(epsilon) * natgrad * alpha
         newpol.set_params(rho)
@@ -106,6 +113,12 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
     delta_bound_old = -np.inf * np.ones(n_bounds)
     
     rho_old = rho_init
+    if max_search_ite<=0:
+        rho = rho_init + alpha*natgrad
+        newpol.set_params(rho)
+        delta_bound = newpol.eval_bound(actor_params, rets, pol, rmax, 
+                                 normalize, use_rmax, use_renyi, delta) - bound_init
+        return rho, np.ones(len(epsilon)), delta_bound, 0
 
     for i in range(max_search_ite):
 
