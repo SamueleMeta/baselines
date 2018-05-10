@@ -9,8 +9,8 @@ import sys
 sys.path.append('/home/alberto/rllab')
 sys.path.append('/home/matteo/rllab')
 
-from baselines.policy.pemlp_policy import PeMlpPolicy as MultiPeMlpPolicy
-import baselines.pgpe.poisnpe_50k as multipoisnpe
+from baselines.policy.neuronwise_pemlp_policy import MultiPeMlpPolicy
+import baselines.coordinate_poisnpe_par as multipoisnpe
 from baselines.pgpe.parallel_sampler import ParallelSampler
 import numpy as np
 
