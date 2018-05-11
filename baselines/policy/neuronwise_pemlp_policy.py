@@ -307,7 +307,10 @@ class MultiPeMlpPolicy(object):
                 self._build_iw_graph(behavioral, index)
                 self._behavioral = behavioral
         batch_size = len(rets)
-        ppf = lamb
+        if lamb>1.:
+            ppf = lamb
+        else:
+            ppf = np.sqrt(1./lamb -1)
         bound_getter = self._get_bound
         
         bound = bound_getter(actor_params, rets, batch_size, ppf, rmax)[0]
@@ -320,7 +323,10 @@ class MultiPeMlpPolicy(object):
                 self._build_iw_graph(behavioral, index)
                 self._behavioral = behavioral
         batch_size = len(rets)
-        ppf = lamb
+        if lamb>1.:
+            ppf = lamb
+        else:
+            ppf = np.sqrt(1./lamb -1)
         bound_and_grad_getter = self._get_bound_grad
         
         bound = self.eval_bound(actor_params, rets, behavioral, rmax, normalize,

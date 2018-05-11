@@ -121,8 +121,9 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
         return rho, np.ones(len(epsilon)), delta_bound, 0
 
     for i in range(max_search_ite):
-
-        rho = rho_init + reassign(epsilon) * alpha * natgrad
+        stepsize = alpha*reassign(epsilon)
+        stepsize = np.where(np.isnan(stepsize), np.zeros(len(stepsize)), stepsize)
+        rho = rho_init + stepsize * natgrad
         newpol.set_params(rho)
 
         bound = newpol.eval_bound(actor_params, rets, pol, rmax,
@@ -134,16 +135,11 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
             return rho_old, epsilon_old, delta_bound_old, i + 1
 	
         epsilon_old = epsilon
-        
-        epsilon = np.where(np.isnan(bound), bound, epsilon)
-        bound = np.where(np.isnan(bound), -np.inf * np.ones(n_bounds), bound)
         delta_bound = bound - bound_init
 
         epsilon = np.where(delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old,
                            epsilon_old*max_increase,
                            epsilon_old ** 2 / (2 * (epsilon_old - delta_bound)))
-        epsilon = np.where(np.isnan(epsilon), epsilon_old, epsilon)
-        
 
         if np.all(delta_bound <= delta_bound_old + delta_bound_tol):
             if np.all(delta_bound_old < 0.):
@@ -159,9 +155,15 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
                            epsilon_old,
                            epsilon)
 
+        epsilon = np.where(np.isnan(epsilon), np.zeros(len(epsilon)), epsilon)
+        delta_bound = np.where(np.isnan(delta_bound), np.zeros(len(delta_bound)), delta_bound)
+
         delta_bound_old = delta_bound
         rho_old = rho
 
+    delta_bound_old = np.where(np.isnan(epsilon_old), np.zeros(len(delta_bound_old)), delta_bound_old)
+    epsilon_old = np.where(np.isnan(epsilon_old), np.zeros(len(epsilon_old)), epsilon_old)
+    epsilon_old = np.where(np.isinf(epsilon_old), np.zeros(len(epsilon_old)), epsilon_old)
     return rho_old, epsilon_old, delta_bound_old, i+1
 
 def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
@@ -192,7 +194,8 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         newpol.set_params(rho)
 
         #subsampling
-        indexes = np.random.choice(len(rets), 100, replace=False)
+        indexes = np.random.choice(len(rets), min(2000,len(rets)), replace=False)
+        #indexes = np.argsort(rets)[-min(500, len(rets)):]
         _rets = np.take(rets, indexes, axis=0)
         _actor_params = np.take(actor_params, indexes, axis=0)        
 
@@ -235,6 +238,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         grad_norms2 = reassign(grad_norms2)
         alpha = 1. / grad_norms2
         grad_norms = np.sqrt(grad_norms2)
+        alpha = np.where(np.isnan(alpha), np.zeros(len(alpha)), alpha)
         if np.sum(grad_norms) < grad_tol:
             print("stopping - gradient norm < gradient_tol")
             return rho, improvement
@@ -267,11 +271,14 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         num_line_search = 0
         #"""
         
+        stepsize = alpha*reassign(epsilon)
+        stepsize = np.where(np.isnan(stepsize), np.zeros(len(stepsize)), stepsize)
+
         newpol.set_params(rho)
         improvement+=delta_bound
         print(fmtstr % (i+1, 
                         np.max(epsilon), 
-                        np.max(alpha*reassign(epsilon)), 
+                        np.max(stepsize), 
                         num_line_search, 
                         grad_norm, 
                         np.amax(delta_bound), 

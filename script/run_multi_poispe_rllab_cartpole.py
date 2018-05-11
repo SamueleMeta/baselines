@@ -66,7 +66,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               use_renyi=use_renyi,
               max_offline_ite=20,
               max_search_ite=30,
-              delta=1.2,
+              delta=0.4,
               shift=shift,
               use_parabola=True)
 
