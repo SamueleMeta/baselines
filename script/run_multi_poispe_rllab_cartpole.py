@@ -59,14 +59,14 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path):
               task_horizon=horizon,
               max_iterations=500,
               save_to=DIR,
-              verbose=1,
+              verbose=2,
               feature_fun=np.ravel,
               normalize=normalize,
               use_rmax=use_rmax,
               use_renyi=use_renyi,
-              max_offline_ite=10,
-              max_search_ite=0,
-              delta=0.,
+              max_offline_ite=20,
+              max_search_ite=30,
+              delta=1.2,
               shift=shift,
               use_parabola=True)
 
