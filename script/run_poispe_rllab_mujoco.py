@@ -46,8 +46,8 @@ sess = U.single_threaded_session()
 sess.__enter__()
 
 
-def train(seed, shift, normalize, use_rmax, use_renyi, path, env_name):
-    DIR = path + '/poisnpe72/' + env_name +'/seed_' + str(seed)
+def train(seed, shift, normalize, use_rmax, use_renyi, path, env_name, delta):
+    DIR = '../results/' + path + '/poisnpe72/' + env_name +'/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)
@@ -78,7 +78,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path, env_name):
               use_renyi=use_renyi,
               max_offline_ite=10,
               max_search_ite=30,
-              delta=0.2,
+              delta=delta,
               shift=shift)
 
 if __name__=='__main__':
@@ -91,7 +91,10 @@ if __name__=='__main__':
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
     parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=1)
     parser.add_argument('--env', help='task name', type=str, default='cartpole')
+    parser.add_argument('--delta', help='delta', type=str, default='0.4')
     args = parser.parse_args()
+    delta = float(args.delta)
+
     if args.seed is None: args.seed = np.random.randint(low=0, high=999)
     train(args.seed,
           args.shift,
@@ -99,4 +102,5 @@ if __name__=='__main__':
           args.use_rmax,
           args.use_renyi,
           args.path,
-          args.env)
+          args.env,
+          delta)
