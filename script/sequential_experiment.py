@@ -29,5 +29,5 @@ def execute(cmd):
 
 for seed in map(int, args.seeds.split(' ')):
     print('SEED %d' % seed)
-    for script in execute(['python3 ' + args.script + '.py --seed %d --path %s --env %s --delta %s' % (seed, path, args.env, args.delta)]):
+    for script in execute(['python3 ' + args.script + '.py --seed %d --path %s --delta %s' % (seed, path, args.delta)]):
         print(script, end='')
