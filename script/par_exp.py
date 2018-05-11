@@ -13,6 +13,7 @@ parser.add_argument('--path', help='save here', type=str, default='../script/tem
 parser.add_argument('--seeds', help='RNG seed', type=str, default='10 109 904 160 570')
 parser.add_argument('--env', help='task name', type=str, default='cartpole')
 parser.add_argument('--delta', help='delta', type=str, default='0.4')
+parser.add_argument('--name', help='name', type=str, default='s')
 args = parser.parse_args()
 
 seeds = map(int, args.seeds.split(' '))
@@ -22,6 +23,6 @@ commands = ['python3 run_poispe_rllab_mujoco.py --env %s --seed %d --path %s --d
                                                                                                    args.delta)
                 for seed in seeds]
 
-Screener().run(commands, name='acrobot')
+Screener().run(commands, name=args.name)
 for c in commands:
     print(c)
