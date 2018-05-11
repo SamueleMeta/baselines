@@ -151,10 +151,16 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
     for i in range(max_offline_ite):
         #Candidate policy
         newpol.set_params(rho)
-        
+
+        #subsampling
+        indexes = np.argsort(rets)[:100]#np.random.choice(len(rets), 100, replace=False)
+        _rets = np.take(rets, indexes, axis=0)
+        _actor_params = np.take(actor_params, indexes, axis=0)       
+ 
         #Bound with gradient
-        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, pol, rmax,
+        bound, grad = newpol.eval_bound_and_grad(_actor_params, _rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
+	
         if np.any(np.isnan(grad)):
             warnings.warn('Got NaN gradient! Stopping!')
             return rho, improvement
@@ -181,8 +187,8 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         line_search = line_search_parabola if use_parabola else line_search_binary
         rho, epsilon, delta_bound, num_line_search = line_search(pol, 
                                                                  newpol, 
-                                                                 actor_params, 
-                                                                 rets, 
+                                                                 _actor_params, 
+                                                                 _rets, 
                                                                  alpha, 
                                                                  natgrad, 
                                                                  normalize=normalize,
