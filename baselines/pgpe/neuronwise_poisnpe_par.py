@@ -435,6 +435,7 @@ def learn(env_maker, pol_maker, sampler,
         logger.record_tabular('AvgNormIw', np.mean(iws))
         logger.record_tabular('VarNormIw', np.var(iws, ddof=1))
         logger.record_tabular('renyi2', renyi)
+        logger.record_tabular('delta', delta)
         logger.record_tabular('AvgRet', np.mean(rets[-eps_this_iter:]))
         logger.record_tabular('VanillaAvgRet', np.mean(rets[-eps_this_iter:]))
         logger.record_tabular('VarRet', np.var(rets[-eps_this_iter:], ddof=1))
