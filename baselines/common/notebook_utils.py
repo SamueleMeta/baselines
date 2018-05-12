@@ -22,6 +22,13 @@ def read_data(path, iters=None, default_batchsize=100):
     df['CumAvgRet'] = np.cumsum(df['AvgRet']*df['EpsThisIter'])/np.sum(df['EpsThisIter'])
     return df
 
+def read_data2(path, iters=None, default_batchsize=100):
+    df = pd.read_csv(path, encoding='utf-8')
+    if iters: df = df.loc[:iters, :]
+    df['SamplesSoFar'] = np.cumsum(df['SamplesThisIter'])
+    df['CumAvgRet'] = np.cumsum(df['AvgRet']*df['SamplesThisIter'])/np.sum(df['SamplesThisIter'])
+    return df
+
 def moments(dfs):
     concat_df = pd.concat(dfs, axis=1)
     mean_df = pd.concat(dfs, axis=1).groupby(by=concat_df.columns, axis=1).mean()
@@ -63,6 +70,25 @@ def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None):
         ax.plot(mean_df['EpsSoFar'], mean)
         interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
         ax.fill_between(mean_df['EpsSoFar'], interval[0], interval[1], alpha=0.3)
+    ax.legend(entries)
+    if ylim: ax.set_ylim(ylim)
+    if xlim: ax.set_xlim(xlim)
+    return fig
+
+def compare2(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    entries = []
+    for candidate_name in candidates:
+        entries.append(candidate_name)
+        dfs = candidates[candidate_name]
+        n_runs = len(dfs)
+        mean_df, std_df = moments(dfs)
+        mean = mean_df[key]
+        std = std_df[key]
+        ax.plot(mean_df['SamplesSoFar'], mean)
+        interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
+        ax.fill_between(mean_df['SamplesSoFar'], interval[0], interval[1], alpha=0.3)
     ax.legend(entries)
     if ylim: ax.set_ylim(ylim)
     if xlim: ax.set_xlim(xlim)
