@@ -6,16 +6,18 @@ Created on Wed May  9 22:20:25 2018
 @author: matteo
 """
 from screener import Screener
+import random
 
 deltas = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.]
 deltas = map(str, deltas)
 path = 'tuning_network'
 seed = 109
+start = 44
 
-commands = ['python3 run_multi_poispe_rllab_cartpole.py --path %s --delta %s --seed %d' % (path + '/delta_' + delta.replace('.',''),
+commands = ['taskset -ca %d-%d python3 run_multi_poispe_rllab_cartpole.py --path %s --delta %s --seed %d' % (start+2*i, start+2*i+1, path + '/delta_' + delta.replace('.',''),
                                                                                     delta, seed)
-                for delta in deltas]
+                for i, delta in enumerate(deltas)]
 
-Screener().run(commands, name='tuning_network')
+Screener().run(commands, name='tuning_network3_%d' % int(random.random()*1e6))
 for c in commands:
     print(c)
