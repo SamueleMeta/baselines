@@ -194,10 +194,10 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         newpol.set_params(rho)
 
         #subsampling
-        #indexes = np.random.choice(len(rets), min(2000,len(rets)), replace=False)
+        indexes = np.random.choice(len(rets), min(2000,len(rets)), replace=False)
         #indexes = np.argsort(rets)[-min(500, len(rets)):]
-        _rets = rets#np.take(rets, indexes, axis=0)
-        _actor_params = actor_params#np.take(actor_params, indexes, axis=0)        
+        _rets = np.take(rets, indexes, axis=0)
+        _actor_params = np.take(actor_params, indexes, axis=0)        
 
         #Bound with gradient
         bound, grad = newpol.eval_bound_and_grad(_actor_params, _rets, pol, rmax,
