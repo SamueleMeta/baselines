@@ -22,7 +22,7 @@ from baselines.common import set_global_seeds
 
 def train(seed, shift, normalize, use_rmax, use_renyi, path, delta):
     index = int(str(int(shift)) + str(int(normalize)) + str(int(use_rmax)) + str(int(use_renyi)), 2)
-    DIR = '../results/' + path + '/multipoisnpe/bound_' + str(index) + '/cartpole_rllab/seed_' + str(seed)
+    DIR = '../results/' + path + '/multipoisnpe' + '/cartpole_rllab/seed_' + str(seed)
     import os
     if not os.path.exists(DIR):
         os.makedirs(DIR)

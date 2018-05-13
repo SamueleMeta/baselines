@@ -19,7 +19,7 @@ def read_data(path, iters=None, default_batchsize=100, scale='Eps'):
     if not 'AvgRet' in df: df['AvgRet'] = df['AverageReturn']
     if not 'EpsThisIter' in df: df['EpsThisIter'] = df['BatchSize'] 
     df['EpsSoFar'] = np.cumsum(df['EpsThisIter'])
-    df['SamplesSoFar'] = np.cumsum(df['SamplesThisIter'])
+    if 'SamplesThisIter' in df: df['SamplesSoFar'] = np.cumsum(df['SamplesThisIter'])
     df['CumAvgRet'] = np.cumsum(df['AvgRet']*df[scale+'ThisIter'])/np.sum(df[scale+'ThisIter'])
     return df
 

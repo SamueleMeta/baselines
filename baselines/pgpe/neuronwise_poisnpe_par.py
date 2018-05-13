@@ -329,7 +329,7 @@ def learn(env_maker, pol_maker, sampler,
         rho = pol.eval_params() #Higher-order-policy parameters
         if verbose>1:
             logger.log('Higher-order parameters: ', rho)
-        if save_to: np.save(save_to + '/weights_' + str(it), rho)
+        if save_to and it % 100 == 0: np.save(save_to + '/weights_' + str(it), rho)
             
         #Add 50k samples to the batch
         with timed('Sampling'):
