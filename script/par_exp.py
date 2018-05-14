@@ -10,7 +10,8 @@ from screener import Screener
 import argparse
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--path', help='save here', type=str, default='../script/temp')
-parser.add_argument('--seeds', help='RNG seed', type=str, default='10 109 904 160 570')
+parser.add_argument('--seeds', help='RNG seed', type=str, 
+                    default='662 963 100 746 236 247 689 153 947 307 42 950 315 545 178')
 parser.add_argument('--env', help='task name', type=str, default='cartpole')
 parser.add_argument('--delta', help='delta', type=str, default='0.4')
 parser.add_argument('--name', help='name', type=str, default='s')
