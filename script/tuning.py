@@ -11,7 +11,7 @@ import random
 deltas = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.]
 deltas = map(str, deltas)
 path = 'tuning'
-env = 'inverted_pendulum'
+env = 'acrobot'
 
 commands = ['python3 sequential_experiment.py --path %s --delta %s --env %s' % (path + '/delta_' + delta.replace('.',''),
                                                                                     delta, env)
