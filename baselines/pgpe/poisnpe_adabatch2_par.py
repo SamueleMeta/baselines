@@ -202,7 +202,8 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
     return rho, improvement
 
 
-def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iterations, 
+def learn(env_maker, pol_maker, sampler,
+          gamma, initial_batch_size, task_horizon, max_iterations, 
           feature_fun=None, 
           rmax=None,
           normalize=True, 
@@ -223,8 +224,9 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
     logger.configure(dir=save_to, format_strs=format_strs)
 
     #Initialization
-    pol = pol_maker('pol')
-    newpol = pol_maker('oldpol')
+    env = env_maker()
+    pol = pol_maker('pol', env.observation_space, env.action_space)
+    newpol = pol_maker('newpol', env.observation_space, env.action_space)
     newpol.set_params(pol.eval_params())
     old_rho = pol.eval_params()
     batch_size = initial_batch_size
@@ -242,14 +244,23 @@ def learn(env, pol_maker, gamma, initial_batch_size, task_horizon, max_iteration
             
         #Add 100 trajectories to the batch
         with timed('Sampling', verbose):
-            frozen_pol = pol.freeze()
-            for ep in range(initial_batch_size):
-                theta = frozen_pol.resample()
-                actor_params.append(theta)
-                ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, task_horizon, feature_fun)
-                rets.append(ret)
-                disc_rets.append(disc_ret)
-                lens.append(ep_len)
+            if sampler:
+                seg = sampler.collect(rho)
+                seg = sampler.collect(rho)
+                _lens, _rets, _disc_rets, _actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
+                lens.extend(_lens)
+                rets.extend(_rets)
+                disc_rets.extend(_disc_rets)
+                actor_params.extend(_actor_params)
+            else:
+                frozen_pol = pol.freeze()
+                for ep in range(initial_batch_size):
+                    theta = frozen_pol.resample()
+                    actor_params.append(theta)
+                    ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, task_horizon, feature_fun)
+                    rets.append(ret)
+                    disc_rets.append(disc_ret)
+                    lens.append(ep_len)
         complete = len(rets)>=batch_size #Is the batch complete?
         #Normalize reward
         norm_disc_rets = np.array(disc_rets)
