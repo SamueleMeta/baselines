@@ -10,7 +10,7 @@ sys.path.append('/home/alberto/rllab')
 sys.path.append('/home/matteo/rllab')
 
 from baselines.policy.pemlp_policy import PeMlpPolicy
-import baselines.pgpe.poisnpe_adabatch2 as poisnpe
+import baselines.pgpe.poisnpe_adabatch2_par as poisnpe
 import numpy as np
 
 #Rllab envs
@@ -79,7 +79,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path, env_name, delta):
     poisnpe.learn(env_maker,
               pol_maker,
               sampler,
-              gamma=gamma,
+              gamma=1.,
               initial_batch_size=batch_size,
               task_horizon=horizon,
               max_iterations=500,
