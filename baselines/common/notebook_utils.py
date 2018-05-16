@@ -37,16 +37,16 @@ def plot_all(dfs, key='AvgRet', ylim=None):
         ax.plot(df['EpsSoFar'], value)
     return fig
 
-def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None):
+def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None, scale='Eps'):
     n_runs = len(dfs)
     mean_df, std_df = moments(dfs)
     mean = mean_df[key]
     std = std_df[key]
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(mean_df['EpsSoFar'], mean)
+    ax.plot(mean_df[scale+'SoFar'], mean)
     interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
-    ax.fill_between(mean_df['EpsSoFar'], interval[0], interval[1], alpha=0.3)
+    ax.fill_between(mean_df[scale+'SoFar'], interval[0], interval[1], alpha=0.3)
     if ylim: ax.set_ylim(ylim)
     return fig
 
