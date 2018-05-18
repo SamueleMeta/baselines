@@ -79,7 +79,7 @@ if __name__=='__main__':
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
     parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=0)
-    parser.add_argument('--delta', help='delta', type=str, default='0.5')
+    parser.add_argument('--delta', help='delta', type=str, default='0.6')
     args = parser.parse_args()
     delta = float(args.delta)
     train(args.seed,
