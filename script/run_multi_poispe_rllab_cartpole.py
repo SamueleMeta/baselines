@@ -58,7 +58,7 @@ def train(seed, shift, normalize, use_rmax, use_renyi, path, delta):
               gamma=gamma,
               initial_batch_size=batch_size,
               task_horizon=horizon,
-              max_iterations=500,
+              max_iterations=100,
               save_to=DIR,
               verbose=2,
               feature_fun=np.ravel,
@@ -80,7 +80,7 @@ if __name__=='__main__':
     parser.add_argument('--normalize', help='Normalize weights?', type=int, default=1)
     parser.add_argument('--use_rmax', help='Use Rmax in bound (or var)?', type=int, default=1)
     parser.add_argument('--use_renyi', help='Use Renyi in ESS (or weight norm)?', type=int, default=0)
-    parser.add_argument('--delta', help='delta', type=str, default='0.8')
+    parser.add_argument('--delta', help='delta', type=str, default='0.6')
     args = parser.parse_args()
     train(args.seed,
           args.shift,
