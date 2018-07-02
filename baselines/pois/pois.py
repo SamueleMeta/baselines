@@ -520,6 +520,9 @@ def learn(make_env, make_policy, *,
 
         if save_weights:
             logger.record_tabular('Weights', str(get_parameter()))
+            import pickle
+            file = open('latest_weights.pkl', 'wb')
+            pickle.dump(theta, file)
 
         with timed("offline optimization"):
             theta, improvement = optimize_offline(theta,
