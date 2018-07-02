@@ -73,7 +73,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
     def make_policy(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                          hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         clip_ob=False, hidden_W_init=tf.contrib.layers.xavier_initializer(),
+                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
                          output_W_init=tf.contrib.layers.xavier_initializer())
 
     sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed)
