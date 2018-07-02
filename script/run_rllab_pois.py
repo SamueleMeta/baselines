@@ -3,7 +3,7 @@
 import sys
 sys.path.remove('/home/deep/alberto/baselines')
 sys.path.append('/home/deep/nico/t3p/baselines')
-sys.path.append('/home/deep/alberto/rllab')
+sys.path.append('/home/deep/alberto/rllab/rllab')
 
 from baselines.common import set_global_seeds
 import gym
