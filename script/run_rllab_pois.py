@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # noinspection PyUnresolvedReferences
 import sys
-sys.path.remove('/home/alberto/baselines')
-sys.path.append('/home/alberto/baselines_ours')
+sys.path.append('/home/nico/t3p/baselines')
 sys.path.append('/home/alberto/rllab')
 
 from baselines.common import set_global_seeds
@@ -18,7 +17,7 @@ import tensorflow as tf
 from baselines.pois.parallel_sampler import ParallelSampler
 from rllab.envs.box2d.cartpole_env import CartpoleEnv
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
-'''
+
 from rllab.envs.mujoco.swimmer_env import SwimmerEnv
 from rllab.envs.mujoco.ant_env import AntEnv
 from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
@@ -31,7 +30,7 @@ from rllab.envs.mujoco.walker2d_env import Walker2DEnv
 from rllab.envs.box2d.mountain_car_env import MountainCarEnv
 from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
 from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
-'''
+
 def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
 
     if env == 'swimmer':
