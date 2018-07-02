@@ -24,7 +24,7 @@ def train(num_episodes, horizon, iw_method, iw_norm, natural, bound, ess, seed):
     workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
     set_global_seeds(workerseed)
 
-    env = gym.make('Swimmer-v2')
+    env = gym.make('Swimmer-v1')
 
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
@@ -32,7 +32,7 @@ def train(num_episodes, horizon, iw_method, iw_norm, natural, bound, ess, seed):
     env.seed(workerseed)
     gym.logger.setLevel(logging.WARN)
 
-    pois.learn(env, policy_fn, num_episodes=num_episodes, iters=500,
+    pois.learn(env, policy_fn, n_episodes=num_episodes, iters=500,
                horizon=horizon, gamma=1., delta=0.2, use_natural_gradient='exact' if natural else False,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, ess_correction=ess)
 
