@@ -157,7 +157,7 @@ class ParallelSampler(object):
 
     def collect(self, actor_weights):
         for i in range(self.n_workers):
-            self.input_queues[i].put(('collect', actor_weights[i]))
+            self.input_queues[i].put(('collect', actor_weights))
 
         for e in self.events:
             e.set()
@@ -201,4 +201,3 @@ class ParallelSampler(object):
 
         for w in self.workers:
             w.join()
-
