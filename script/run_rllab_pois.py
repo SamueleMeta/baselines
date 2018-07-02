@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # noinspection PyUnresolvedReferences
 import sys
+sys.path.remove('/home/deep/alberto/baselines')
 sys.path.append('/home/deep/nico/t3p/baselines')
 sys.path.append('/home/deep/alberto/rllab')
 
