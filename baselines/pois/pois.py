@@ -379,6 +379,10 @@ def learn(make_env, make_policy, *,
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
 
     if iw_method == 'pdis':
+        # log_ratio_split cumulative sum
+        # Exponentiate
+        # Multiply by the step-wise reward (not episode)
+        # Average on episodes
         raise NotImplementedError()
     elif iw_method == 'is':
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
@@ -509,7 +513,7 @@ def learn(make_env, make_policy, *,
             evaluate_natural_gradient = None
 
         with timed('summaries before'):
-            logger.record_tabular("Itaration", iters_so_far)
+            logger.record_tabular("Iteration", iters_so_far)
             logger.record_tabular("InitialBound", evaluate_loss())
             logger.record_tabular("EpLenMean", np.mean(lenbuffer))
             logger.record_tabular("EpRewMean", np.mean(rewbuffer))
@@ -521,7 +525,7 @@ def learn(make_env, make_policy, *,
         if save_weights:
             logger.record_tabular('Weights', str(get_parameter()))
             import pickle
-            file = open('latest_weights.pkl', 'wb')
+            file = open('checkpoint.pkl', 'wb')
             pickle.dump(theta, file)
 
         with timed("offline optimization"):
