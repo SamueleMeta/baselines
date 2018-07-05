@@ -380,10 +380,20 @@ def learn(make_env, make_policy, *,
 
     if iw_method == 'pdis':
         # log_ratio_split cumulative sum
+        log_ratio_cumsum = tf.cumsum(log_ratio_split, axis=1)
         # Exponentiate
+        ratio_cumsum = tf.exp(log_ratio_cumsum)
         # Multiply by the step-wise reward (not episode)
+        ratio_reward = ratio_cumsum * disc_rew_split
         # Average on episodes
-        raise NotImplementedError()
+        ratio_reward_per_episode = tf.reduce_sum(ratio_reward, axis=1)
+        w_return_mean = tf.reduce_sum(ratio_reward_per_episode, axis=0) / n_episodes
+        # TMP: passthrough
+        iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
+        iwn = iw / n_episodes
+        ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
+        sqrt_ess_classic = tf.linalg.norm(iw, 1) / tf.linalg.norm(iw, 2)
+        ess_renyi = n_episodes / empirical_d2
     elif iw_method == 'is':
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
         if iw_norm == 'none':
