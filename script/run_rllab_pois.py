@@ -112,7 +112,7 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     args = parser.parse_args()
     if args.file_name == 'progress':
-        file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
+        file_name = '%s_iw=%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.iw_method, args.delta, args.seed, time.time())
     else:
         file_name = args.file_name
     logger.configure(dir='.', format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
