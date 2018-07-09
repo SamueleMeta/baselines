@@ -549,8 +549,8 @@ def learn(make_env, make_policy, *,
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
 
-        print(seg['rew'][:20])
-        print(seg['mask'][:20])
+        #print(seg['rew'][:20])
+        #print(seg['mask'][:20])
 
         args = ob, ac, rew, disc_rew, mask = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask']
 
@@ -599,11 +599,11 @@ def learn(make_env, make_policy, *,
                                                   max_offline_ite=max_offline_iters)
 
         set_parameter(theta)
-        tmp = compute_temp(*args)
-        print(tmp[0][0, :100])
-        print(tmp[1][0, :100])
-        print(tmp[2][:100])
-        exit(0)
+        #tmp = compute_temp(*args)
+        #print(tmp[0][0, :100])
+        #print(tmp[1][0, :100])
+        #print(tmp[2][:100])
+        #exit(0)
 
         with timed('summaries after'):
             meanlosses = np.array(compute_losses(*args))
