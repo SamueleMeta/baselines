@@ -87,7 +87,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
     gym.logger.setLevel(logging.WARN)
 
     pois.learn(make_env, make_policy, n_episodes=num_episodes, max_iters=500,
-               horizon=horizon, gamma=1., delta=delta, use_natural_gradient=natural,
+               horizon=horizon, gamma=0.99, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
                center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
 
@@ -113,7 +113,7 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     args = parser.parse_args()
     if args.file_name == 'progress':
-        file_name = '%s_iw=%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.iw_method, args.delta, args.seed, time.time())
+        file_name = '%s_iw=%s_bound=%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.iw_method, args.bound, args.delta, args.seed, time.time())
     else:
         file_name = args.file_name
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
