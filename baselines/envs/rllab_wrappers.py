@@ -1,6 +1,3 @@
-import sys
-sys.path.append('/home/alberto/rllab')
-
 import rllab
 from rllab.envs.normalized_env import normalize
 import gym
@@ -35,5 +32,3 @@ class Rllab2GymWrapper(gym.Env):
 
     def seed(self, seed=0):
         pass
-
-
