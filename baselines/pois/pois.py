@@ -585,10 +585,6 @@ def learn(make_env, make_policy, *,
                                                   max_offline_ite=max_offline_iters)
 
         set_parameter(theta)
-        #tmp = compute_temp(*args)
-        #print(tmp[0][:10])
-        #print(tmp[1][:10])
-        #exit(0)
 
         with timed('summaries after'):
             meanlosses = np.array(compute_losses(*args))
