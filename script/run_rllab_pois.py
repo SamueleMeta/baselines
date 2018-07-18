@@ -87,7 +87,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
     gym.logger.setLevel(logging.WARN)
 
     pois.learn(make_env, make_policy, n_episodes=num_episodes, max_iters=500,
-               horizon=horizon, gamma=0.99, delta=delta, use_natural_gradient=natural,
+               horizon=horizon, gamma=1.0, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
                center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
 

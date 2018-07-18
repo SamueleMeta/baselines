@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # noinspection PyUnresolvedReferences
 #import mujoco_py # Mujoco must come before other imports. https://openai.slack.com/archives/C1H6P3R7B/p1492828680631850
+import sys
+sys.path.remove('/home/deep/alberto/baselines')
+sys.path.append('/home/deep/nico/t3p/baselines')
+sys.path.append('/home/deep/alberto/rllab/rllab')
+
 from mpi4py import MPI
 from baselines.common import set_global_seeds
 import os.path as osp
@@ -33,13 +38,13 @@ def train(env_id, num_timesteps, seed, save_dir):
     env = gym.make(env_id)
     def policy_fn(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=env.observation_space, ac_space=env.action_space,
-            hid_size=64, num_hid_layers=2,gaussian_fixed_var=True,use_bias=True)
+            hid_size=0, num_hid_layers=0,gaussian_fixed_var=True,use_bias=True)
     env = bench.Monitor(env, logger.get_dir() and
         osp.join(logger.get_dir(), str(rank)))
     env.seed(workerseed)
     gym.logger.setLevel(logging.WARN)
 
-    trpo_mpi.learn(env, policy_fn, batch_size = BATCH_SIZE, 
+    trpo_mpi.learn(env, policy_fn, batch_size = BATCH_SIZE,
                    task_horizon = HORIZON, max_kl=0.01, cg_iters=20, cg_damping=0.1,
         max_timesteps=num_timesteps, gamma=.995, lam=0.97, vf_iters=5, vf_stepsize=1e-3,
         weights_dir=save_dir, per_decision=False, normalize=True, truncate_at=np.infty)
@@ -49,6 +54,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--env', help='environment ID')
+    parser.add_argument('--logdir', type=str, default='.')
     parser.add_argument('--seed', help='RNG seed', type=int, default=None)
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     args = parser.parse_args()
@@ -57,10 +63,9 @@ def main():
     import os
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    logger.configure(dir=save_dir,format_strs=['stdout','csv'])
+    logger.configure(dir=args.logdir,format_strs=['stdout','csv', 'tensorboard'])
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed, save_dir=save_dir)
 
 
 if __name__ == '__main__':
     main()
-

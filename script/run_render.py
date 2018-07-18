@@ -98,10 +98,12 @@ def play(env, num_episodes, horizon, seed, policy, weights_file):
 
     obs = env.reset()
     done = False
+    from time import sleep
     while not done:
         ac, vpred = pi.act(True, obs)
         obs, r, done, _ = env.step(ac)
         env_rllab.render()
+        sleep(0.5)
 
     env.close()
 

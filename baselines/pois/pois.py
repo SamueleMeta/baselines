@@ -379,6 +379,13 @@ def learn(make_env, make_policy, *,
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
 
+    losses_with_name = []
+    losses_with_name.extend([(return_mean, 'InitialReturnMean'),
+                             (return_max, 'InitialReturnMax'),
+                             (return_min, 'InitialReturnMin'),
+                             (return_std, 'InitialReturnStd'),
+                             (empirical_d2, 'EmpiricalD2')])
+
     if iw_method == 'pdis':
         # log_ratio_split cumulative sum
         log_ratio_cumsum = tf.cumsum(log_ratio_split, axis=1)
@@ -389,55 +396,18 @@ def learn(make_env, make_policy, *,
         # Average on episodes
         ratio_reward_per_episode = tf.reduce_sum(ratio_reward, axis=1)
         w_return_mean = tf.reduce_sum(ratio_reward_per_episode, axis=0) / n_episodes
-        # Compute discount factor v4
-        discount_v4 = (1 - pow(gamma, 2 * horizon)) / (1 - pow(gamma, 2))
-
-        # ------ Variance bound nico --------
-        # Discount constant
-        def discount_term(t):
-            return pow(gamma, 2 * t) * (1 + gamma - 2 * pow(gamma, horizon - t)) / (1 - gamma)
-        discounter = tf.constant([discount_term(t) for t in range(horizon)])
-        # Sum log-d2 over timesteps to multiply
-        emp_d2_pd_log = tf.cumsum(emp_d2_split, axis=1)
-        # Exponentiate to get the non log d2
-        emp_d2_pd = tf.exp(emp_d2_pd_log)
-        emp_d2_pd_discounted = emp_d2_pd * discounter
-        # Sum over episode's timesteps
-        emp_d2_pd_episode = tf.reduce_sum(emp_d2_pd_discounted, axis=1)
-        # Mean over episodes
-        emp_d2_pd = tf.reduce_mean(emp_d2_pd_episode) / n_episodes
-
-        # ------ Variance bound nicov2 --------
-        # Square discounted reward
-        square_disc_reward = tf.square(disc_rew_split)
-        # Sum over each episode
-        square_disc_episode_reward = tf.reduce_sum(square_disc_reward, axis=1)
-        # Mean over episodes
-        mean_square_disc_reward = tf.reduce_mean(square_disc_episode_reward)
         # Get d2(w0:t) with mask
-        d2_w_0_t = tf.exp(tf.cumsum(emp_d2_split, axis=1)) * mask_
-        # Sum over timesteps
-        d2_w_episode = tf.reduce_sum(d2_w_0_t, axis=1) * discount_v4
-        # Mean over episodes
-        d2_over_episodes = tf.reduce_mean(d2_w_episode)
-        # Variance estimate
-        var_estimate = mean_square_disc_reward * d2_over_episodes
+        d2_w_0t = tf.exp(tf.cumsum(emp_d2_split, axis=1)) * mask_split
+        # Sum d2(w0:t) over timesteps
+        episode_d2_0t = tf.reduce_sum(d2_w_0t, axis=1)
 
-        # ------ Variance bound nicov4 --------
-        # Max step reward
-        max_step_reward = tf.reduce_max(tf.abs(rew_))
-
-        # TMP: passthrough
-        iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
-        iwn = iw / n_episodes
-        ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
-        sqrt_ess_classic = tf.linalg.norm(iw, 1) / tf.linalg.norm(iw, 2)
-        ess_renyi = n_episodes / empirical_d2
     elif iw_method == 'is':
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
         if iw_norm == 'none':
             iwn = iw / n_episodes
             w_return_mean = tf.reduce_sum(iwn * ep_return)
+            J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(iw * ep_return - w_return_mean))
+            losses_with_name.append((J_sample_variance, 'J_sample_variance'))
         elif iw_norm == 'sn':
             iwn = iw / tf.reduce_sum(iw)
             w_return_mean = tf.reduce_sum(iwn * ep_return)
@@ -448,10 +418,19 @@ def learn(make_env, make_policy, *,
             w_return_mean = tf.reduce_mean(iw * ep_return - beta * (iw - 1))
         else:
             raise NotImplementedError()
-
         ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
         sqrt_ess_classic = tf.linalg.norm(iw, 1) / tf.linalg.norm(iw, 2)
         ess_renyi = n_episodes / empirical_d2
+        losses_with_name.extend([(tf.reduce_max(iwn), 'MaxIWNorm'),
+                                 (tf.reduce_min(iwn), 'MinIWNorm'),
+                                 (tf.reduce_mean(iwn), 'MeanIWNorm'),
+                                 (U.reduce_std(iwn), 'StdIWNorm'),
+                                 (tf.reduce_max(iw), 'MaxIW'),
+                                 (tf.reduce_min(iw), 'MinIW'),
+                                 (tf.reduce_mean(iw), 'MeanIW'),
+                                 (U.reduce_std(iw), 'StdIW'),
+                                 (ess_classic, 'ESSClassic'),
+                                 (ess_renyi, 'ESSRenyi')])
     else:
         raise NotImplementedError()
 
@@ -460,28 +439,38 @@ def learn(make_env, make_policy, *,
     elif bound == 'std-d2':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_std
     elif bound == 'max-d2':
+        var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
         bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
     elif bound == 'max-ess':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
     elif bound == 'std-ess':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_std
-    elif bound == 'nico':
-        bound_ = w_return_mean - tf.sqrt((1 - delta) * emp_d2_pd / (delta)) * return_abs_max
-    elif bound == 'nicov2':
-        bound_ = w_return_mean - tf.sqrt((1 - delta) * (var_estimate) / (delta))
-    elif bound == 'nicov3':
-        bound_ = w_return_mean - tf.sqrt((1 - delta) * (var_estimate / n_episodes) / (delta))
-    elif bound == 'nicov4':
-        bound_ = w_return_mean - tf.sqrt((1 - delta) * d2_over_episodes / (delta * n_episodes))
+    elif bound == 'nico-rest':
+        square_disc_reward = tf.square(disc_rew_split) # Square discounted reward
+        square_disc_episode_reward = tf.reduce_sum(square_disc_reward, axis=1) # Sum over each episode
+        rest = episode_d2_0t * square_disc_episode_reward # Multiply square reward times episode d2
+        rest_mean = tf.reduce_mean(rest) # Take the mean over episodes
+        bound_ = w_return_mean - tf.sqrt((1 - delta) * rest_mean / (delta * n_episodes))
+    elif bound == 'nico-rmax':
+        max_step_reward = tf.reduce_max(tf.abs(rew_)) # Max step reward
+        discounter = [pow(gamma, i) for i in range(0, horizon)] # Decreasing gamma
+        discounter_tf = tf.constant(discounter)
+        discounted_ratio = ratio_cumsum * discounter_tf # Discounted w0:t
+        discounted_ratio_per_episode = tf.square(tf.reduce_sum(discounted_ratio, axis=1)) # Sum over single episodes
+        discounted_mean_d2 = tf.reduce_mean(discounted_ratio_per_episode) # Mean over episodes
+        bound_ = w_return_mean - tf.sqrt((1 - delta) * discounted_mean_d2 / (delta * n_episodes)) * max_step_reward
+    elif bound == 'nico-ermax':
+        est_episode_d2 = tf.reduce_mean(episode_d2_0t) # Expected d2
+        bound_ = w_return_mean - tf.sqrt((1-delta) * est_episode_d2 / (delta * n_episodes)) * return_abs_max
+    elif bound == 'nico-d2max':
+        d2max_over_t = tf.reduce_mean(tf.reduce_max(d2_w_0t, axis=1)) # Get the max d2 over time
+        bound_ = w_return_mean - tf.sqrt((1-delta) * horizon * d2max_over_t / (delta*n_episodes)) * return_abs_max
     else:
         raise NotImplementedError()
 
-    losses = [bound_, var_estimate, return_mean, return_max, return_min, return_std, empirical_d2, w_return_mean,
-              tf.reduce_max(iwn), tf.reduce_min(iwn), tf.reduce_mean(iwn), U.reduce_std(iwn), tf.reduce_max(iw),
-              tf.reduce_min(iw), tf.reduce_mean(iw), U.reduce_std(iw), ess_classic, ess_renyi]
-    loss_names = ['Bound', 'var_estimate', 'InitialReturnMean', 'InitialReturnMax', 'InitialReturnMin', 'InitialReturnStd',
-                  'EmpiricalD2', 'ReturnMeanIW', 'MaxIWNorm', 'MinIWNorm', 'MeanIWNorm', 'StdIWNorm',
-                  'MaxIW', 'MinIW', 'MeanIW', 'StdIW', 'ESSClassic', 'ESSRenyi']
+    losses_with_name.append((w_return_mean, 'ReturnMeanIW'))
+    losses_with_name.append((bound_, 'Bound'))
+    losses, loss_names = zip(*losses_with_name)
 
     if use_natural_gradient:
         p = tf.placeholder(dtype=tf.float32, shape=[None])
@@ -499,7 +488,7 @@ def learn(make_env, make_policy, *,
     compute_grad = U.function([ob_, ac_, rew_, disc_rew_, mask_], [U.flatgrad(bound_, var_list)])
     compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_], [bound_])
     compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_], losses)
-    compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [emp_d2_split, d2_w_0_t, E_d2_w_0_t])
+    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
@@ -549,9 +538,6 @@ def learn(make_env, make_policy, *,
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
 
-        #print(seg['rew'][:20])
-        #print(seg['mask'][:20])
-
         args = ob, ac, rew, disc_rew, mask = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask']
 
         assign_old_eq_new()
@@ -600,9 +586,8 @@ def learn(make_env, make_policy, *,
 
         set_parameter(theta)
         #tmp = compute_temp(*args)
-        #print(tmp[0][0, :100])
-        #print(tmp[1][0, :100])
-        #print(tmp[2][:100])
+        #print(tmp[0][:10])
+        #print(tmp[1][:10])
         #exit(0)
 
         with timed('summaries after'):
