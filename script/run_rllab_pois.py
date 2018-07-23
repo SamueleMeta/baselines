@@ -91,6 +91,15 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
 
 def main():
     import argparse
+
+    def str2bool(v):
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
+
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--env', type=str, default='cartpole')
@@ -108,7 +117,7 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--alias', type=str, default=None)
     parser.add_argument('--gamma', type=float, default=1.0)
-    parser.add_argument('--center', type=bool, default=True)
+    parser.add_argument('--center', type=str2bool, default='yes')
     args = parser.parse_args()
     if args.file_name == 'progress':
         if args.alias is not None:
