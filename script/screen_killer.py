@@ -8,5 +8,5 @@ args = parser.parse_args()
 rule = re.compile(args.re)
 
 for s in list_screens():
-    if rule.match(s):
+    if rule.match(s.name):
         s.kill()
