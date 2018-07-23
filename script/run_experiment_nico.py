@@ -14,7 +14,8 @@ parser.add_argument('--experiment', help='Experiment CSV file to load.', type=st
 args = parser.parse_args()
 
 if args.experiment is not None:
-    experiment = pd.read_csv(args.experiment)
+    exp_filename = 'experiments/' + args.experiment + '.csv'
+    experiment = pd.read_csv(exp_filename)
     cmd_base = 'source activate baselines && python script/'
     param_cols = list(experiment)
     param_cols.remove('script')
@@ -25,7 +26,7 @@ if args.experiment is not None:
             _c += '--' + str(p).strip() + '=' + str(row[p]).strip() + ' '
         cmds.append(_c)
     scr = Screener()
-    scr.run(cmds)
+    scr.run(cmds, name=args.experiment)
 else:
     print("Provide an experiment file.")
     exit(-1)

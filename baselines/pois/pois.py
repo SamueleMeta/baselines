@@ -373,8 +373,8 @@ def learn(make_env, make_policy, *,
     ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
     if center_return:
         ep_return = ep_return - tf.reduce_mean(ep_return)
-        #disc_rew_split = disc_rew_split - tf.reduce_mean(disc_rew_split)
-        #rew_split = rew_split - tf.reduce_mean(rew_split)
+        disc_rew_split = disc_rew_split - tf.reduce_mean(disc_rew_split)
+        rew_split = rew_split - tf.reduce_mean(rew_split)
         # Normalize
         #disc_rew_split = disc_rew_split / (tf.reduce_max(disc_rew_split) - tf.reduce_min(disc_rew_split))
         #rew_split = rew_split / (tf.reduce_max(rew_split) - tf.reduce_min(rew_split))
