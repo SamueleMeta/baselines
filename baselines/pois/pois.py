@@ -359,6 +359,7 @@ def learn(make_env, make_policy, *,
 
     # Split operations
     disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes))
+    rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes))
     log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
     target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes))
     mask_split = tf.stack(tf.split(mask_, n_episodes))
@@ -372,12 +373,21 @@ def learn(make_env, make_policy, *,
     ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
     if center_return:
         ep_return = ep_return - tf.reduce_mean(ep_return)
+        #disc_rew_split = disc_rew_split - tf.reduce_mean(disc_rew_split)
+        #rew_split = rew_split - tf.reduce_mean(rew_split)
+        # Normalize
+        #disc_rew_split = disc_rew_split / (tf.reduce_max(disc_rew_split) - tf.reduce_min(disc_rew_split))
+        #rew_split = rew_split / (tf.reduce_max(rew_split) - tf.reduce_min(rew_split))
 
     return_mean = tf.reduce_mean(ep_return)
     return_std = U.reduce_std(ep_return)
     return_max = tf.reduce_max(ep_return)
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
+    return_step_max = tf.reduce_max(tf.abs(rew_)) # Max step reward
+    positive_step_return_max = tf.maximum(0.0, tf.reduce_max(rew_split))
+    negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
+    return_step_maxmin = tf.abs(positive_step_return_max - negative_step_return_max)
 
     losses_with_name = []
     losses_with_name.extend([(return_mean, 'InitialReturnMean'),
@@ -400,6 +410,9 @@ def learn(make_env, make_policy, *,
         d2_w_0t = tf.exp(tf.cumsum(emp_d2_split, axis=1)) * mask_split
         # Sum d2(w0:t) over timesteps
         episode_d2_0t = tf.reduce_sum(d2_w_0t, axis=1)
+        # Sample variance
+        J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(ratio_reward_per_episode - w_return_mean))
+        losses_with_name.append((J_sample_variance, 'J_sample_variance'))
 
     elif iw_method == 'is':
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
@@ -452,25 +465,50 @@ def learn(make_env, make_policy, *,
         rest_mean = tf.reduce_mean(rest) # Take the mean over episodes
         bound_ = w_return_mean - tf.sqrt((1 - delta) * rest_mean / (delta * n_episodes))
     elif bound == 'nico-rmax':
-        max_step_reward = tf.reduce_max(tf.abs(rew_)) # Max step reward
         discounter = [pow(gamma, i) for i in range(0, horizon)] # Decreasing gamma
         discounter_tf = tf.constant(discounter)
         discounted_ratio = ratio_cumsum * discounter_tf # Discounted w0:t
         discounted_ratio_per_episode = tf.square(tf.reduce_sum(discounted_ratio, axis=1)) # Sum over single episodes
         discounted_mean_d2 = tf.reduce_mean(discounted_ratio_per_episode) # Mean over episodes
-        bound_ = w_return_mean - tf.sqrt((1 - delta) * discounted_mean_d2 / (delta * n_episodes)) * max_step_reward
+        bound_ = w_return_mean - tf.sqrt((1 - delta) * discounted_mean_d2 / (delta * n_episodes)) * return_step_max
     elif bound == 'nico-ermax':
         est_episode_d2 = tf.reduce_mean(episode_d2_0t) # Expected d2
         bound_ = w_return_mean - tf.sqrt((1-delta) * est_episode_d2 / (delta * n_episodes)) * return_abs_max
     elif bound == 'nico-d2max':
         d2max_over_t = tf.reduce_mean(tf.reduce_max(d2_w_0t, axis=1)) # Get the max d2 over time
         bound_ = w_return_mean - tf.sqrt((1-delta) * horizon * d2max_over_t / (delta*n_episodes)) * return_abs_max
+    elif bound == 'pdis-d2':
+        # Discount factor
+        if gamma >= 1:
+            discounter = [float(1+2*(horizon-t-1)) for t in range(0, horizon)]
+        else:
+            def f(t):
+                return pow(gamma, 2*t) + (2*pow(gamma,t)*(pow(gamma, t+1) - pow(gamma, horizon))) / (1-gamma)
+            discounter = [f(t) for t in range(0, horizon)]
+        discounter_tf = tf.constant(discounter)
+        mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / tf.reduce_sum(mask_split, axis=0)
+        discounted_d2 = mean_episode_d2 * discounter_tf # Discounted d2
+        discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0) # Sum over time
+        bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*n_episodes)) * return_step_max
+    elif bound == 'pdis-d2-maxmin':
+        # Discount factor
+        if gamma >= 1:
+            discounter = [float(1+2*(horizon-t-1)) for t in range(0, horizon)]
+        else:
+            def f(t):
+                return pow(gamma, 2*t) + (2*pow(gamma,t)*(pow(gamma, t+1) - pow(gamma, horizon))) / (1-gamma)
+            discounter = [f(t) for t in range(0, horizon)]
+        discounter_tf = tf.constant(discounter)
+        mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / tf.reduce_sum(mask_split, axis=0)
+        discounted_d2 = mean_episode_d2 * discounter_tf # Discounted d2
+        discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0) # Sum over time
+        bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*n_episodes)) * return_step_maxmin
     else:
         raise NotImplementedError()
 
     losses_with_name.append((w_return_mean, 'ReturnMeanIW'))
     losses_with_name.append((bound_, 'Bound'))
-    losses, loss_names = zip(*losses_with_name)
+    losses, loss_names = map(list, zip(*losses_with_name))
 
     if use_natural_gradient:
         p = tf.placeholder(dtype=tf.float32, shape=[None])

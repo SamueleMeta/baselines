@@ -27,7 +27,7 @@ from rllab.envs.box2d.mountain_car_env import MountainCarEnv
 from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
 from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
 
-def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
+def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, njobs=1):
 
     if env == 'swimmer':
         make_env_rllab = SwimmerEnv
@@ -82,9 +82,9 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
     gym.logger.setLevel(logging.WARN)
 
     pois.learn(make_env, make_policy, n_episodes=num_episodes, max_iters=500,
-               horizon=horizon, gamma=1.0, delta=delta, use_natural_gradient=natural,
+               horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
-               center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
+               center_return=center_return, render_after=None, max_offline_iters=max_offline_iters,)
 
     sampler.close()
 
@@ -106,9 +106,15 @@ def main():
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--max_offline_iters', type=int, default=10)
+    parser.add_argument('--alias', type=str, default=None)
+    parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--center', type=bool, default=True)
     args = parser.parse_args()
     if args.file_name == 'progress':
-        file_name = '%s_iw=%s_bound=%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.iw_method, args.bound, args.delta, args.seed, time.time())
+        if args.alias is not None:
+            file_name = '%s_iw=%s_bound=%s_delta=%s_gamma=%s_center=%s_alias=%s_seed=%s_%s' % (args.env.upper(), args.iw_method, args.bound, args.delta, args.gamma, args.center, args.alias, args.seed, time.time())
+        else:
+            file_name = '%s_iw=%s_bound=%s_delta=%s_gamma=%s_center=%s_seed=%s_%s' % (args.env.upper(), args.iw_method, args.bound, args.delta, args.gamma, args.center, args.seed, time.time())
     else:
         file_name = args.file_name
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
@@ -123,6 +129,8 @@ def main():
           seed=args.seed,
           policy=args.policy,
           max_offline_iters=args.max_offline_iters,
+          gamma=args.gamma,
+          center_return=args.center,
           njobs=args.njobs)
 
 if __name__ == '__main__':

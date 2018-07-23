@@ -1,0 +1,31 @@
+'''
+Author: nico
+
+Loads from a CSV file a set of parameters, where each row represents an experiment.
+Each script is run in a separate screen session.
+'''
+
+import pandas as pd
+import argparse, os, sys
+from screener import Screener
+
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('--experiment', help='Experiment CSV file to load.', type=str, default=None)
+args = parser.parse_args()
+
+if args.experiment is not None:
+    experiment = pd.read_csv(args.experiment)
+    cmd_base = 'source activate baselines && python script/'
+    param_cols = list(experiment)
+    param_cols.remove('script')
+    cmds = []
+    for index, row in experiment.iterrows():
+        _c = cmd_base + row['script'] + ' '
+        for p in param_cols:
+            _c += '--' + str(p).strip() + '=' + str(row[p]).strip() + ' '
+        cmds.append(_c)
+    scr = Screener()
+    scr.run(cmds)
+else:
+    print("Provide an experiment file.")
+    exit(-1)
