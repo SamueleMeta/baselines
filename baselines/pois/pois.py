@@ -373,11 +373,12 @@ def learn(make_env, make_policy, *,
     ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
     if center_return:
         ep_return = ep_return - tf.reduce_mean(ep_return)
-        disc_rew_split = disc_rew_split - (tf.reduce_mean(disc_rew_split) / tf.reduce_sum(mask_split))
-        rew_split = rew_split - (tf.reduce_mean(rew_split) / tf.reduce_sum(mask_split))
+        rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
         # Normalize
-        #disc_rew_split = disc_rew_split / (tf.reduce_max(disc_rew_split) - tf.reduce_min(disc_rew_split))
         #rew_split = rew_split / (tf.reduce_max(rew_split) - tf.reduce_min(rew_split))
+    discounter = [pow(gamma, i) for i in range(0, horizon)] # Decreasing gamma
+    discounter_tf = tf.constant(discounter)
+    disc_rew_split = rew_split * discounter_tf
 
     return_mean = tf.reduce_mean(ep_return)
     return_std = U.reduce_std(ep_return)
@@ -407,12 +408,16 @@ def learn(make_env, make_policy, *,
         ratio_reward_per_episode = tf.reduce_sum(ratio_reward, axis=1)
         w_return_mean = tf.reduce_sum(ratio_reward_per_episode, axis=0) / n_episodes
         # Get d2(w0:t) with mask
-        d2_w_0t = tf.exp(tf.cumsum(emp_d2_split, axis=1)) * mask_split
+        d2_w_0t = tf.exp(tf.cumsum(emp_d2_split, axis=1) * mask_split)
         # Sum d2(w0:t) over timesteps
         episode_d2_0t = tf.reduce_sum(d2_w_0t, axis=1)
         # Sample variance
         J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(ratio_reward_per_episode - w_return_mean))
         losses_with_name.append((J_sample_variance, 'J_sample_variance'))
+        losses_with_name.extend([(tf.reduce_max(ratio_cumsum), 'MaxIW'),
+                                 (tf.reduce_min(ratio_cumsum), 'MinIW'),
+                                 (tf.reduce_mean(ratio_cumsum), 'MeanIW'),
+                                 (U.reduce_std(ratio_cumsum), 'StdIW')])
 
     elif iw_method == 'is':
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
@@ -486,7 +491,7 @@ def learn(make_env, make_policy, *,
                 return pow(gamma, 2*t) + (2*pow(gamma,t)*(pow(gamma, t+1) - pow(gamma, horizon))) / (1-gamma)
             discounter = [f(t) for t in range(0, horizon)]
         discounter_tf = tf.constant(discounter)
-        mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-12)
+        mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
         discounted_d2 = mean_episode_d2 * discounter_tf # Discounted d2
         discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0) # Sum over time
         bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*n_episodes)) * return_step_max
