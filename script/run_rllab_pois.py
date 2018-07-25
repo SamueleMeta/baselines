@@ -27,7 +27,7 @@ from rllab.envs.box2d.mountain_car_env import MountainCarEnv
 from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
 from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
 
-def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, njobs=1):
+def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1):
 
     if env == 'swimmer':
         make_env_rllab = SwimmerEnv
@@ -84,7 +84,8 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
     pois.learn(make_env, make_policy, n_episodes=num_episodes, max_iters=500,
                horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
-               center_return=center_return, render_after=None, max_offline_iters=max_offline_iters,)
+               center_return=center_return, render_after=None, max_offline_iters=max_offline_iters,
+               clipping=clipping)
 
     sampler.close()
 
@@ -118,6 +119,7 @@ def main():
     parser.add_argument('--alias', type=str, default=None)
     parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--center', type=str2bool, default='yes')
+    parser.add_argument('--clipping', type=str2bool, default='no')
     args = parser.parse_args()
     if args.file_name == 'progress':
         if args.alias is not None:
@@ -140,7 +142,8 @@ def main():
           max_offline_iters=args.max_offline_iters,
           gamma=args.gamma,
           center_return=args.center,
-          njobs=args.njobs)
+          njobs=args.njobs,
+          clipping=args.clipping)
 
 if __name__ == '__main__':
     main()
