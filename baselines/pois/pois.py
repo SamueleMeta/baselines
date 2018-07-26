@@ -376,7 +376,7 @@ def learn(make_env, make_policy, *,
     # Policy entropy for exploration
     ent = pi.pd.entropy()
     meanent = tf.reduce_mean(ent)
-    entcoeff_decay = entdecay[1] + (entdecay[0] - entdecay[1]) * (1.0 - iter_progress_)
+    entcoeff_decay = tf.maximum(0.0, entdecay[1] + (entdecay[0] - entdecay[1]) * (1.0 - iter_progress_))
     entbonus = entcoeff_decay * meanent
     losses_with_name.append((meanent, 'MeanEntropy'))
     losses_with_name.append((entcoeff_decay, 'EntropyCoefficient'))
