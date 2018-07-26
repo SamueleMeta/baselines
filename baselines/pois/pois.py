@@ -318,7 +318,8 @@ def learn(make_env, make_policy, *,
           render_after=None,
           max_offline_iters=100,
           callback=None,
-          clipping=False):
+          clipping=False,
+          entcoeff=0.0):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -370,11 +371,17 @@ def learn(make_env, make_policy, *,
     emp_d2_cum_split = tf.reduce_sum(emp_d2_split, axis=1)
     empirical_d2 = tf.reduce_mean(tf.exp(emp_d2_cum_split))
 
+    # Policy entropy for exploration
+    ent = pi.pd.entropy()
+    meanent = tf.reduce_mean(ent)
+    entbonus = entcoeff * meanent
+    losses_with_name.append((meanent, 'MeanEntropy'))
+
     # Return
     ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
     if clipping:
         rew_split = tf.clip_by_value(rew_split, -1, 1)
-        
+
     if center_return:
         ep_return = ep_return - tf.reduce_mean(ep_return)
         rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
@@ -523,6 +530,9 @@ def learn(make_env, make_policy, *,
     losses_with_name.append((w_return_mean, 'ReturnMeanIW'))
     losses_with_name.append((bound_, 'Bound'))
     losses, loss_names = map(list, zip(*losses_with_name))
+
+    # Add policy entropy bonus
+    w_return_mean = w_return_mean + entbonus
 
     if use_natural_gradient:
         p = tf.placeholder(dtype=tf.float32, shape=[None])
