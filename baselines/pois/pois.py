@@ -353,6 +353,7 @@ def learn(make_env, make_policy, *,
     rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
     disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='disc_rew')
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
+    losses_with_name = []
 
     # Policy densities
     target_log_pdf = pi.pd.logp(ac_)
@@ -400,7 +401,6 @@ def learn(make_env, make_policy, *,
     negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
     return_step_maxmin = tf.abs(positive_step_return_max - negative_step_return_max)
 
-    losses_with_name = []
     losses_with_name.extend([(return_mean, 'InitialReturnMean'),
                              (return_max, 'InitialReturnMax'),
                              (return_min, 'InitialReturnMin'),
