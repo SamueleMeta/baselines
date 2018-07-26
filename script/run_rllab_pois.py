@@ -27,7 +27,7 @@ from rllab.envs.box2d.mountain_car_env import MountainCarEnv
 from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
 from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
 
-def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entcoeff=0.0):
+def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entdecay=(0.0, 0.0)):
 
     if env == 'swimmer':
         make_env_rllab = SwimmerEnv
@@ -85,7 +85,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
                horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
                center_return=center_return, render_after=None, max_offline_iters=max_offline_iters,
-               clipping=clipping, entcoeff=entcoeff)
+               clipping=clipping, entdecay=entdecay)
 
     sampler.close()
 
@@ -120,7 +120,7 @@ def main():
     parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--center', type=str2bool, default='yes')
     parser.add_argument('--clipping', type=str2bool, default='no')
-    parser.add_argument('--entropy', type=float, default=0.0)
+    parser.add_argument('--entropy', type=str, default='0,0')
     args = parser.parse_args()
     if args.file_name == 'progress':
         if args.alias is not None:
@@ -129,6 +129,7 @@ def main():
             file_name = '%s_iw=%s_bound=%s_delta=%s_gamma=%s_center=%s_entropy=%s_seed=%s_%s' % (args.env.upper(), args.iw_method, args.bound, args.delta, args.gamma, args.center, args.entropy, args.seed, time.time())
     else:
         file_name = args.file_name
+    ent_decay = tuple(map(float, args.entropy.split(',')))
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     train(env=args.env,
           num_episodes=args.num_episodes,
@@ -145,7 +146,7 @@ def main():
           center_return=args.center,
           njobs=args.njobs,
           clipping=args.clipping,
-          entcoeff=args.entropy)
+          entdecay=ent_decay)
 
 if __name__ == '__main__':
     main()

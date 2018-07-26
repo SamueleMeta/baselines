@@ -319,7 +319,7 @@ def learn(make_env, make_policy, *,
           max_offline_iters=100,
           callback=None,
           clipping=False,
-          entcoeff=0.0):
+          entdecay=(0.0, 0.0)):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -353,6 +353,7 @@ def learn(make_env, make_policy, *,
     rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
     disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='disc_rew')
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
+    iter_progress_ = tf.placeholder(dtype=tf.float32, name='iter_progress')
     losses_with_name = []
 
     # Policy densities
@@ -375,8 +376,10 @@ def learn(make_env, make_policy, *,
     # Policy entropy for exploration
     ent = pi.pd.entropy()
     meanent = tf.reduce_mean(ent)
-    entbonus = entcoeff * meanent
+    entcoeff_decay = ent_decay[1] + (ent_decay[0] - ent_decay[1]) * iter_progress_
+    entbonus = entcoeff_decay * meanent
     losses_with_name.append((meanent, 'MeanEntropy'))
+    losses_with_name.append((entcoeff_decay, 'EntropyCoefficient'))
 
     # Return
     ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
@@ -532,7 +535,7 @@ def learn(make_env, make_policy, *,
     losses, loss_names = map(list, zip(*losses_with_name))
 
     # Add policy entropy bonus
-    w_return_mean = w_return_mean + entbonus
+    bound_ = bound_ + entbonus
 
     if use_natural_gradient:
         p = tf.placeholder(dtype=tf.float32, shape=[None])
@@ -546,10 +549,10 @@ def learn(make_env, make_policy, *,
     assign_old_eq_new = U.function([], [], updates=[tf.assign(oldv, newv)
                 for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
 
-    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, mask_], losses + [U.flatgrad(bound_, var_list)])
-    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, mask_], [U.flatgrad(bound_, var_list)])
-    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_], [bound_])
-    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_], losses)
+    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_progress_], losses + [U.flatgrad(bound_, var_list)])
+    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_progress_], [U.flatgrad(bound_, var_list)])
+    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_progress_], [bound_])
+    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_progress_], losses)
     #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
 
     set_parameter = U.SetFromFlat(var_list)
@@ -599,8 +602,9 @@ def learn(make_env, make_policy, *,
         rewbuffer.extend(rets)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
+        ip = iters_so_far / max_iters
 
-        args = ob, ac, rew, disc_rew, mask = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask']
+        args = ob, ac, rew, disc_rew, mask, iter_progress = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], ip
 
         assign_old_eq_new()
 
