@@ -11,12 +11,15 @@ from screener import Screener
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--experiment', help='Experiment CSV file to load.', type=str, default=None)
+parser.add_argument('--condaenv', help='Conda environment to activate.', type=str, default=None)
 args = parser.parse_args()
 
 if args.experiment is not None:
     exp_filename = 'experiments/' + args.experiment + '.csv'
     experiment = pd.read_csv(exp_filename)
-    cmd_base = 'source activate baselines && python script/'
+    cmd_base = 'python script/'
+    if args.condaenv is not None:
+        cmd_base = 'source activate baselines && ' + cmd_base
     param_cols = list(experiment)
     param_cols.remove('script')
     cmds = []
