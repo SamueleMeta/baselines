@@ -129,7 +129,7 @@ def main():
             file_name = '%s_iw=%s_bound=%s_delta=%s_gamma=%s_center=%s_entropy=%s_seed=%s_%s' % (args.env.upper(), args.iw_method, args.bound, args.delta, args.gamma, args.center, args.entropy, args.seed, time.time())
     else:
         file_name = args.file_name
-    ent_decay = tuple(map(float, args.entropy.split(',')))
+    ent_decay = tuple(map(float, args.entropy.split(':')))
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     train(env=args.env,
           num_episodes=args.num_episodes,
