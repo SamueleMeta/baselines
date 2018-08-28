@@ -34,8 +34,9 @@ if args.experiment is not None:
         for p in param_cols:
             _c += str(p).strip() + '=' + str(row[p]).strip() + ' '
         cmds.append(_c)
-    scr = Screener()
-    scr.run(cmds, name=args.experiment)
+    print(cmds)
+    #scr = Screener()
+    #scr.run(cmds, name=args.experiment)
 else:
     print("Provide an experiment file.")
     exit(-1)
