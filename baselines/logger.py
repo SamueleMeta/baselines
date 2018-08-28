@@ -168,7 +168,17 @@ class TensorBoardOutputFormat(KVWriter):
             self.writer.Close()
             self.writer = None
 
-def make_output_format(format, ev_dir, file_name=None):
+class SacredOutputFormat(KVWriter):
+    def __init__(self, run):
+        self.run = run
+
+    def writekvs(self, kvs):
+        print(kvs)
+
+    def close(self):
+        pass
+
+def make_output_format(format, ev_dir, file_name=None, run=None):
     from mpi4py import MPI
     os.makedirs(ev_dir, exist_ok=True)
     rank = MPI.COMM_WORLD.Get_rank()
@@ -186,6 +196,9 @@ def make_output_format(format, ev_dir, file_name=None):
     elif format == 'tensorboard':
         assert rank==0
         return TensorBoardOutputFormat(osp.join(ev_dir, 'tb', 'run' if file_name is None else file_name))
+    elif format == 'sacred':
+        assert rank==0
+        return SacredOutputFormat(run)
     else:
         raise ValueError('Unknown format specified: %s' % (format,))
 
