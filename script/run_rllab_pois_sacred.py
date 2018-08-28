@@ -40,6 +40,7 @@ def custom_config():
     seed = 0
     env = 'cartpole'
     num_episodes = 100
+    max_iters = 500
     horizon = 500
     iw_method = 'is'
     iw_norm = 'none'
@@ -61,7 +62,7 @@ def custom_config():
     else:
         file_name = file_name
 
-def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entdecay=(0.0, 0.0)):
+def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entdecay=(0.0, 0.0), max_iters=500):
 
     if env == 'swimmer':
         make_env_rllab = SwimmerEnv
@@ -115,7 +116,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
 
     gym.logger.setLevel(logging.WARN)
 
-    pois.learn(make_env, make_policy, n_episodes=num_episodes, max_iters=1,
+    pois.learn(make_env, make_policy, n_episodes=num_episodes, max_iters=max_iters,
                horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
                center_return=center_return, render_after=None, max_offline_iters=max_offline_iters,
@@ -125,7 +126,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
 
 @ex.automain
 def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_name, logdir, bound, delta,
-            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, _run):
+            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, max_iters, _run):
 
     ent_decay = tuple(map(float, entropy.split(':')))
     logger.configure(dir=logdir, format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
@@ -144,4 +145,5 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_nam
           center_return=center,
           njobs=njobs,
           clipping=clipping,
-          entdecay=ent_decay)
+          entdecay=ent_decay,
+          max_iters=max_iters)
