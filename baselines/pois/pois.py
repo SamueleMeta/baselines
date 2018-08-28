@@ -535,7 +535,7 @@ def learn(make_env, make_policy, *,
     losses, loss_names = map(list, zip(*losses_with_name))
 
     # Add policy entropy bonus
-    if ent_decay[0] != 0 or ent_decay[1] != 0:
+    if entdecay[0] != 0 or entdecay[1] != 0:
         bound_ = bound_ + entbonus
 
     if use_natural_gradient:
