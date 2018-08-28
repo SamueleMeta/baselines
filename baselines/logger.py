@@ -173,7 +173,8 @@ class SacredOutputFormat(KVWriter):
         self.run = run
 
     def writekvs(self, kvs):
-        print(kvs)
+        for k,v in kvs.items():
+            run.log_scalar(k, v)
 
     def close(self):
         pass
