@@ -33,7 +33,8 @@ from sacred.observers import FileStorageObserver, SlackObserver
 # Create experiment
 ex = Experiment('POIS')
 # Set a File Observer
-ex.observers.append(FileStorageObserver.create('my_runs'))
+ex.observers.append(FileStorageObserver.create('sacred_runs'))
+ex.observers.append(SlackObserver.from_config('../../configs/slack.json'))
 
 @ex.config
 def custom_config():

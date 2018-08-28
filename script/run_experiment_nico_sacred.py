@@ -13,7 +13,6 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 parser.add_argument('--experiment', help='Experiment CSV file to load.', type=str, default=None)
 parser.add_argument('--condaenv', help='Conda environment to activate.', type=str, default=None)
 parser.add_argument('--pythonv', help='Python version to use', type=str, default='python3')
-parser.add_argument('--pythonpath', help='Python path additions', type=str, default=None)
 args = parser.parse_args()
 
 if args.experiment is not None:
@@ -34,9 +33,8 @@ if args.experiment is not None:
         for p in param_cols:
             _c += str(p).strip() + '=' + str(row[p]).strip() + ' '
         cmds.append(_c)
-    print(cmds)
-    #scr = Screener()
-    #scr.run(cmds, name=args.experiment)
+    scr = Screener()
+    scr.run(cmds, name=args.experiment)
 else:
     print("Provide an experiment file.")
     exit(-1)
