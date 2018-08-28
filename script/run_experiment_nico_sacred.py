@@ -19,8 +19,6 @@ if args.experiment is not None:
     exp_filename = 'experiments/' + args.experiment + '.csv'
     experiment = pd.read_csv(exp_filename)
     cmd_base = args.pythonv + ' script/'
-    if args.pythonpath:
-        cmd_base = 'PYTHONPATH="PYTHONPATH:' + args.pythonpath + '" ' + cmd_base
     if args.condaenv is not None:
         cmd_base = 'source activate baselines && ' + cmd_base
     param_cols = list(experiment)
