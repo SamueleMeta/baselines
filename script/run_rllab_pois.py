@@ -120,7 +120,7 @@ def main():
     parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--center', type=str2bool, default='yes')
     parser.add_argument('--clipping', type=str2bool, default='no')
-    parser.add_argument('--entropy', type=str, default='0,0')
+    parser.add_argument('--entropy', type=str, default='0:0')
     args = parser.parse_args()
     if args.file_name == 'progress':
         if args.alias is not None:

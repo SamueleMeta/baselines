@@ -56,7 +56,7 @@ def custom_config():
     gamma = 1.0
     center = True
     clipping = False
-    entropy = '0,0'
+    entropy = '0:0'
     # Create the filename
     if file_name == 'progress':
         file_name = '%s_iw=%s_bound=%s_delta=%s_gamma=%s_center=%s_entropy=%s_seed=%s_%s' % (env.upper(), iw_method, bound, delta, gamma, center, entropy, seed, time.time())
