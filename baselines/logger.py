@@ -320,7 +320,7 @@ class Logger(object):
 
 Logger.DEFAULT = Logger.CURRENT = Logger(dir=None, output_formats=[HumanOutputFormat(sys.stdout)])
 
-def configure(dir=None, format_strs=None, file_name=None):
+def configure(dir=None, format_strs=None, file_name=None, run=None):
     if dir is None:
         dir = os.getenv('OPENAI_LOGDIR')
     if dir is None:
@@ -332,7 +332,7 @@ def configure(dir=None, format_strs=None, file_name=None):
     if format_strs is None:
         strs = os.getenv('OPENAI_LOG_FORMAT')
         format_strs = strs.split(',') if strs else LOG_OUTPUT_FORMATS
-    output_formats = [make_output_format(f, dir, file_name) for f in format_strs]
+    output_formats = [make_output_format(f, dir, file_name, run) for f in format_strs]
 
     Logger.CURRENT = Logger(dir=dir, output_formats=output_formats)
     log('Logging to %s'%dir)
