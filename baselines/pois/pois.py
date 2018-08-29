@@ -319,7 +319,7 @@ def learn(make_env, make_policy, *,
           max_offline_iters=100,
           callback=None,
           clipping=False,
-          entdecay=(0.0, 0.0)):
+          entcoeff=0.0):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -376,8 +376,7 @@ def learn(make_env, make_policy, *,
     # Policy entropy for exploration
     ent = pi.pd.entropy()
     meanent = tf.reduce_mean(ent)
-    entcoeff_decay = tf.maximum(0.0, entdecay[1] + (entdecay[0] - entdecay[1]) * (1.0 - iter_progress_))
-    entbonus = entcoeff_decay * meanent
+    entbonus = entcoeff * meanent
     losses_with_name.append((meanent, 'MeanEntropy'))
     losses_with_name.append((entcoeff_decay, 'EntropyCoefficient'))
 
@@ -388,7 +387,7 @@ def learn(make_env, make_policy, *,
 
     if center_return:
         ep_return = ep_return - tf.reduce_mean(ep_return)
-        #rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
+        rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
 
     discounter = [pow(gamma, i) for i in range(0, horizon)] # Decreasing gamma
     discounter_tf = tf.constant(discounter)
@@ -535,8 +534,8 @@ def learn(make_env, make_policy, *,
     losses, loss_names = map(list, zip(*losses_with_name))
 
     # Add policy entropy bonus
-    if entdecay[0] != 0 or entdecay[1] != 0:
-        bound_ = bound_ + entbonus
+    if entcoeff != 0:
+        bound_ = bound_ + entbonus * tf.reduce_mean(iw)
 
     if use_natural_gradient:
         p = tf.placeholder(dtype=tf.float32, shape=[None])
