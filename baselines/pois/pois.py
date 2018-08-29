@@ -374,17 +374,17 @@ def learn(make_env, make_policy, *,
     empirical_d2 = tf.reduce_mean(tf.exp(emp_d2_cum_split))
 
     # Policy entropy for exploration
-    #ent = pi.pd.entropy()
-    #meanent = tf.reduce_mean(ent)
-    #entcoeff_decay = tf.maximum(0.0, entdecay[1] + (entdecay[0] - entdecay[1]) * (1.0 - iter_progress_))
-    #entbonus = entcoeff_decay * meanent
-    #losses_with_name.append((meanent, 'MeanEntropy'))
-    #losses_with_name.append((entcoeff_decay, 'EntropyCoefficient'))
+    ent = pi.pd.entropy()
+    meanent = tf.reduce_mean(ent)
+    entcoeff_decay = tf.maximum(0.0, entdecay[1] + (entdecay[0] - entdecay[1]) * (1.0 - iter_progress_))
+    entbonus = entcoeff_decay * meanent
+    losses_with_name.append((meanent, 'MeanEntropy'))
+    losses_with_name.append((entcoeff_decay, 'EntropyCoefficient'))
 
     # Return
     ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
-    #if clipping:
-    #    rew_split = tf.clip_by_value(rew_split, -1, 1)
+    if clipping:
+        rew_split = tf.clip_by_value(rew_split, -1, 1)
 
     if center_return:
         ep_return = ep_return - tf.reduce_mean(ep_return)
@@ -535,8 +535,8 @@ def learn(make_env, make_policy, *,
     losses, loss_names = map(list, zip(*losses_with_name))
 
     # Add policy entropy bonus
-    #if entdecay[0] != 0 or entdecay[1] != 0:
-    #    bound_ = bound_ + entbonus
+    if entdecay[0] != 0 or entdecay[1] != 0:
+        bound_ = bound_ + entbonus
 
     if use_natural_gradient:
         p = tf.placeholder(dtype=tf.float32, shape=[None])
