@@ -528,7 +528,7 @@ def learn(make_env, make_policy, *,
     losses_with_name.append((meanent, 'MeanEntropy'))
     # Add policy entropy bonus
     if entcoeff != 0:
-        ent_f = tf.minimum(0.0, 1-tf.abs(tf.reduce_mean(iw) - 1)) * entcoeff
+        ent_f = tf.exp(-tf.abs(tf.reduce_mean(iw) - 1)) * entcoeff
         losses_with_name.append((ent_f, 'EntropyCoefficient'))
         bound_ = bound_ + ent_f * meanent
 
