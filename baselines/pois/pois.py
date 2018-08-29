@@ -319,7 +319,8 @@ def learn(make_env, make_policy, *,
           max_offline_iters=100,
           callback=None,
           clipping=False,
-          entcoeff=0.0):
+          entcoeff=0.0,
+          entscale=1.0):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -528,7 +529,7 @@ def learn(make_env, make_policy, *,
     losses_with_name.append((meanent, 'MeanEntropy'))
     # Add policy entropy bonus
     if entcoeff != 0:
-        ent_f = tf.exp(-tf.abs(tf.reduce_mean(iw) - 1)) * entcoeff
+        ent_f = tf.exp(-tf.abs(tf.reduce_mean(iw) - 1) * entscale) * entcoeff
         losses_with_name.append((ent_f, 'EntropyCoefficient'))
         bound_ = bound_ + ent_f * meanent
 
@@ -543,7 +544,6 @@ def learn(make_env, make_policy, *,
         dot_product = tf.reduce_sum(grad_logprob * p)
         hess_logprob = U.flatgrad(dot_product, var_list)
         compute_linear_operator = U.function([p, ob_, ac_, disc_rew_, mask_], [-hess_logprob])
-
 
     assign_old_eq_new = U.function([], [], updates=[tf.assign(oldv, newv)
                 for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
