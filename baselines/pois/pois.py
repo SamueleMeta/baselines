@@ -522,10 +522,6 @@ def learn(make_env, make_policy, *,
     else:
         raise NotImplementedError()
 
-    losses_with_name.append((w_return_mean, 'ReturnMeanIW'))
-    losses_with_name.append((bound_, 'Bound'))
-    losses, loss_names = map(list, zip(*losses_with_name))
-
     # Policy entropy for exploration
     ent = pi.pd.entropy()
     meanent = tf.reduce_mean(ent)
@@ -535,6 +531,10 @@ def learn(make_env, make_policy, *,
         ent_f = tf.minimum(0.0, 1-tf.abs(tf.reduce_mean(iw) - 1)) * entcoeff
         losses_with_name.append((ent_f, 'EntropyCoefficient'))
         bound_ = bound_ + ent_f * meanent
+
+    losses_with_name.append((w_return_mean, 'ReturnMeanIW'))
+    losses_with_name.append((bound_, 'Bound'))
+    losses, loss_names = map(list, zip(*losses_with_name))
 
     if use_natural_gradient:
         p = tf.placeholder(dtype=tf.float32, shape=[None])
