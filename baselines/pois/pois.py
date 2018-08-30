@@ -530,7 +530,7 @@ def learn(make_env, make_policy, *,
     if entropy != 'none':
         scheme, v1, v2 = entropy.split(':')
         if scheme == 'step':
-            entcoeff = tf.cond(iter_progress < int(v2), lambda: float(v1), lambda: 0.0)
+            entcoeff = tf.cond(iter_progress_ < int(v2), lambda: float(v1), lambda: 0.0)
             losses_with_name.append((entcoeff, 'EntropyCoefficient'))
             entbonus = entcoeff_decay * meanent
             bound_ = bound_ + entbonus
