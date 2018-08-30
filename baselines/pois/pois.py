@@ -537,7 +537,7 @@ def learn(make_env, make_policy, *,
         elif scheme == 'lin':
             entcoeff_decay = tf.maximum(0.0, float(v2) + (float(v1) - float(v2)) * (1.0 - iter_progress_))
             losses_with_name.append((entcoeff_decay, 'EntropyCoefficient'))
-            entbonus = entcoeff_decay * meangit ent
+            entbonus = entcoeff_decay * meanent
             bound_ = bound_ + entbonus
         elif scheme == 'exp':
             ent_f = tf.exp(-tf.abs(tf.reduce_mean(iw) - 1) * float(v2)) * float(v1)
