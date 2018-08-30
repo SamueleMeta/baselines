@@ -56,15 +56,19 @@ def custom_config():
     gamma = 1.0
     center = True
     clipping = False
-    entropy = 0.0
-    entscale = 1.0
+    entropy = 'none'
+    # ENTROPY can be of 4 schemes:
+    #    - 'none'
+    #    - 'step:<height>:<duration>': step function which is <height> tall for <duration> iterations
+    #    - 'lin:<max>:<min>': linearly decreasing function from <max> to <min> over all iterations, clipped to 0 for negatives
+    #    - 'exp:<height>:<scale>': exponentially decreasing curve <height> tall, use <scale> to make it "spread" more
     # Create the filename
     if file_name == 'progress':
         file_name = '%s_iw=%s_bound=%s_delta=%s_gamma=%s_center=%s_entropy=%s_seed=%s_%s' % (env.upper(), iw_method, bound, delta, gamma, center, entropy, seed, time.time())
     else:
         file_name = file_name
 
-def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entcoeff=0.0, entscale=1.0, max_iters=500):
+def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entropy='none', max_iters=500):
 
     if env == 'swimmer':
         make_env_rllab = SwimmerEnv
@@ -122,7 +126,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
                horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
                center_return=center_return, render_after=None, max_offline_iters=max_offline_iters,
-               clipping=clipping, entcoeff=entcoeff, entscale=entscale)
+               clipping=clipping, entropy=entropy)
 
     sampler.close()
 
@@ -146,6 +150,5 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_nam
           center_return=center,
           njobs=njobs,
           clipping=clipping,
-          entcoeff=entropy,
-          entscale=entscale,
+          entropy=entropy,
           max_iters=max_iters)

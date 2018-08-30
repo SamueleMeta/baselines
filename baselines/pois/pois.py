@@ -319,8 +319,7 @@ def learn(make_env, make_policy, *,
           max_offline_iters=100,
           callback=None,
           clipping=False,
-          entcoeff=0.0,
-          entscale=1.0):
+          entropy='none'):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -528,10 +527,24 @@ def learn(make_env, make_policy, *,
     meanent = tf.reduce_mean(ent)
     losses_with_name.append((meanent, 'MeanEntropy'))
     # Add policy entropy bonus
-    if entcoeff != 0:
-        ent_f = tf.exp(-tf.abs(tf.reduce_mean(iw) - 1) * entscale) * entcoeff
-        losses_with_name.append((ent_f, 'EntropyCoefficient'))
-        bound_ = bound_ + ent_f * meanent
+    if entropy != 'none':
+        scheme, v1, v2 = entropy.split(':')
+        if scheme == 'step':
+            entcoeff = tf.cond(iter_progress < int(v2), lambda: float(v1), lambda: 0.0)
+            losses_with_name.append((entcoeff, 'EntropyCoefficient'))
+            entbonus = entcoeff_decay * meanent
+            bound_ = bound_ + entbonus
+        elif scheme == 'lin':
+            entcoeff_decay = tf.maximum(0.0, float(v2) + (float(v1) - float(v2)) * (1.0 - iter_progress_))
+            losses_with_name.append((entcoeff_decay, 'EntropyCoefficient'))
+            entbonus = entcoeff_decay * meanent
+            bound_ = bound_ + entbonus
+        elif scheme == 'exp':
+            ent_f = tf.exp(-tf.abs(tf.reduce_mean(iw) - 1) * float(v2)) * float(v1)
+            losses_with_name.append((ent_f, 'EntropyCoefficient'))
+            bound_ = bound_ + ent_f * meanent
+        else:
+            raise Exception('Unrecognized entropy scheme.')
 
     losses_with_name.append((w_return_mean, 'ReturnMeanIW'))
     losses_with_name.append((bound_, 'Bound'))
