@@ -353,7 +353,7 @@ def learn(make_env, make_policy, *,
     rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
     disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='disc_rew')
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
-    iter_progress_ = tf.placeholder(dtype=tf.int32, name='iter_progress')
+    iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
     losses_with_name = []
 
     # Policy densities
@@ -530,12 +530,13 @@ def learn(make_env, make_policy, *,
     if entropy != 'none':
         scheme, v1, v2 = entropy.split(':')
         if scheme == 'step':
-            entcoeff = tf.cond(tf.less_equal(iter_progress_ * max_iters, int(v2)), lambda: float(v1), lambda: float(0.0))
+            entcoeff = tf.cond(iter_number_ < int(v2)), lambda: float(v1), lambda: float(0.0))
             losses_with_name.append((entcoeff, 'EntropyCoefficient'))
             entbonus = entcoeff * meanent
             bound_ = bound_ + entbonus
         elif scheme == 'lin':
-            entcoeff_decay = tf.maximum(0.0, float(v2) + (float(v1) - float(v2)) * (1.0 - iter_progress_))
+            ip = tf.cast(iter_number_ / max_iters, tf.float32)
+            entcoeff_decay = tf.maximum(0.0, float(v2) + (float(v1) - float(v2)) * (1.0 - ip))
             losses_with_name.append((entcoeff_decay, 'EntropyCoefficient'))
             entbonus = entcoeff_decay * meanent
             bound_ = bound_ + entbonus
@@ -561,10 +562,10 @@ def learn(make_env, make_policy, *,
     assign_old_eq_new = U.function([], [], updates=[tf.assign(oldv, newv)
                 for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
 
-    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_progress_], losses + [U.flatgrad(bound_, var_list)])
-    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_progress_], [U.flatgrad(bound_, var_list)])
-    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_progress_], [bound_])
-    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_progress_], losses)
+    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list)])
+    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list)])
+    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [bound_])
+    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses)
     #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
 
     set_parameter = U.SetFromFlat(var_list)
@@ -614,9 +615,8 @@ def learn(make_env, make_policy, *,
         rewbuffer.extend(rets)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
-        ip = iters_so_far / max_iters
 
-        args = ob, ac, rew, disc_rew, mask, iter_progress = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], ip
+        args = ob, ac, rew, disc_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
 
         assign_old_eq_new()
 
