@@ -132,7 +132,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
 
 @ex.automain
 def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_name, logdir, bound, delta,
-            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, entscale, max_iters, _run):
+            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, max_iters, _run):
 
     logger.configure(dir=logdir, format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
     train(env=env,
