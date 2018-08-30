@@ -532,7 +532,7 @@ def learn(make_env, make_policy, *,
         if scheme == 'step':
             entcoeff = tf.cond(iter_progress_ < int(v2), lambda: float(v1), lambda: 0.0)
             losses_with_name.append((entcoeff, 'EntropyCoefficient'))
-            entbonus = entcoeff_decay * meanent
+            entbonus = entcoeff * meanent
             bound_ = bound_ + entbonus
         elif scheme == 'lin':
             entcoeff_decay = tf.maximum(0.0, float(v2) + (float(v1) - float(v2)) * (1.0 - iter_progress_))
