@@ -353,7 +353,7 @@ def learn(make_env, make_policy, *,
     rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
     disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='disc_rew')
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
-    iter_progress_ = tf.placeholder(dtype=tf.float32, name='iter_progress')
+    iter_progress_ = tf.placeholder(dtype=tf.int32, name='iter_progress')
     losses_with_name = []
 
     # Policy densities
@@ -530,14 +530,14 @@ def learn(make_env, make_policy, *,
     if entropy != 'none':
         scheme, v1, v2 = entropy.split(':')
         if scheme == 'step':
-            entcoeff = tf.cond(tf.less_equal(iter_progress_, float(v2)), lambda: float(v1), lambda: 0.0)
+            entcoeff = tf.cond(tf.less_equal(iter_progress_, int(v2)), lambda: float(v1), lambda: float(0.0))
             losses_with_name.append((entcoeff, 'EntropyCoefficient'))
             entbonus = entcoeff * meanent
             bound_ = bound_ + entbonus
         elif scheme == 'lin':
             entcoeff_decay = tf.maximum(0.0, float(v2) + (float(v1) - float(v2)) * (1.0 - iter_progress_))
             losses_with_name.append((entcoeff_decay, 'EntropyCoefficient'))
-            entbonus = entcoeff_decay * meanent
+            entbonus = entcoeff_decay * meangit ent
             bound_ = bound_ + entbonus
         elif scheme == 'exp':
             ent_f = tf.exp(-tf.abs(tf.reduce_mean(iw) - 1) * float(v2)) * float(v1)
