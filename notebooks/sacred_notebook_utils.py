@@ -70,6 +70,8 @@ def plot_mean_ci(my_runs, metric, axis, conf=0.95):
 '''
 def plot_all(my_runs, metric, axis):
     # Extract the metric
-    metric_matrix = np.array([value['metrics'][metric]['values'] for key, value in my_runs.items()])
+    run_keys = list(my_runs.keys())
+    metric_matrix = np.array([my_runs[key]['metrics'][metric]['values'] for key in run_keys])
     for i in range(metric_matrix.shape[0]):
-        axis.plot(metric_matrix[i])
+        axis.plot(metric_matrix[i], label='Seed:'+str(my_runs[run_keys[i]]['config']['seed']))
+    axis.legend()
