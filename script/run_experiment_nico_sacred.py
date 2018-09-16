@@ -26,7 +26,7 @@ if args.experiment is not None:
     cmds = []
     for index, row in experiment.iterrows():
         _c = cmd_base + row['script'] + ' '
-        #_c = _c + '-e '
+        _c = _c + '-e '
         if len(param_cols) > 0:
             _c = _c + 'with '
         for p in param_cols:
