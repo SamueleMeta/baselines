@@ -1,0 +1,85 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/gradient/nico/t3p/baselines/script",
+    "dependencies": [
+      "baselines==0.1.5",
+      "gym==0.10.5",
+      "numpy==1.14.3",
+      "sacred==0.7.4",
+      "tensorflow==1.8.0"
+    ],
+    "mainfile": "run_rllab_pois_sacred.py",
+    "name": "POIS",
+    "repositories": [
+      {
+        "commit": "4778b8c8c874ce8860e075ccb2c48c2f2a2b5331",
+        "dirty": false,
+        "url": "https://github.com/T3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "run_rllab_pois_sacred.py",
+        "_sources/run_rllab_pois_sacred_7f0cca296a86b66cd25d39cbf1138bc6.py"
+      ]
+    ]
+  },
+  "heartbeat": "2018-09-16T13:30:50.796682",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E5-4610 v2 @ 2.30GHz",
+    "hostname": "nash",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-134-generic-x86_64-with-debian-stretch-sid"
+    ],
+    "python_version": "3.5.5"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": true,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "env=inverted-double-pendulum",
+        "policy=linear",
+        "iw_method=pdis",
+        "logdir=idp",
+        "bound=pdis-d2",
+        "delta=0.6",
+        "gamma=0.99",
+        "center=True",
+        "num_episodes=100",
+        "njobs=1",
+        "seed=570",
+        "entropy=step:10.0:100"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2018-09-16T09:31:33.885665",
+  "status": "COMPLETED",
+  "stop_time": "2018-09-16T13:30:50.791608"
+}
