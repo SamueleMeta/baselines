@@ -57,6 +57,7 @@ def custom_config():
     center = True
     clipping = False
     entropy = 'none'
+    positive_return = False
     # ENTROPY can be of 4 schemes:
     #    - 'none'
     #    - 'step:<height>:<duration>': step function which is <height> tall for <duration> iterations
@@ -68,7 +69,7 @@ def custom_config():
     else:
         file_name = file_name
 
-def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entropy='none', max_iters=500):
+def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entropy='none', max_iters=500, positive_return=False):
 
     if env == 'swimmer':
         make_env_rllab = SwimmerEnv
@@ -126,13 +127,13 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
                horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
                center_return=center_return, render_after=None, max_offline_iters=max_offline_iters,
-               clipping=clipping, entropy=entropy)
+               clipping=clipping, entropy=entropy, positive_return=positive_return)
 
     sampler.close()
 
 @ex.automain
 def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_name, logdir, bound, delta,
-            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, max_iters, _run):
+            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, max_iters, positive_return, _run):
 
     logger.configure(dir=logdir, format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
     train(env=env,
@@ -151,4 +152,5 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_nam
           njobs=njobs,
           clipping=clipping,
           entropy=entropy,
-          max_iters=max_iters)
+          max_iters=max_iters,
+          positive_return=positive_return)

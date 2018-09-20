@@ -319,7 +319,8 @@ def learn(make_env, make_policy, *,
           max_offline_iters=100,
           callback=None,
           clipping=False,
-          entropy='none'):
+          entropy='none',
+          positive_return=False):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -382,6 +383,10 @@ def learn(make_env, make_policy, *,
         ep_return = ep_return - tf.reduce_mean(ep_return)
         rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
 
+    if positive_return:
+        ep_return = ep_return + tf.minimum(0.0, tf.reduce_min(ep_return))
+        rew_split = rew_split + tf.minimum(0.0, tf.reduce_min(ep_return))
+
     discounter = [pow(gamma, i) for i in range(0, horizon)] # Decreasing gamma
     discounter_tf = tf.constant(discounter)
     disc_rew_split = rew_split * discounter_tf
@@ -391,7 +396,7 @@ def learn(make_env, make_policy, *,
     return_max = tf.reduce_max(ep_return)
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
-    return_step_max = tf.reduce_max(tf.abs(rew_)) # Max step reward
+    return_step_max = tf.reduce_max(tf.abs(rew_split)) # Max step reward
     positive_step_return_max = tf.maximum(0.0, tf.reduce_max(rew_split))
     negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
     return_step_maxmin = tf.abs(positive_step_return_max - negative_step_return_max)
