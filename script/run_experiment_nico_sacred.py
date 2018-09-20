@@ -12,6 +12,7 @@ from screener import Screener
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--experiment', help='Experiment CSV file to load.', type=str, default=None)
 parser.add_argument('--condaenv', help='Conda environment to activate.', type=str, default=None)
+parser.add_argument('--dirty', action='store_true', default=False, help='Enable sacred dirty running.')
 parser.add_argument('--pythonv', help='Python version to use', type=str, default='python3')
 args = parser.parse_args()
 
@@ -26,7 +27,7 @@ if args.experiment is not None:
     cmds = []
     for index, row in experiment.iterrows():
         _c = cmd_base + row['script'] + ' '
-        _c = _c + '-e '
+        #_c = _c + '-e '
         if len(param_cols) > 0:
             _c = _c + 'with '
         for p in param_cols:
