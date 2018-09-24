@@ -52,8 +52,10 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     rllab_env_class = rllab_env_from_name(env)
 
     def make_env(seed=0):
-        env_rllab = Rllab2GymWrapper(rllab_env_class())
-        return env_rllab.seed(seed)
+        def _thunk():
+            env_rllab = Rllab2GymWrapper(rllab_env_class())
+            return env_rllab.seed(seed)
+        return _thunk
 
     parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
     print(parallel_env.reset())
