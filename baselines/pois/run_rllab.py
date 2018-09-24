@@ -5,6 +5,7 @@ from baselines import bench, logger
 import time
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
+from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 
 def rllab_env_from_name(env):
     if env == 'swimmer':
@@ -50,14 +51,16 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
 
     rllab_env_class = rllab_env_from_name(env)
 
-    def make_env():
+    def make_env(seed=0):
         env_rllab = Rllab2GymWrapper(rllab_env_class())
-        return env_rllab
+        return env_rllab.seed(seed)
 
-    my_env = make_env()
-    print(my_env.reset())
-    print(my_env.observation_space)
-    print(my_env.action_space)
+    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
+    print(parallel_env.reset())
+    print(parallel_env.observation_space)
+    print(parallel_env.action_space)
+    print(parallel_env.step_async(parallel_env.action_space.sample()))
+    print(parallel_env.step_wait())
 
     '''
     from baselines.common import set_global_seeds
