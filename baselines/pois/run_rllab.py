@@ -62,7 +62,8 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     print(parallel_env.reset())
     print(parallel_env.observation_space)
     print(parallel_env.action_space)
-    print(parallel_env.step_async(parallel_env.action_space.sample()))
+    a = np.array([parallel_env.action_space.sample() for i in range(njobs)])
+    print(parallel_env.step_async(a))
     print(parallel_env.step_wait())
 
     '''
