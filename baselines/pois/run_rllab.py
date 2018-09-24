@@ -3,6 +3,7 @@ import argparse
 from baselines.common.cmd_util import mujoco_arg_parser
 from baselines import bench, logger
 import time
+import numpy as np
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
