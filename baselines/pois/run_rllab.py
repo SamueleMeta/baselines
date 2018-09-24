@@ -3,6 +3,7 @@ import argparse
 from baselines.common.cmd_util import mujoco_arg_parser
 from baselines import bench, logger
 import rllab
+import time
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 
