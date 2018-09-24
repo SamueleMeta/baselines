@@ -2,48 +2,62 @@
 import argparse
 from baselines.common.cmd_util import mujoco_arg_parser
 from baselines import bench, logger
-import rllab
 import time
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 
 def rllab_env_from_name(env):
     if env == 'swimmer':
-        return rllab.envs.mujoco.swimmer_env.SwimmerEnv
+        from rllab.envs.mujoco.swimmer_env import SwimmerEnv
+        return SwimmerEnv
     elif env == 'ant':
-        return rllab.envs.mujoco.ant_env.AntEnv
+        from rllab.envs.mujoco.ant_env import AntEnv
+        return AntEnv
     elif env == 'half-cheetah':
-        return rllab.envs.mujoco.half_cheetah_env.HalfCheetahEnv
+        from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
+        return HalfCheetahEnv
     elif env == 'hopper':
-        return rllab.envs.mujoco.hopper_env.HopperEnv
+        from rllab.envs.mujoco.hopper_env import HopperEnv
+        return HopperEnv
     elif env == 'simple-humanoid':
-        return rllab.envs.mujoco.simple_humanoid_env.SimpleHumanoidEnv
+        from rllab.envs.mujoco.simple_humanoid_env import SimpleHumanoidEnv
+        return SimpleHumanoidEnv
     elif env == 'full-humanoid':
-        return rllab.envs.mujoco.humanoid_env.HumanoidEnv
+        from rllab.envs.mujoco.humanoid_env import HumanoidEnv
+        return HumanoidEnv
     elif env == 'walker':
-        return rllab.envs.mujoco.walker2d_env.Walker2DEnv
+        from rllab.envs.mujoco.walker2d_env import Walker2DEnv
+        return Walker2DEnv
     elif env == 'cartpole':
-        return rllab.envs.box2d.cartpole_env.CartpoleEnv
+        from rllab.envs.box2d.cartpole_env import CartpoleEnv
+        return CartpoleEnv
     elif env == 'mountain-car':
-        return rllab.envs.box2d.mountain_car_env.MountainCarEnv
+        from rllab.envs.box2d.mountain_car_env import MountainCarEnv
+        return MountainCarEnv
     elif env == 'inverted-pendulum':
-        return rllab.envs.box2d.cartpole_swingup_env.CartpoleSwingupEnv
+        from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
+        return InvertedPendulumEnv
     elif env == 'acrobot':
-        return rllab.envs.box2d.double_pendulum_env.DoublePendulumEnv
+        from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
+        return AcrobotEnv
     elif env == 'inverted-double-pendulum':
-        return rllab.envs.mujoco.inverted_double_pendulum_env.InvertedDoublePendulumEnv
+        from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
+        return InvertedPendulumEnv
+    else:
+        raise Exception('Unrecognized rllab environment.')
 
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
 
+    rllab_env_class = rllab_env_from_name(env)
+
     def make_env():
-        env_rllab = rllab_env_from_name(env)()
-        env_rllab = Rllab2GymWrapper(env_rllab)
+        env_rllab = Rllab2GymWrapper(rllab_env_class())
         return env_rllab
 
-    env = make_env()
-    print(env.reset())
-    print(env.observation_space)
-    print(env.action_space)
+    my_env = make_env()
+    print(my_env.reset())
+    print(my_env.observation_space)
+    print(my_env.action_space)
 
     '''
     from baselines.common import set_global_seeds
