@@ -36,7 +36,7 @@ def rllab_env_from_name(env):
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
 
     def make_env():
-        env_rllab = rllab_env_from_name(env_id)()
+        env_rllab = rllab_env_from_name(env)()
         env_rllab = Rllab2GymWrapper(env_rllab)
         return env_rllab
 
