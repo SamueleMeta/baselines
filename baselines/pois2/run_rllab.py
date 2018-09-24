@@ -7,6 +7,8 @@ import numpy as np
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
+from baselines.pois2.mlp_policy import MlpPolicy
+from baselines.pois2 import pois2
 
 def rllab_env_from_name(env):
     if env == 'swimmer':
@@ -49,53 +51,37 @@ def rllab_env_from_name(env):
         raise Exception('Unrecognized rllab environment.')
 
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
-
+    # Setup the Tensorflow session and config
+    ncpu = len(os.sched_getaffinity(0))
+    config = tf.ConfigProto(allow_soft_placement=True,
+                            intra_op_parallelism_threads=ncpu,
+                            inter_op_parallelism_threads=ncpu)
+    config.gpu_options.allow_growth = True #pylint: disable=E1101
+    tf.Session(config=config).__enter__()
+    # Declare env and created the vectorized env
     rllab_env_class = rllab_env_from_name(env)
-
     def make_env(seed=0):
         def _thunk():
             env_rllab = Rllab2GymWrapper(rllab_env_class())
             env_rllab.seed(seed)
             return env_rllab
         return _thunk
-
     parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
-    print(parallel_env.reset())
-    print(parallel_env.observation_space)
-    print(parallel_env.action_space)
-    a = np.array([parallel_env.action_space.sample() for i in range(njobs)])
-    print(parallel_env.step_async(a))
-    print(parallel_env.step_wait())
 
-    '''
-    from baselines.common import set_global_seeds
-    from baselines.common.vec_env.vec_normalize import VecNormalize
-    from baselines.ppo2 import ppo2
-    from baselines.ppo2.policies import MlpPolicy
-    import gym
-    import tensorflow as tf
-    from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
-    ncpu = 1
-    config = tf.ConfigProto(allow_soft_placement=True,
-                            intra_op_parallelism_threads=ncpu,
-                            inter_op_parallelism_threads=ncpu)
-    tf.Session(config=config).__enter__()
-    def make_env():
-        env = gym.make(env_id)
-        env = bench.Monitor(env, logger.get_dir())
-        return env
-    env = DummyVecEnv([make_env])
-    env = VecNormalize(env)
+    # Create the policy
+    if policy == 'linear':
+        hid_size = num_hid_layers = 0
+    elif policy == 'nn':
+        hid_size = [100, 50, 25]
+        num_hid_layers = 3
 
-    set_global_seeds(seed)
-    policy = MlpPolicy
-    ppo2.learn(policy=policy, env=env, nsteps=2048, nminibatches=32,
-        lam=0.95, gamma=0.99, noptepochs=10, log_interval=1,
-        ent_coef=0.0,
-        lr=3e-4,
-        cliprange=0.2,
-        total_timesteps=num_timesteps)
-    '''
+    def make_policy(name, ob_space, ac_space):
+        return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
+                         hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
+                         clip_ob=False, use_rms=False, hidden_W_init=tf.contrib.layers.xavier_initializer(),
+                         output_W_init=tf.contrib.layers.xavier_initializer())
+
+    pois2.learn(parallel_env, make_policy)
 
 def main():
     parser = mujoco_arg_parser()
