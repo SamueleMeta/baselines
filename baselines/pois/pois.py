@@ -228,7 +228,7 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
     print(bound_init, bound)
 
     print(d)
-    
+
     set_parameter(theta)
     improvement = bound_init + bound
     return theta, improvement
@@ -355,13 +355,13 @@ def learn(make_env, make_policy, *,
     target_log_pdf = pi.pd.logp(ac_)
     behavioral_log_pdf = oldpi.pd.logp(ac_)
     log_ratio = target_log_pdf - behavioral_log_pdf
-    
+
     # Split operations
     disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes))
     log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
     target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes))
     mask_split = tf.stack(tf.split(mask_, n_episodes))
-    
+
     # Renyi divergence
     emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
     emp_d2_cum_split = tf.reduce_sum(emp_d2_split, axis=1)
@@ -377,7 +377,7 @@ def learn(make_env, make_policy, *,
     return_max = tf.reduce_max(ep_return)
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
-    
+
     if iw_method == 'pdis':
         raise NotImplementedError()
     elif iw_method == 'is':
@@ -395,13 +395,13 @@ def learn(make_env, make_policy, *,
             w_return_mean = tf.reduce_mean(iw * ep_return - beta * (iw - 1))
         else:
             raise NotImplementedError()
-        
+
         ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
         sqrt_ess_classic = tf.linalg.norm(iw, 1) / tf.linalg.norm(iw, 2)
         ess_renyi = n_episodes / empirical_d2
     else:
         raise NotImplementedError()
-    
+
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'std-d2':
@@ -433,7 +433,7 @@ def learn(make_env, make_policy, *,
 
     assign_old_eq_new = U.function([], [], updates=[tf.assign(oldv, newv)
                 for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
-    
+
     compute_lossandgrad = U.function([ob_, ac_, disc_rew_, mask_], losses + [U.flatgrad(bound_, var_list)])
     compute_grad = U.function([ob_, ac_, disc_rew_, mask_], [U.flatgrad(bound_, var_list)])
     compute_bound = U.function([ob_, ac_, disc_rew_, mask_], [bound_])
@@ -447,16 +447,16 @@ def learn(make_env, make_policy, *,
         sampler = type("SequentialSampler", (object,), {"collect": lambda self, _: seg_gen.__next__()})()
 
     U.initialize()
-    
+
     # Starting optimizing
-    
+
     episodes_so_far = 0
     timesteps_so_far = 0
     iters_so_far = 0
     tstart = time.time()
     lenbuffer = deque(maxlen=n_episodes)
     rewbuffer = deque(maxlen=n_episodes)
-    
+
     while True:
 
         iters_so_far += 1
@@ -473,12 +473,12 @@ def learn(make_env, make_policy, *,
             break
 
         logger.log('********** Iteration %i ************' % iters_so_far)
-        
+
         theta = get_parameter()
         print(theta)
         with timed('sampling'):
             seg = sampler.collect(theta)
-        
+
         add_disc_rew(seg, gamma)
 
         lens, rets = seg['ep_lens'], seg['ep_rets']
