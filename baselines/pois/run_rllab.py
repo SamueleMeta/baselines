@@ -88,7 +88,7 @@ def main():
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
-    parser.parse_args()
+    args = parser.parse_args()
     # Configure logging
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
