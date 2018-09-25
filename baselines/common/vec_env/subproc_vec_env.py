@@ -2,18 +2,16 @@ import numpy as np
 from multiprocessing import Process, Pipe
 from baselines.common.vec_env import VecEnv, CloudpickleWrapper
 
-def worker(remote, parent_remote, env_fn_wrapper):
+def worker(remote, parent_remote, env_fn_wrapper, terminating):
     # Use this to make the envs repeat the last observation, reward
     # and done flag if the episodes has ended before the horizon.
-    TERMINATING = True
-
     parent_remote.close()
     env = env_fn_wrapper.x()
     done = False
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            if not done or not TERMINATING:
+            if not done or not terminating:
                 ob, reward, done, info = env.step(data)
             if done:
                 ob = env.reset()
@@ -34,7 +32,7 @@ def worker(remote, parent_remote, env_fn_wrapper):
             raise NotImplementedError
 
 class SubprocVecEnv(VecEnv):
-    def __init__(self, env_fns, spaces=None):
+    def __init__(self, env_fns, spaces=None, terminating=False):
         """
         envs: list of gym environments to run in subprocesses
         """
@@ -42,7 +40,7 @@ class SubprocVecEnv(VecEnv):
         self.closed = False
         nenvs = len(env_fns)
         self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-        self.ps = [Process(target=worker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
+        self.ps = [Process(target=worker, args=(work_remote, remote, CloudpickleWrapper(env_fn), terminating))
             for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
         for p in self.ps:
             p.daemon = True # if the main process crashes, we should not cause things to hang
