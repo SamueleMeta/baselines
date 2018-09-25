@@ -2,19 +2,25 @@ import numpy as np
 from multiprocessing import Process, Pipe
 from baselines.common.vec_env import VecEnv, CloudpickleWrapper
 
-
 def worker(remote, parent_remote, env_fn_wrapper):
+    # Use this to make the envs repeat the last observation, reward
+    # and done flag if the episodes has ended before the horizon.
+    TERMINATING = True
+
     parent_remote.close()
     env = env_fn_wrapper.x()
+    done = False
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, reward, done, info = env.step(data)
+            if not done or not TERMINATING:
+                ob, reward, done, info = env.step(data)
             if done:
                 ob = env.reset()
             remote.send((ob, reward, done, info))
         elif cmd == 'reset':
             ob = env.reset()
+            done = False
             remote.send(ob)
         elif cmd == 'reset_task':
             ob = env.reset_task()
@@ -26,7 +32,6 @@ def worker(remote, parent_remote, env_fn_wrapper):
             remote.send((env.observation_space, env.action_space))
         else:
             raise NotImplementedError
-
 
 class SubprocVecEnv(VecEnv):
     def __init__(self, env_fns, spaces=None):

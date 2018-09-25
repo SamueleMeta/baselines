@@ -7,28 +7,32 @@ import numpy as np
 import scipy.stats as sts
 #import time
 
+# FIXME: WAAAT
+
 class MlpPolicy(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""
     recurrent = False
     def __init__(self, name, *args, **kwargs):
-        #with tf.device('/cpu:0'):
         with tf.variable_scope(name):
             self._init(*args, **kwargs)
             U.initialize()
             self.scope = tf.get_variable_scope().name
-            self._prepare_getsetters()
+            #self._prepare_getsetters()
 
-    def _init(self, ob_space, ac_space, nbatch, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True, use_critic=True,
+    def _init(self, sess, ob_space, ac_space, nbatch, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True, use_critic=True,
               seed=None, hidden_W_init=U.normc_initializer(1.0), hidden_b_init=tf.zeros_initializer(),
                  output_W_init=U.normc_initializer(0.01), output_b_init=tf.zeros_initializer()):
         """Params:
             ob_space: task observation space
-            ac_space : task action space
+            ac_space: task action space
+            nbatch: number of parallel environments
             hid_size: width of hidden layers
             num_hid_layers: depth
             gaussian_fixed_var: True->separate parameter for logstd, False->two-headed mlp
             use_bias: whether to include bias in neurons
         """
+        self.sess = sess
+
         assert isinstance(ob_space, gym.spaces.Box)
 
         if isinstance(hid_size, list):
@@ -40,8 +44,8 @@ class MlpPolicy(object):
             tf.set_random_seed(seed)
 
         self.pdtype = pdtype = make_pdtype(ac_space)
-        sequence_length = None
-        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[sequence_length] + list(ob_space.shape))
+        self.nbatch = nbatch
+        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[self.nbatch] + list(ob_space.shape))
 
         with tf.variable_scope("obfilter"):
             self.ob_rms = RunningMeanStd(shape=ob_space.shape)
@@ -54,7 +58,6 @@ class MlpPolicy(object):
                 for i in range(num_hid_layers):
                     last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size[i], name="fc%i"%(i+1), kernel_initializer=hidden_W_init))
                 self.vpred = tf.layers.dense(last_out, 1, name='final', kernel_initializer=hidden_W_init)[:,0]
-
         #Actor
         with tf.variable_scope('pol'):
             last_out = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
@@ -81,17 +84,26 @@ class MlpPolicy(object):
         stochastic = tf.placeholder(dtype=tf.bool, shape=())
         ac = U.switch(stochastic, self.pd.sample(), self.pd.mode())
         if use_critic:
-            self._act = U.function([stochastic, ob], [ac, self.vpred])
+            vpred = self.vpred
         else:
-            self._act = U.function([stochastic, ob], [ac, tf.zeros(1)])
+            vpred = tf.zeros(1)
 
+        def step(_ob, _stochastic=False):
+            a, v = self.sess.run([ac, vpred], {ob: _ob, stochastic:_stochastic})
+            return a, v
+
+        self.step = step
+
+    '''
         #Evaluating
         self.ob = ob
-        self.ac_in = self.pdtype.sample_placeholder([sequence_length]+list(ac_space.shape), name='ac_in')
+        self.ac_in = U.get_placeholder(name="ac_in", dtype=tf.float32,
+                                       shape=[self.nbatch] +
+                                       list(ac_space.shape))
         self.gamma = U.get_placeholder(name="gamma",
                                         dtype=tf.float32,shape=[])
         self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
-                                       shape=[sequence_length]+[1])
+                                       shape=[self.nbatch]+[1])
         self.logprobs = self.pd.logp(self.ac_in) #  [\log\pi(a|s)]
 
         #Fisher
@@ -105,19 +117,6 @@ class MlpPolicy(object):
 
         #Performance graph initializations
         self._setting = []
-
-    #Acting
-    def act(self, stochastic, ob):
-        """
-        Actions sampled from the policy
-
-        Params:
-               stochastic: use noise
-               ob: current state
-        """
-        ac1, vpred1 =  self._act(stochastic, ob)
-        return ac1, vpred1
-
 
     #Divergence
     def eval_renyi(self, states, other, order=2):
@@ -515,11 +514,14 @@ class MlpPolicy(object):
         fisher_samples = np.array([fun(s, a)[0] for (s,a) in zip(_states, _actions)]) #one call per EPISODE
         return np.mean(fisher_samples, axis=0)
 
+    '''
+
     def _prepare_getsetters(self):
         with tf.variable_scope('pol') as vs:
             self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
 
+        #logstd = tf.get_default_session().run(self.logstd)
         self.get_parameter = U.GetFlat(self.var_list)
         self.set_parameter = U.SetFromFlat(self.var_list)
 

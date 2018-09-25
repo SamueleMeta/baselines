@@ -2,54 +2,13 @@
 import argparse
 from baselines.common.cmd_util import mujoco_arg_parser
 from baselines import bench, logger
-import time, os
+import time, os, gym
 import tensorflow as tf
 import numpy as np
 
-from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.pois2.mlp_policy import MlpPolicy
 from baselines.pois2 import pois2
-
-def rllab_env_from_name(env):
-    if env == 'swimmer':
-        from rllab.envs.mujoco.swimmer_env import SwimmerEnv
-        return SwimmerEnv
-    elif env == 'ant':
-        from rllab.envs.mujoco.ant_env import AntEnv
-        return AntEnv
-    elif env == 'half-cheetah':
-        from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
-        return HalfCheetahEnv
-    elif env == 'hopper':
-        from rllab.envs.mujoco.hopper_env import HopperEnv
-        return HopperEnv
-    elif env == 'simple-humanoid':
-        from rllab.envs.mujoco.simple_humanoid_env import SimpleHumanoidEnv
-        return SimpleHumanoidEnv
-    elif env == 'full-humanoid':
-        from rllab.envs.mujoco.humanoid_env import HumanoidEnv
-        return HumanoidEnv
-    elif env == 'walker':
-        from rllab.envs.mujoco.walker2d_env import Walker2DEnv
-        return Walker2DEnv
-    elif env == 'cartpole':
-        from rllab.envs.box2d.cartpole_env import CartpoleEnv
-        return CartpoleEnv
-    elif env == 'mountain-car':
-        from rllab.envs.box2d.mountain_car_env import MountainCarEnv
-        return MountainCarEnv
-    elif env == 'inverted-pendulum':
-        from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
-        return InvertedPendulumEnv
-    elif env == 'acrobot':
-        from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
-        return AcrobotEnv
-    elif env == 'inverted-double-pendulum':
-        from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
-        return InvertedPendulumEnv
-    else:
-        raise Exception('Unrecognized rllab environment.')
 
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
     # Setup the Tensorflow session and config
@@ -65,10 +24,9 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     config.gpu_options.allow_growth = True #pylint: disable=E1101
     tf.Session(config=config).__enter__()
     # Declare env and created the vectorized env
-    rllab_env_class = rllab_env_from_name(env)
     def make_env(seed=0):
         def _thunk():
-            env_rllab = Rllab2GymWrapper(rllab_env_class())
+            env_rllab = gym.make(env)
             env_rllab.seed(seed)
             return env_rllab
         return _thunk

@@ -8,8 +8,8 @@ import numpy as np
 
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
-from baselines.pois2.mlp_policy import MlpPolicy
-from baselines.pois2 import pois2
+from baselines.pois3.mlp_policy import MlpPolicy
+from baselines.pois3 import pois3
 
 def rllab_env_from_name(env):
     if env == 'swimmer':
@@ -51,14 +51,9 @@ def rllab_env_from_name(env):
     else:
         raise Exception('Unrecognized rllab environment.')
 
-def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
+def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
     # Setup the Tensorflow session and config
-    try:
-        affinity = len(os.sched_getaffinity(0))
-    except:
-        affinity = njobs
-    ncpu = min(njobs, affinity)
-    print("Using", ncpu, "CPUs.")
+    ncpu = len(os.sched_getaffinity(0))
     config = tf.ConfigProto(allow_soft_placement=True,
                             intra_op_parallelism_threads=ncpu,
                             inter_op_parallelism_threads=ncpu)
@@ -72,7 +67,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
             env_rllab.seed(seed)
             return env_rllab
         return _thunk
-    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(ncpu)])
+    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
 
     # Create the policy
     if policy == 'linear':
@@ -81,16 +76,13 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
         hid_size = [100, 50, 25]
         num_hid_layers = 3
 
-    def make_policy(name, ob_space, ac_space, nbatch):
-        return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, nbatch=nbatch,
+    def make_policy(name, ob_space, ac_space):
+        return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                          hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
                          hidden_W_init=tf.contrib.layers.xavier_initializer(),
                          output_W_init=tf.contrib.layers.xavier_initializer())
 
-    pois2.learn(parallel_env, make_policy, n_episodes=num_episodes, max_iters=max_iters,
-               horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
-               iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True,
-               center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
+    pois3.learn(parallel_env, make_policy)
 
 def main():
     parser = mujoco_arg_parser()
@@ -102,7 +94,6 @@ def main():
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--bound', type=str, default='max-d2')
     parser.add_argument('--delta', type=float, default=0.99)
-    parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--max_offline_iters', type=int, default=10)
@@ -124,7 +115,6 @@ def main():
           natural=args.natural,
           bound=args.bound,
           delta=args.delta,
-          gamma=args.gamma,
           seed=args.seed,
           policy=args.policy,
           max_offline_iters=args.max_offline_iters,

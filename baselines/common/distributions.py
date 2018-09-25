@@ -81,7 +81,7 @@ class DiagGaussianPdType(PdType):
         return [self.size]
     def sample_dtype(self):
         return tf.float32
-    
+
 class GaussianVectorPdType(PdType):
     def __init__(self, size):
         self.size = size
@@ -93,7 +93,7 @@ class GaussianVectorPdType(PdType):
         return [self.size]
     def sample_dtype(self):
         return tf.float32
-    
+
 class MultiGaussianVectorPdType(PdType):
     def __init__(self, size):
         self.size = size
@@ -190,6 +190,11 @@ class CategoricalPd(Pd):
     def sample(self):
         u = tf.random_uniform(tf.shape(self.logits))
         return tf.argmax(self.logits - tf.log(-tf.log(u)), axis=-1)
+
+    def renyi(self, other, alpha=2.):
+        assert isinstance(other, CategoricalPd)
+        raise Exception('Not implemented')
+
     @classmethod
     def fromflat(cls, flat):
         return cls(flat)
@@ -243,21 +248,21 @@ class DiagGaussianPd(Pd):
     def sample_symmetric(self):
         noise = tf.random_normal(tf.shape(self.mean))
         return (self.mean + self.std * noise, self.mean - self.std * noise)
-                
+
     def renyi(self, other, alpha=2.):
         tol = 1e-45
         assert isinstance(other, DiagGaussianPd)
         var_alpha = alpha * tf.square(other.std) + (1. - alpha) * tf.square(self.std)
         return alpha/2. * tf.reduce_sum(tf.square(self.mean - other.mean) / (var_alpha + tol), axis=-1) - \
-               1./(2*(alpha - 1)) * (tf.log(tf.reduce_prod(var_alpha, axis=-1) + tol) - 
-                   tf.log(tf.reduce_prod(tf.square(self.std), axis=-1) + tol) * (1-alpha) 
+               1./(2*(alpha - 1)) * (tf.log(tf.reduce_prod(var_alpha, axis=-1) + tol) -
+                   tf.log(tf.reduce_prod(tf.square(self.std), axis=-1) + tol) * (1-alpha)
                                 - tf.log(tf.reduce_prod(tf.square(other.std), axis=-1) + tol) * alpha)
-               
+
     @classmethod
     def fromflat(cls, flat):
         return cls(flat)
-    
-    
+
+
 class GaussianVectorPd(Pd):
     def __init__(self, flat):
         self.flat = flat
@@ -297,7 +302,7 @@ class GaussianVectorPd(Pd):
     @classmethod
     def fromflat(cls, flat):
         return cls(flat)
-    
+
 class MultiGaussianVectorPd(Pd):
     def __init__(self, flat, layer_lens):
         self.flat = flat
@@ -315,7 +320,7 @@ class MultiGaussianVectorPd(Pd):
         xs = tf.split(x_flat, self.layer_lens, axis=1)
         return tf.stack([0.5 * tf.reduce_sum(tf.square((x - selfmean) / tf.exp(selflogstd)), axis=-1) \
                + 0.5 * np.log(2.0 * np.pi) * tf.to_float(tf.shape(x)[-1]) \
-               + tf.reduce_sum(selflogstd, axis=-1) for selfmean, selflogstd, x 
+               + tf.reduce_sum(selflogstd, axis=-1) for selfmean, selflogstd, x
                in zip(self.means, self.logstds, xs)], axis=1)
     def kl(self, other):
         assert isinstance(other, MultiGaussianVectorPd)
@@ -330,7 +335,7 @@ class MultiGaussianVectorPd(Pd):
     def sample_symmetric(self):
         noise = tf.random_normal(tf.shape(self.flat_mean))
         return (self.flat_mean + tf.exp(self.flat_logstd) * noise, self.flat_mean - tf.exp(self.flat_logstd) * noise)
-                
+
     def renyi(self, other, alpha=2.):
         tol = 1e-45
         assert isinstance(other, MultiGaussianVectorPd)
@@ -338,8 +343,8 @@ class MultiGaussianVectorPd(Pd):
         for selfmean, selflogstd, othermean, otherlogstd in zip(self.means, self.logstds, other.means, other.logstds):
             var_alpha = alpha * tf.exp(2*otherlogstd) + (1. - alpha) * tf.exp(2*selflogstd)
             renyis.append(alpha/2. * tf.reduce_sum(tf.square(selfmean - othermean) / (var_alpha + tol), axis=-1) - \
-                   1./(2*(alpha - 1)) * (tf.log(tf.reduce_prod(var_alpha, axis=-1) + tol) - 
-                       tf.log(tf.reduce_prod(tf.exp(2*selflogstd), axis=-1) + tol) * (1-alpha) 
+                   1./(2*(alpha - 1)) * (tf.log(tf.reduce_prod(var_alpha, axis=-1) + tol) -
+                       tf.log(tf.reduce_prod(tf.exp(2*selflogstd), axis=-1) + tol) * (1-alpha)
                                     - tf.log(tf.reduce_prod(tf.exp(otherlogstd), axis=-1) + tol) * alpha))
         return tf.stack(renyis, axis=0)
 
@@ -348,7 +353,7 @@ class CholeskyGaussianPd(Pd):
     """d-dimensional multivariate Gaussian distribution"""
     def __init__(self, flat, size):
         """Params:
-            flat: the d(d+3)/2 necessary parameters in a flat tensor. 
+            flat: the d(d+3)/2 necessary parameters in a flat tensor.
                 For a d-dimensional Gaussian, first d parameters for the mean,
                 then d(d+1)/2 parameters for the nonzero elements of upper triangular
                 standard deviation matrix L. The diagonal entries are exponentiated, while the others are kept
@@ -360,13 +365,13 @@ class CholeskyGaussianPd(Pd):
         if size*(size+3)!=2*l:
             raise ValueError('Multivariate Gaussian: parameter size does not match dimension')
         self.size = size
-        
-        #Build std matrix    
+
+        #Build std matrix
         mask = np.triu_indices(size)
         mask = mask[0] * size + mask[1]
         mask = np.expand_dims(mask, -1)
-        mean, std_params = tf.split(axis=0, 
-                                num_or_size_splits=[size, l-size], 
+        mean, std_params = tf.split(axis=0,
+                                num_or_size_splits=[size, l-size],
                                 value=flat)
         self.mean = mean
         self.std = tf.scatter_nd(mask, std_params, shape=[size**2])
@@ -376,10 +381,10 @@ class CholeskyGaussianPd(Pd):
         self.cov = tf.matmul(self.std, self.std, transpose_b=True)
         #Distribution properties
         self.log_det_cov = 2*tf.reduce_sum(tf.log(tf.matrix_diag_part(self.std)))
-        self._entropy = 0.5*(self.size + 
-                             self.size*tf.log(tf.constant(2*np.pi)) + 
+        self._entropy = 0.5*(self.size +
+                             self.size*tf.log(tf.constant(2*np.pi)) +
                              self.log_det_cov)
-        
+
     def flatparam(self):
         return self.flat
     def mode(self):
@@ -387,22 +392,22 @@ class CholeskyGaussianPd(Pd):
     def neglogp(self, x):
         delta = tf.expand_dims(x - self.mean, axis=-1)
         stds = 0*delta + self.std
-        half_quadratic = tf.matrix_triangular_solve(stds, 
+        half_quadratic = tf.matrix_triangular_solve(stds,
                                                     delta, lower=False)
         quadratic = tf.matmul(half_quadratic, half_quadratic, transpose_a=True)
-        
+
         return 0.5 * (self.log_det_cov + quadratic + self.size*tf.log(2*tf.constant(np.pi)))
     def kl(self, other):
         assert isinstance(other, CholeskyGaussianPd)
         assert self.size==other.size
         std_mix = tf.matrix_triangular_solve(other.std, self.std, lower=False)
         trace_mix = tf.trace(tf.matmul(std_mix, std_mix, transpose_b=True))
-        delta = self.mean - other.mean 
+        delta = self.mean - other.mean
         delta = tf.expand_dims(delta, axis=-1)
         half_quadratic = tf.matrix_triangular_solve(other.std, delta, lower=False)
         quadratic = tf.matmul(half_quadratic, half_quadratic, transpose_a=True)
         return 0.5 * (self.log_det_cov - other.log_det_cov + trace_mix +
-                      quadratic - self.size)        
+                      quadratic - self.size)
     def entropy(self):
         return self._entropy
     def sample(self):
@@ -423,8 +428,8 @@ class CholeskyGaussianPd(Pd):
         half_quadratic = tf.matrix_triangular_solve(mix_std, delta, lower=True)
         quadratic = tf.matmul(half_quadratic, half_quadratic, transpose_a=True)
         log_det_mix = 2*tf.reduce_sum(tf.log(tf.matrix_diag_part(mix_std)))
-        return 0.5*alpha*quadratic - 1./(2*(alpha-1))*(log_det_mix - 
-                                      (1-alpha)*self.log_det_cov - 
+        return 0.5*alpha*quadratic - 1./(2*(alpha-1))*(log_det_mix -
+                                      (1-alpha)*self.log_det_cov -
                                       alpha*other.log_det_cov)
 
 
@@ -525,4 +530,3 @@ def validate_probtype(probtype, pdparam):
     klval_ll_stderr = logliks.std() / np.sqrt(N) #pylint: disable=E1101
     assert np.abs(klval - klval_ll) < 3 * klval_ll_stderr # within 3 sigmas
     print('ok on', probtype, pdparam)
-
