@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # noinspection PyUnresolvedReferences
 import sys
-sys.path.remove('/home/alberto/baselines')
-sys.path.append('/home/alberto/baselines_ours')
-sys.path.append('/home/alberto/rllab')
 
 from baselines.common import set_global_seeds
 import gym
@@ -16,10 +13,10 @@ import time
 import os
 import tensorflow as tf
 from baselines.pois.parallel_sampler import ParallelSampler
-from rllab.envs.box2d.cartpole_env import CartpoleEnv
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
-'''
 from rllab.envs.mujoco.swimmer_env import SwimmerEnv
+'''
+from rllab.envs.box2d.cartpole_env import CartpoleEnv
 from rllab.envs.mujoco.ant_env import AntEnv
 from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
 from rllab.envs.mujoco.hopper_env import HopperEnv
@@ -73,10 +70,10 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
     def make_policy(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                          hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         clip_ob=False, use_rms=False, hidden_W_init=tf.contrib.layers.xavier_initializer(),
+                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
                          output_W_init=tf.contrib.layers.xavier_initializer())
 
-    sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed, unit='samples')
+    sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed)
 
     affinity = len(os.sched_getaffinity(0))
     sess = U.make_session(affinity)
