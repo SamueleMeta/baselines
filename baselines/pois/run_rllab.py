@@ -57,20 +57,10 @@ def rllab_env_from_name(env):
 
 def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
 
-    # Setup the Tensorflow session and config
-    try:
-        affinity = len(os.sched_getaffinity(0))
-    except:
-        affinity = njobs
-    ncpu = min(njobs, affinity)
-    print("Using", ncpu, "CPUs.")
-    sess = U.make_session(ncpu)
-    sess.__enter__()
-    # Declare env and created the vectorized env
-    rllab_env_class = rllab_env_from_name(env)
     def make_env():
-        env_rllab = Rllab2GymWrapper(rllab_env_class())
-        return env_rllab
+        env_rllab = rllab_env_from_name()
+        _env = Rllab2GymWrapper(env_rllab)
+        return _env
 
     if policy == 'linear':
         hid_size = num_hid_layers = 0
@@ -86,6 +76,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
 
     sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed)
 
+    affinity = len(os.sched_getaffinity(0))
     sess = U.make_session(affinity)
     sess.__enter__()
 
