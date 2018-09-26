@@ -5,8 +5,8 @@ import gym
 from baselines.common.distributions import make_pdtype
 import numpy as np
 import scipy.stats as sts
-#import time
 from baselines.ppo2.policies import nature_cnn
+#import time
 
 class CnnPolicy(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""
@@ -19,7 +19,7 @@ class CnnPolicy(object):
             self.scope = tf.get_variable_scope().name
             self._prepare_getsetters()
 
-    def _init(self, ob_space, ac_space, gaussian_fixed_var=True, use_bias=True, use_critic=True,
+    def _init(self, ob_space, ac_space, nbatch, gaussian_fixed_var=True, use_bias=True, use_critic=True,
               seed=None, hidden_W_init=U.normc_initializer(1.0), hidden_b_init=tf.zeros_initializer(),
                  output_W_init=U.normc_initializer(0.01), output_b_init=tf.zeros_initializer()):
         """Params:
@@ -55,7 +55,6 @@ class CnnPolicy(object):
         #Actor
         with tf.variable_scope('pol'):
             last_out = nature_cnn(ob)
-
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
                 self.mean = mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
                                        name='final',
@@ -81,9 +80,7 @@ class CnnPolicy(object):
 
         #Evaluating
         self.ob = ob
-        self.ac_in = U.get_placeholder(name="ac_in", dtype=ac_space.dtype,
-                                       shape=[sequence_length] +
-                                       list(ac_space.shape))
+        self.ac_in = self.pdtype.sample_placeholder([sequence_length]+list(ac_space.shape), name='ac_in')
         self.gamma = U.get_placeholder(name="gamma",
                                         dtype=tf.float32,shape=[])
         self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
@@ -111,8 +108,8 @@ class CnnPolicy(object):
                stochastic: use noise
                ob: current state
         """
-        ac1, vpred1 =  self._act(stochastic, ob[None])
-        return ac1[0], vpred1[0]
+        ac1, vpred1 =  self._act(stochastic, ob)
+        return ac1, vpred1
 
 
     #Divergence
