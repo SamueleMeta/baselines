@@ -86,8 +86,6 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
 
     set_global_seeds(seed)
 
-import baselines.common.tf_util as U
-from baselines.common import set_global_seeds
     gym.logger.setLevel(logging.WARN)
 
     pois2.learn(parallel_env, make_policy, n_episodes=num_episodes, max_iters=max_iters,
