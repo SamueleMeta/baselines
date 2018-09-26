@@ -87,7 +87,7 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
                          hidden_W_init=tf.contrib.layers.xavier_initializer(),
                          output_W_init=tf.contrib.layers.xavier_initializer())
 
-    sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed, unit='samples')
+    sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed)
 
     sess = U.make_session(affinity)
     sess.__enter__()
