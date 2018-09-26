@@ -55,7 +55,7 @@ def rllab_env_from_name(env):
     else:
         raise Exception('Unrecognized rllab environment.')
 
-def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
+def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
 
     def make_env():
         env_rllab = rllab_env_from_name()
@@ -76,7 +76,10 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
 
     sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed)
 
-    affinity = len(os.sched_getaffinity(0))
+    try:
+        affinity = len(os.sched_getaffinity(0))
+    except:
+        affinity = njobs
     sess = U.make_session(affinity)
     sess.__enter__()
 
@@ -84,8 +87,8 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
 
     gym.logger.setLevel(logging.WARN)
 
-    pois.learn(make_env, make_policy, n_episodes=num_episodes, max_iters=500,
-               horizon=horizon, gamma=1., delta=delta, use_natural_gradient=natural,
+    pois.learn(make_env, make_policy, n_episodes=num_episodes, max_iters=max_iters,
+               horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
                center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
 
@@ -108,6 +111,8 @@ def main():
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--max_offline_iters', type=int, default=10)
+    parser.add_argument('--max_iters', type=int, default=500)
+    parser.add_argument('--gamma', type=float, default=1.0)
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
@@ -115,6 +120,7 @@ def main():
         file_name = args.file_name
     logger.configure(dir='.', format_strs=['stdout', 'csv'], file_name=file_name)
     train(env=args.env,
+          max_iters=args.max_iters,
           num_episodes=args.num_episodes,
           horizon=args.horizon,
           iw_method=args.iw_method,
@@ -122,6 +128,7 @@ def main():
           natural=args.natural,
           bound=args.bound,
           delta=args.delta,
+          gamma=args.gamma,
           seed=args.seed,
           policy=args.policy,
           max_offline_iters=args.max_offline_iters,
