@@ -64,11 +64,8 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
         affinity = njobs
     ncpu = min(njobs, affinity)
     print("Using", ncpu, "CPUs.")
-    config = tf.ConfigProto(allow_soft_placement=True,
-                            intra_op_parallelism_threads=ncpu,
-                            inter_op_parallelism_threads=ncpu)
-    config.gpu_options.allow_growth = True #pylint: disable=E1101
-    tf.Session(config=config).__enter__()
+    sess = U.make_session(ncpu)
+    sess.__enter__()
     # Declare env and created the vectorized env
     rllab_env_class = rllab_env_from_name(env)
     def make_env():
