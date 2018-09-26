@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import argparse
-from baselines.common.cmd_util import mujoco_arg_parser
 from baselines import bench, logger
-import time, os
+import time, os, gym, logging
 import tensorflow as tf
 import numpy as np
 
+import baselines.common.tf_util as U
+from baselines.common import set_global_seeds
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.pois2.mlp_policy import MlpPolicy
@@ -52,18 +53,7 @@ def rllab_env_from_name(env):
         raise Exception('Unrecognized rllab environment.')
 
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
-    # Setup the Tensorflow session and config
-    try:
-        affinity = len(os.sched_getaffinity(0))
-    except:
-        affinity = njobs
-    ncpu = min(njobs, affinity)
-    print("Using", ncpu, "CPUs.")
-    config = tf.ConfigProto(allow_soft_placement=True,
-                            intra_op_parallelism_threads=ncpu,
-                            inter_op_parallelism_threads=ncpu)
-    config.gpu_options.allow_growth = True #pylint: disable=E1101
-    tf.Session(config=config).__enter__()
+
     # Declare env and created the vectorized env
     rllab_env_class = rllab_env_from_name(env)
     def make_env(seed=0):
@@ -86,6 +76,19 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
                          hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
                          hidden_W_init=tf.contrib.layers.xavier_initializer(),
                          output_W_init=tf.contrib.layers.xavier_initializer())
+
+    try:
+        affinity = len(os.sched_getaffinity(0))
+    except:
+        affinity = njobs
+    sess = U.make_session(affinity)
+    sess.__enter__()
+
+    set_global_seeds(seed)
+
+import baselines.common.tf_util as U
+from baselines.common import set_global_seeds
+    gym.logger.setLevel(logging.WARN)
 
     pois2.learn(parallel_env, make_policy, n_episodes=num_episodes, max_iters=max_iters,
                horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
