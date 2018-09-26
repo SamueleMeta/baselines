@@ -94,7 +94,10 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
                center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
 
 def main():
-    parser = mujoco_arg_parser()
+    import argparse
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+    parser.add_argument('--env', type=str, default='cartpole')
     parser.add_argument('--num_episodes', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_method', type=str, default='is')
@@ -103,11 +106,11 @@ def main():
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--bound', type=str, default='max-d2')
     parser.add_argument('--delta', type=float, default=0.99)
-    parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
+    parser.add_argument('--gamma', type=float, default=1.0)
     args = parser.parse_args()
     # Configure logging
     if args.file_name == 'progress':
