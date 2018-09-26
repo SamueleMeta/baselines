@@ -94,7 +94,6 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
 
     sampler.close()
 
-
 def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
