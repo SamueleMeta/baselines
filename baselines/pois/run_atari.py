@@ -6,9 +6,10 @@ import time, os, gym
 import tensorflow as tf
 import numpy as np
 
-from baselines.policy.mlp_policy import MlpPolicy
+from baselines.policy.cnn_policy import CnnPolicy
 from baselines.pois import pois
 from baselines.pois.parallel_sampler import ParallelSampler
+from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
     # Setup the Tensorflow session and config
@@ -22,23 +23,16 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
                             intra_op_parallelism_threads=ncpu,
                             inter_op_parallelism_threads=ncpu)
     config.gpu_options.allow_growth = True #pylint: disable=E1101
-    tf.Session(config=config).__enter__()
+    tf.InteractiveSession(config=config).__enter__()
     # Declare env and created the vectorized env
-    def make_env():
-        env_rllab = gym.make(env)
-        env_rllab.seed(0)
-        return env_rllab
-
-    # Create the policy
-    if policy == 'linear':
-        hid_size = num_hid_layers = 0
-    elif policy == 'nn':
-        hid_size = [100, 50, 25]
-        num_hid_layers = 3
+    def make_env(): # pylint: disable=C0111
+        atari_env = make_atari(env)
+        atari_env.seed(seed)
+        return wrap_deepmind(atari_env)
 
     def make_policy(name, ob_space, ac_space):
-        return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                         hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
+        return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
+                         gaussian_fixed_var=True, use_bias=False, use_critic=False,
                          hidden_W_init=tf.contrib.layers.xavier_initializer(),
                          output_W_init=tf.contrib.layers.xavier_initializer())
 
@@ -48,7 +42,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
                horizon=horizon, gamma=1., delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True,
                center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
-
+    
 def main():
     parser = mujoco_arg_parser()
     parser.add_argument('--num_episodes', type=int, default=100)

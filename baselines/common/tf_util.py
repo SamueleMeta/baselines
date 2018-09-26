@@ -223,7 +223,7 @@ def flatgrad(loss, var_list, clip_norm=None, grad_ys=None, aggregation_method=No
 def assignFromFlat(var_list, values):
     assigns = []
     shapes = list(map(var_shape, var_list))
-   
+
     start = 0
     assigns = []
     for (shape, v) in zip(shapes, var_list):

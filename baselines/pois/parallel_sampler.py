@@ -106,7 +106,7 @@ class Worker(Process):
         workerseed = self.seed + 10000 * MPI.COMM_WORLD.Get_rank()
         set_all_seeds(workerseed)
         env.seed(workerseed)
-
+        print('Worker %s - Creating policy...' % (os.getpid()))
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
         print('Worker %s - Running with seed %s' % (os.getpid(), workerseed))
 
@@ -128,7 +128,10 @@ class Worker(Process):
 class ParallelSampler(object):
 
     def __init__(self, make_pi, make_env, n_episodes, horizon, stochastic, n_workers=-1, seed=0):
-        affinity = len(os.sched_getaffinity(0))
+        try:
+            affinity = len(os.sched_getaffinity(0))
+        except:
+            affinity = max(1, n_workers)
         if n_workers == -1:
             self.n_workers = affinity
         else:
