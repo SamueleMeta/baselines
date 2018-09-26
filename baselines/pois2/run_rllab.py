@@ -62,7 +62,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
             env_rllab.seed(seed)
             return env_rllab
         return _thunk
-    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(ncpu)], terminating=True)
+    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True)
 
     # Create the policy
     if policy == 'linear':
