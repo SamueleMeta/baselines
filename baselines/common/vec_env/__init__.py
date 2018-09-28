@@ -66,12 +66,20 @@ class VecEnv(ABC):
         """
         pass
 
-    @abstractmethod
-    def close(self):
+    def close_extras(self):
         """
-        Clean up the environments' resources.
+        Clean up the  extra resources, beyond what's in this base class.
+        Only runs when not self.closed.
         """
         pass
+
+    def close(self):
+        if self.closed:
+            return
+        if self.viewer is not None:
+            self.viewer.close()
+        self.close_extras()
+        self.closed = True
 
     def step(self, actions):
         self.step_async(actions)
@@ -83,9 +91,9 @@ class VecEnv(ABC):
 class VecEnvWrapper(VecEnv):
     def __init__(self, venv, observation_space=None, action_space=None):
         self.venv = venv
-        VecEnv.__init__(self, 
+        VecEnv.__init__(self,
             num_envs=venv.num_envs,
-            observation_space=observation_space or venv.observation_space, 
+            observation_space=observation_space or venv.observation_space,
             action_space=action_space or venv.action_space)
 
     def step_async(self, actions):

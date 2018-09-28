@@ -85,9 +85,6 @@ class ShmemVecEnv(VecEnv):
         for proc in self.procs:
             proc.join()
 
-    def close(self):
-        self.close_extras()
-
     def get_images(self, mode='human'):
         for pipe in self.parent_pipes:
             pipe.send(('render', None))
@@ -126,10 +123,10 @@ def _subproc_worker(pipe, parent_pipe, env_fn_wrapper, obs_bufs, obs_shapes, obs
                 pipe.send(_write_obs(env.reset()))
             elif cmd == 'step':
                 if not done or not terminating:
-                    ob, reward, done, info = env.step(data)
+                    obs, reward, done, info = env.step(data)
                 if done:
-                    ob = env.reset()
-                pipe.send((_write_obs(ob), reward, done, info))
+                    obs = env.reset()
+                pipe.send((_write_obs(obs), reward, done, info))
             elif cmd == 'render':
                 pipe.send(env.render(mode='rgb_array'))
             elif cmd == 'close':
