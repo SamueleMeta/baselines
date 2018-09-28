@@ -85,6 +85,9 @@ class ShmemVecEnv(VecEnv):
         for proc in self.procs:
             proc.join()
 
+    def close(self):
+        self.close_extras()
+
     def get_images(self, mode='human'):
         for pipe in self.parent_pipes:
             pipe.send(('render', None))
