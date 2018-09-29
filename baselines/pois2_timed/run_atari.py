@@ -12,6 +12,7 @@ from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.common.vec_env.vec_frame_stack import VecFrameStack
 from baselines.pois2.cnn_policy import CnnPolicy
 from baselines.pois2_timed import pois2
+from baselines.envs.wrappers import FixedHorizonWrapper
 
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
 
@@ -19,17 +20,11 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     def make_env(seed=0):
         def _thunk():
             _env = make_atari(env)
+            _env = FixedHorizonWrapper(_env, horizon)
             _env.seed(seed)
             return wrap_deepmind(_env)
         return _thunk
-    parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True), 4)
-
-    # Create the policy
-    if policy == 'linear':
-        hid_size = num_hid_layers = 0
-    elif policy == 'nn':
-        hid_size = [100, 50, 25]
-        num_hid_layers = 3
+    parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=False), 4)
 
     def make_policy(name, ob_space, ac_space, nbatch):
         return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space, nbatch=nbatch,

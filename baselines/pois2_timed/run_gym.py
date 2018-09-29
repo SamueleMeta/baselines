@@ -17,10 +17,11 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     def make_env(seed=0):
         def _thunk():
             _env = gym.make(env)
+            _env = FixedHorizonWrapper(_env, horizon)
             _env.seed(seed)
             return _env
         return _thunk
-    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True)
+    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=False)
 
     # Create the policy
     if policy == 'linear':

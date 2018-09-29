@@ -59,10 +59,11 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     def make_env(seed=0):
         def _thunk():
             env_rllab = Rllab2GymWrapper(rllab_env_class())
+            _env = FixedHorizonWrapper(_env, horizon)
             env_rllab.seed(seed)
             return env_rllab
         return _thunk
-    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True)
+    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=False)
 
     # Create the policy
     if policy == 'linear':

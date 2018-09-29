@@ -17,8 +17,6 @@ def timed(msg):
     print(colorize('done in %.3f seconds'%(time.time() - tstart), color='magenta'))
 
 def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
-    # FIXME: we could discard the last parallel episodes
-    assert n_episodes % env.num_envs == 0, "Batch size must be multiple of the number of workers."
 
     policy_time = 0
     env_time = 0
@@ -30,55 +28,70 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
     _env_s = time.time()
     ob = env.reset()
     env_time += time.time() - _env_s
+    zero_ob = np.zeros(ob.shape)
 
-    new = True
+    current_indexes = np.arange(0, env.num_envs)
 
-    cur_ep_ret = 0
-    cur_ep_len = 0
-    ep_rets = []
-    ep_lens = []
+    def filter_indexes(idx_vector, t_vector):
+        return map(list, zip(*[(i, v, t) for i,(v,t) in enumerate(zip(idx_vector, t_vector)) if v != -1]))
 
-    # Initialize history arrays
-    obs = np.array([[ob[0] for _t in range(horizon)] for _e in range(n_episodes)])
-    rews = np.zeros((n_episodes, horizon), 'float32')
-    vpreds = np.zeros((n_episodes, horizon), 'float32')
-    #news = np.zeros(horizon * n_episodes, 'int32') #FIXME: what is my goal?
-    acs = np.array([[ac[0] for _t in range(horizon)] for _e in range(n_episodes)])
-    prevacs = acs.copy()
-    mask = np.ones((n_episodes, horizon), 'float32')
+    def has_ended(idx_vector):
+        return sum(idx_vector) == -len(idx_vector)
 
     # Iterate to make yield continuous
     while True:
 
         _tt = time.time()
 
-        for i in range(n_episodes // env.num_envs):
-            idx = i * env.num_envs
-            for j in range(horizon):
-                # Get the action and save the previous one
-                prevac = ac
+        # Initialize history arrays
+        obs = np.array([[zero_ob[0] for _t in range(horizon)] for _e in range(n_episodes)])
+        rews = np.zeros((n_episodes, horizon), 'float32')
+        vpreds = np.zeros((n_episodes, horizon), 'float32')
+        #news = np.zeros(horizon * n_episodes, 'int32') #FIXME: what is my goal?
+        acs = np.array([[ac[0] for _t in range(horizon)] for _e in range(n_episodes)])
+        prevacs = acs.copy()
+        mask = np.zeros((n_episodes, horizon), 'float32')
+        # Initialize indexes and timesteps
+        current_indexes = np.arange(0, env.num_envs)
+        current_timesteps = np.zeros((env.num_envs), dtype=np.int32)
 
-                _pi_s = time.time()
-                ac, vpred = pi.act(stochastic, ob)
-                policy_time += time.time() - _pi_s
+        while not has_ended(current_indexes):
 
-                # Save the current properties
-                obs[idx:idx+env.num_envs,j,:] = ob
-                vpreds[idx:idx+env.num_envs,j] = vpred
-                acs[idx:idx+env.num_envs,j] = ac
-                prevacs[idx:idx+env.num_envs,j] = prevac
-                # Take the action
-                _env_s = time.time()
-                env.step_async(ac)
-                ob, rew, done, _ = env.step_wait()
-                env_time += time.time() - _env_s
-                # Save the reward
-                rews[idx:idx+env.num_envs, j] = rew
-                mask[idx:idx+env.num_envs, j] = np.invert(np.array(done))
-            # Reset the workers
+            # Get the action and save the previous one
+            prevac = ac
+
+            _pi_s = time.time()
+            ac, vpred = pi.act(stochastic, ob)
+            policy_time += time.time() - _pi_s
+
+            # Filter the current indexes
+            ci_ob, ci_memory, ct = filter_indexes(current_indexes, current_timesteps)
+
+            # Save the current properties
+            obs[ci_memory, ct,:] = ob[ci_ob]
+            vpreds[ci_memory, ct] = vpred
+            acs[ci_memory, ct] = ac[ci_ob]
+            prevacs[ci_memory, ct] = prevac[ci_ob]
+
+            # Take the action
             _env_s = time.time()
-            ob = env.reset()
+            env.step_async(ac)
+            ob, rew, done, _ = env.step_wait()
             env_time += time.time() - _env_s
+
+            # Save the reward
+            rews[ci_memory, ct] = rew[ci_ob]
+            mask[ci_memory, ct] = np.invert(np.array(done))[ci_ob]
+
+            # Update the indexes and timesteps
+            for i, d in enumerate(done):
+                if not d:
+                    current_timesteps[i] += 1
+                elif max(current_indexes) < n_episodes - 1:
+                    current_timesteps[i] = 0 # Reset the timestep
+                    current_indexes[i] = max(current_indexes) + 1 # Increment the index
+                else:
+                    current_indexes[i] = -1 # Disabling
 
         # Add discounted reward (here is simpler)
         gamma_log = np.log(np.full((horizon), gamma, dtype='float32'))
@@ -103,6 +116,7 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
                'policy_time': policy_time,
                'env_time': env_time}
 
+        # Reset time counters
         policy_time = 0
         env_time = 0
 
