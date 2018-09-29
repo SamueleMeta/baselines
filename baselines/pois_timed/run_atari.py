@@ -16,8 +16,8 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
 
     # Create the environment
     def make_env():
-        _env = make_atari(env, frame_stack=True)
-        return wrap_deepmind(_env)
+        _env = make_atari(env)
+        return wrap_deepmind(_env, frame_stack=True)
 
     def make_policy(name, ob_space, ac_space):
         return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
