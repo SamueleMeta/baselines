@@ -40,7 +40,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
 
     pois.learn(make_env, make_policy, sampler=sampler, n_episodes=num_episodes, max_iters=500,
                horizon=horizon, gamma=1., delta=delta, use_natural_gradient=natural,
-               iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True,
+               iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=False,
                center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
 
     sampler.close()
