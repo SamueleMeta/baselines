@@ -9,6 +9,7 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 import baselines.common.tf_util as U
 from baselines.common import set_global_seeds
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
+from baselines.common.vec_env.vec_frame_stack import VecFrameStack
 from baselines.pois2.cnn_policy import CnnPolicy
 from baselines.pois2_timed import pois2
 
@@ -21,7 +22,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
             _env.seed(seed)
             return wrap_deepmind(_env)
         return _thunk
-    parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True)
+    parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True), 4)
 
     # Create the policy
     if policy == 'linear':

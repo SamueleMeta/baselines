@@ -5,45 +5,34 @@ import time, os, gym, logging
 import tensorflow as tf
 import numpy as np
 
+from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 import baselines.common.tf_util as U
 from baselines.common import set_global_seeds
-from baselines.policy.cnn_policy import CnnPolicy
-from baselines.pois_timed import pois
-from baselines.pois_timed.parallel_sampler import ParallelSampler
-from baselines.common.atari_wrappers import make_atari, wrap_deepmind
+from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
+from baselines.pois2.cnn_policy import CnnPolicy
+from baselines.pois2_timed import pois2
+from baselines.common.vec_env.vec_frame_stack import VecFrameStack
 
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
 
-    # Create the environment
-    def make_env():
-        _env = make_atari(env, frame_stack=True)
-        return wrap_deepmind(_env)
+    # Declare env and created the vectorized env
+    def make_env(seed=0):
+        def _thunk():
+            _env = make_atari(env)
+            _env.seed(seed)
+            return wrap_deepmind(_env)
+        return _thunk
+    parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True), 4)
 
-    def make_policy(name, ob_space, ac_space):
-        return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                         gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                         output_W_init=tf.contrib.layers.xavier_initializer())
+    obs = parallel_env.reset()
+    print(obs.shape)
+    print(obs[0, :2, :2, :])
 
-    sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed)
-
-    try:
-        affinity = len(os.sched_getaffinity(0))
-    except:
-        affinity = njobs
-    sess = U.make_session(affinity)
-    sess.__enter__()
-
-    set_global_seeds(seed)
-
-    gym.logger.setLevel(logging.WARN)
-
-    pois.learn(make_env, make_policy, sampler=sampler, n_episodes=num_episodes, max_iters=500,
-               horizon=horizon, gamma=1., delta=delta, use_natural_gradient=natural,
-               iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True,
-               center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
-
-    sampler.close()
+    dummy_env = make_env(0)()
+    for i in range(10):
+        parallel_env.step_async([dummy_env.action_space.sample()] * njobs)
+        obs, rew, done, _ = parallel_env.step_wait()
+        print(obs[0, 74:84, :, :])
 
 def main():
     import argparse
@@ -64,11 +53,13 @@ def main():
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
     args = parser.parse_args()
+    # Configure logging
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
     else:
         file_name = args.file_name
-    logger.configure(dir='.', format_strs=['stdout', 'csv'], file_name=file_name)
+    logger.configure(dir='logs', format_strs=['stdout', 'csv'], file_name=file_name)
+    # Start training
     train(env=args.env,
           max_iters=args.max_iters,
           num_episodes=args.num_episodes,
@@ -83,6 +74,7 @@ def main():
           policy=args.policy,
           max_offline_iters=args.max_offline_iters,
           njobs=args.njobs)
+
 
 if __name__ == '__main__':
     main()
