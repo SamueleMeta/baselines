@@ -22,7 +22,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
             _env.seed(seed)
             return wrap_deepmind(_env)
         return _thunk
-    parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True), 32)
+    parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True), 4)
 
     # Create the policy
     if policy == 'linear':
