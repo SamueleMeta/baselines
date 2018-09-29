@@ -106,7 +106,7 @@ class Worker(Process):
         workerseed = self.seed + 10000 * MPI.COMM_WORLD.Get_rank()
         set_all_seeds(workerseed)
         env.seed(workerseed)
-        print('Worker %s - Creating policy...' % (os.getpid()))
+        #print('Worker %s - Creating policy...' % (os.getpid()))
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
         print('Worker %s - Running with seed %s' % (os.getpid(), workerseed))
 
