@@ -11,6 +11,7 @@ from baselines.common import set_global_seeds
 from baselines.common.vec_env.shmem_vec_env import ShmemVecEnv
 from baselines.pois2.cnn_policy import CnnPolicy
 from baselines.pois2_timed import pois2
+from baselines.envs.wrappers import FixedHorizonWrapper
 
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
 
@@ -18,17 +19,11 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     def make_env(seed=0):
         def _thunk():
             _env = make_atari(env)
+            _env = FixedHorizonWrapper(_env, horizon)
             _env.seed(seed)
             return wrap_deepmind(_env)
         return _thunk
-    parallel_env = ShmemVecEnv([make_env(i + seed) for i in range(njobs)], terminating=True)
-
-    # Create the policy
-    if policy == 'linear':
-        hid_size = num_hid_layers = 0
-    elif policy == 'nn':
-        hid_size = [100, 50, 25]
-        num_hid_layers = 3
+    parallel_env = ShmemVecEnv([make_env(i + seed) for i in range(njobs)], terminating=False)
 
     def make_policy(name, ob_space, ac_space, nbatch):
         return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space, nbatch=nbatch,
