@@ -18,7 +18,7 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
     new = True
     env_d = 0
     _tenv = time.time()
-    ob = env.reset()
+    ob = np.array(env.reset())
     env_d += time.time() - _tenv
 
     cur_ep_ret = 0
@@ -75,6 +75,7 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
 
         _tenv = time.time()
         ob, rew, new, _ = env.step(ac)
+        ob = np.array(ob)
         env_d += time.time() - _tenv
 
         rews[t] = rew
@@ -107,7 +108,7 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
             cur_ep_len = 0
 
             _tenv = time.time()
-            ob = env.reset()
+            ob = np.array(env.reset())
             env_d += time.time() - _tenv
 
             next_t = (i+1) * horizon
