@@ -26,14 +26,15 @@ def train(env_id, num_timesteps, seed, policy):
         ent_coef=.01,
         lr=lambda f : f * 2.5e-4,
         cliprange=lambda f : f * 0.1,
-        total_timesteps=int(num_timesteps * 1.1))
+        total_timesteps=int(num_timesteps * 1.1),
+        save_interval=100)
 
 def main():
     parser = atari_arg_parser()
     parser.add_argument('--policy', help='Policy architecture', choices=['cnn', 'lstm', 'lnlstm'], default='cnn')
     parser.add_argument('--filename', help='Logger filename', default='ppo2_atari')
     args = parser.parse_args()
-    logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
+    logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard'], file_name=args.filename)
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed,
         policy=args.policy)
 
