@@ -318,6 +318,7 @@ def learn(env, make_policy, *,
           center_return=False,
           render_after=None,
           max_offline_iters=100,
+          entropy='none',
           callback=None):
 
     np.set_printoptions(precision=3)
@@ -414,6 +415,27 @@ def learn(env, make_policy, *,
         bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_std
     else:
         raise NotImplementedError()
+
+    # Policy entropy for exploration
+    ent = pi.pd.entropy()
+    meanent = tf.reduce_mean(ent)
+    # Add policy entropy bonus
+    if entropy != 'none':
+        scheme, v1, v2 = entropy.split(':')
+        if scheme == 'step':
+            entcoeff = tf.cond(iter_number_ < int(v2), lambda: float(v1), lambda: float(0.0))
+            entbonus = entcoeff * meanent
+            bound_ = bound_ + entbonus
+        elif scheme == 'lin':
+            ip = tf.cast(iter_number_ / max_iters, tf.float32)
+            entcoeff_decay = tf.maximum(0.0, float(v2) + (float(v1) - float(v2)) * (1.0 - ip))
+            entbonus = entcoeff_decay * meanent
+            bound_ = bound_ + entbonus
+        elif scheme == 'exp':
+            ent_f = tf.exp(-tf.abs(tf.reduce_mean(iw) - 1) * float(v2)) * float(v1)
+            bound_ = bound_ + ent_f * meanent
+        else:
+            raise Exception('Unrecognized entropy scheme.')
 
     losses = [bound_, return_mean, return_max, return_min, return_std, empirical_d2, w_return_mean,
               tf.reduce_max(iwn), tf.reduce_min(iwn), tf.reduce_mean(iwn), U.reduce_std(iwn), tf.reduce_max(iw),

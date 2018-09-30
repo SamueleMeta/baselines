@@ -66,6 +66,7 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--entropy', type=str, default='none')
     args = parser.parse_args()
     # Configure logging
     if args.file_name == 'progress':
@@ -87,6 +88,7 @@ def main():
           seed=args.seed,
           policy=args.policy,
           max_offline_iters=args.max_offline_iters,
+          entropy=args.entropy,
           njobs=args.njobs)
 
 
