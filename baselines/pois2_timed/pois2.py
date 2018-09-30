@@ -351,6 +351,7 @@ def learn(env, make_policy, *,
     mask_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='mask')
     disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='disc_rew')
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
+    iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
 
     # Policy densities
     target_log_pdf = pi.pd.logp(ac_)
@@ -456,10 +457,10 @@ def learn(env, make_policy, *,
     assign_old_eq_new = U.function([], [], updates=[tf.assign(oldv, newv)
                 for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
 
-    compute_lossandgrad = U.function([ob_, ac_, disc_rew_, mask_], losses + [U.flatgrad(bound_, var_list)])
-    compute_grad = U.function([ob_, ac_, disc_rew_, mask_], [U.flatgrad(bound_, var_list)])
-    compute_bound = U.function([ob_, ac_, disc_rew_, mask_], [bound_])
-    compute_losses = U.function([ob_, ac_, disc_rew_, mask_], losses)
+    compute_lossandgrad = U.function([ob_, ac_, disc_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list)])
+    compute_grad = U.function([ob_, ac_, disc_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list)])
+    compute_bound = U.function([ob_, ac_, disc_rew_, mask_, iter_number_], [bound_])
+    compute_losses = U.function([ob_, ac_, disc_rew_, mask_, iter_number_], losses)
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
@@ -507,7 +508,7 @@ def learn(env, make_policy, *,
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
 
-        args = ob, ac, disc_rew, mask = seg['ob'], seg['ac'], seg['disc_rew'], seg['mask']
+        args = ob, ac, disc_rew, mask, iter_number = seg['ob'], seg['ac'], seg['disc_rew'], seg['mask'], iters_so_far
 
         assign_old_eq_new()
 
