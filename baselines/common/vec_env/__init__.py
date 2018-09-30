@@ -25,6 +25,7 @@ class VecEnv(ABC):
         self.num_envs = num_envs
         self.observation_space = observation_space
         self.action_space = action_space
+        self.closed = False
 
     """
     An abstract asynchronous, vectorized environment.
