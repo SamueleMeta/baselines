@@ -193,8 +193,11 @@ class CategoricalPd(Pd):
 
     def renyi(self, other, alpha=2.):
         assert isinstance(other, CategoricalPd)
-        return 0
-        #raise Exception('Not implemented')
+        ea0 = tf.exp(self.logits)
+        ea1 = tf.exp(other.logits)
+        softmax0 = ea0 / tf.reduce_sum(ea0, axis=-1, keepdims=True)
+        softmax1 = ea1 / tf.reduce_sum(ea1, axis=-1, keepdims=True)
+        return (1 / (alpha-1)) * tf.log(tf.reduce_sum(tf.pow(softmax0, alpha) * tf.pow(softmax1, 1-alpha), axis=-1))
 
     @classmethod
     def fromflat(cls, flat):

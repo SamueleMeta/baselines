@@ -11,6 +11,7 @@ from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.pois2.mlp_policy import MlpPolicy
 from baselines.pois2_timed import pois2
+from baselines.envs.wrappers import FixedHorizonWrapper
 
 def rllab_env_from_name(env):
     if env == 'swimmer':
