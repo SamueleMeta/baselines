@@ -85,7 +85,7 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
 
             # Update the indexes and timesteps
             for i, d in enumerate(done):
-                if not d and current_timestep[i] < (horizon-1):
+                if not d and current_timesteps[i] < (horizon-1):
                     current_timesteps[i] += 1
                 elif max(current_indexes) < n_episodes - 1:
                     current_timesteps[i] = 0 # Reset the timestep
