@@ -13,7 +13,7 @@ from baselines.pois2.cnn_policy import CnnPolicy
 from baselines.pois2_timed import pois2
 from baselines.envs.wrappers import FixedHorizonWrapper
 
-def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
+def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, entropy, njobs=1):
 
     # Declare env and created the vectorized env
     def make_env(seed=0):
@@ -45,7 +45,8 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     pois2.learn(parallel_env, make_policy, n_episodes=num_episodes, max_iters=max_iters,
                horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
                iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True,
-               center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
+               center_return=True, render_after=None, max_offline_iters=max_offline_iters,
+               entropy=entropy)
 
 def main():
     import argparse
@@ -65,6 +66,7 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--entropy', type=str, default='none')
     args = parser.parse_args()
     # Configure logging
     if args.file_name == 'progress':
@@ -86,6 +88,7 @@ def main():
           seed=args.seed,
           policy=args.policy,
           max_offline_iters=args.max_offline_iters,
+          entropy=args.entropy,
           njobs=args.njobs)
 
 
