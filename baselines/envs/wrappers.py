@@ -14,6 +14,6 @@ class FixedHorizonWrapper(gym.Wrapper):
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
         self.current_timestep += 1
-        if self.current_timestep == self.horizon:
+        if self.current_timestep == self.horizon - 1:
             done = True
         return obs, reward, done, info
