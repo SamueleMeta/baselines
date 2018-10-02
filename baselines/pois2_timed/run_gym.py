@@ -77,7 +77,7 @@ def main():
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
     else:
         file_name = args.file_name
-    logger.configure(dir='logs', format_strs=['stdout', 'csv'], file_name=file_name)
+    logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     # Start training
     train(env=args.env,
           max_iters=args.max_iters,
