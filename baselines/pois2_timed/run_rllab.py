@@ -72,7 +72,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     elif policy == 'nn':
         hid_size = [100, 50, 25]
         num_hid_layers = 3
-    elif policy == 'nn2':
+    elif policy == 'nn-200':
         hid_size = [200, 100, 50, 25]
         num_hid_layers = 4
 
