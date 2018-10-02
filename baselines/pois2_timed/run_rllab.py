@@ -75,6 +75,9 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     elif policy == 'nn-200':
         hid_size = [200, 100, 50, 25]
         num_hid_layers = 4
+    elif policy == 'nn-1k':
+        hid_size = [1000, 200, 100, 50, 25]
+        num_hid_layers = 5
 
     def make_policy(name, ob_space, ac_space, nbatch):
         return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, nbatch=nbatch,
