@@ -81,7 +81,7 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
 
             # Save the reward
             rews[ci_memory, ct] = rew[ci_ob]
-            mask[ci_memory, ct] = np.invert(np.array(done))[ci_ob]
+            mask[ci_memory, ct] = np.invert(np.reshape(np.array(done), (-1,)))[ci_ob]
 
             # Update the indexes and timesteps
             for i, d in enumerate(done):
