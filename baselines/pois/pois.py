@@ -481,8 +481,8 @@ def learn(make_env, make_policy, *,
         ratio_reward = ratio_clustered * reward_unique
         w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)
         # Divergences
-        ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
-        sqrt_ess_classic = tf.linalg.norm(iw, 1) / tf.linalg.norm(iw, 2)
+        ess_classic = tf.linalg.norm(ratio_reward, 1) ** 2 / tf.linalg.norm(ratio_reward, 2) ** 2
+        sqrt_ess_classic = tf.linalg.norm(ratio_reward, 1) / tf.linalg.norm(ratio_reward, 2)
         ess_renyi = n_episodes / empirical_d2
         # Summaries
         losses_with_name.extend([(tf.reduce_max(ratio_clustered), 'MaxIW'),
