@@ -469,14 +469,14 @@ def learn(make_env, make_policy, *,
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
         target_pdf_episode = tf.exp(target_log_pdf_episode) + TOLERANCE
-        tf.add_to_collection('prints', tf.Print(target_pdf_episode, target_pdf_episode))
+        tf.add_to_collection('prints', tf.Print(target_pdf_episode, [target_pdf_episode]))
         behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode) + TOLERANCE
         tf.add_to_collection('asserts', tf.assert_positive(target_pdf_episode, name='target_pdf_positive'))
         tf.add_to_collection('asserts', tf.assert_positive(behavioral_pdf_episode, name='behavioral_pdf_positive'))
         # Compute the merging matrix (reward-clustering) and the number of clusters
         reward_unique, reward_indexes = tf.unique(ep_return)
         episode_clustering_matrix = tf.one_hot(reward_indexes, n_episodes)
-        tf.add_to_collection('prints', tf.Print(episode_clustering_matrix, episode_clustering_matrix))
+        tf.add_to_collection('prints', tf.Print(episode_clustering_matrix, [episode_clustering_matrix]))
         max_index = tf.reduce_max(reward_indexes) + 1
         tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
         # Get the clustered pdfs
