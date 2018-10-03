@@ -476,7 +476,7 @@ def learn(make_env, make_policy, *,
         # Compute the merging matrix (reward-clustering) and the number of clusters
         reward_unique, reward_indexes = tf.unique(ep_return)
         episode_clustering_matrix = tf.one_hot(reward_indexes, n_episodes)
-        tf.add_to_collection('prints', tf.Print(episode_clustering_matrix, [episode_clustering_matrix]))
+        tf.add_to_collection('prints', tf.Print(episode_clustering_matrix, [tf.reshape(episode_clustering_matrix, (-1))]))
         max_index = tf.reduce_max(reward_indexes) + 1
         tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
         # Get the clustered pdfs
@@ -668,7 +668,7 @@ def learn(make_env, make_policy, *,
             return loss[0]
 
         def evaluate_gradient():
-            gradient, _ = compute_grad(*args)
+            gradient = compute_grad(*args)
             return gradient[0]
 
         if use_natural_gradient:
