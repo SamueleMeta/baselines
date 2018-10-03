@@ -467,26 +467,23 @@ def learn(make_env, make_policy, *,
         # Get pdfs for episodes
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
-        target_pdf_episode = tf.clip_by_value(tf.exp(target_log_pdf_episode), 1e-24, 1e+24)
-        tf.add_to_collection('prints', tf.Print(target_pdf_episode, [target_pdf_episode], 'target_pdf', summarize=20))
-        behavioral_pdf_episode = tf.clip_by_value(tf.exp(behavioral_log_pdf_episode), 1e-24, 1e+24)
+        target_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(target_log_pdf_episode), tf.float64), 1e-256, 1e+256)
+        behavioral_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(behavioral_log_pdf_episode), tf.float64), 1e-256, 1e+256)
         tf.add_to_collection('asserts', tf.assert_positive(target_pdf_episode, name='target_pdf_positive'))
         tf.add_to_collection('asserts', tf.assert_positive(behavioral_pdf_episode, name='behavioral_pdf_positive'))
         # Compute the merging matrix (reward-clustering) and the number of clusters
         reward_unique, reward_indexes = tf.unique(ep_return)
-        episode_clustering_matrix = tf.one_hot(reward_indexes, n_episodes)
-        tf.add_to_collection('prints', tf.Print(episode_clustering_matrix, [tf.reshape(episode_clustering_matrix, (-1,))], 'mat', summarize=20))
+        episode_clustering_matrix = tf.cast(tf.one_hot(reward_indexes, n_episodes), tf.float64)
         max_index = tf.reduce_max(reward_indexes) + 1
         tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
         # Get the clustered pdfs
         clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
-        tf.add_to_collection('prints', tf.Print(episode_clustering_matrix, [tf.reshape(clustered_target_pdf, (-1,))], 'target_cluster', summarize=20))
         clustered_behavioral_pdf = tf.matmul(tf.reshape(behavioral_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
         tf.add_to_collection('asserts', tf.assert_positive(clustered_target_pdf, name='clust_target_pdf_positive'))
         tf.add_to_collection('asserts', tf.assert_positive(clustered_behavioral_pdf, name='clust_behavioral_pdf_positive'))
         # Compute the J
         ratio_clustered = clustered_target_pdf / clustered_behavioral_pdf
-        ratio_reward = ratio_clustered * reward_unique
+        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique
         w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)
         # Divergences
         ess_classic = tf.linalg.norm(ratio_reward, 1) ** 2 / tf.linalg.norm(ratio_reward, 2) ** 2
