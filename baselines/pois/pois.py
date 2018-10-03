@@ -476,6 +476,8 @@ def learn(make_env, make_policy, *,
         # Get the clustered pdfs
         clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
         clustered_behavioral_pdf = tf.matmul(tf.reshape(behavioral_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
+        tf.add_to_collection('asserts', tf.assert_positive(clustered_target_pdf, name='clust_target_pdf_positive'))
+        tf.add_to_collection('asserts', tf.assert_positive(clustered_behavioral_pdf, name='clust_behavioral_pdf_positive'))
         # Compute the J
         ratio_clustered = clustered_target_pdf / clustered_behavioral_pdf
         ratio_reward = ratio_clustered * reward_unique
@@ -491,7 +493,8 @@ def learn(make_env, make_policy, *,
                                  (U.reduce_std(ratio_clustered), 'StdIW'),
                                  (1-(max_index / n_episodes), 'RewardCompression'),
                                  (ess_classic, 'ESSClassic'),
-                                 (ess_renyi, 'ESSRenyi')])
+                                 (ess_renyi, 'ESSRenyi')],
+                                 ())
     else:
         raise NotImplementedError()
 
@@ -594,10 +597,12 @@ def learn(make_env, make_policy, *,
     assign_old_eq_new = U.function([], [], updates=[tf.assign(oldv, newv)
                 for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
 
-    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list)])
-    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list)])
-    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [bound_])
-    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses)
+    assert_ops = tf.group(*tf.get_collection('asserts'))
+
+    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list), assert_ops])
+    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops])
+    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [bound_, assert_ops])
+    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [losses, assert_ops])
     #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
 
     set_parameter = U.SetFromFlat(var_list)
@@ -653,11 +658,11 @@ def learn(make_env, make_policy, *,
         assign_old_eq_new()
 
         def evaluate_loss():
-            loss = compute_bound(*args)
+            loss, _ = compute_bound(*args)
             return loss[0]
 
         def evaluate_gradient():
-            gradient = compute_grad(*args)
+            gradient, _ = compute_grad(*args)
             return gradient[0]
 
         if use_natural_gradient:
