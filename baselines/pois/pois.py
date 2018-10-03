@@ -467,9 +467,9 @@ def learn(make_env, make_policy, *,
         # Get pdfs for episodes
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
-        target_pdf_episode = tf.clip_by_value(tf.exp(target_log_pdf_episode), 1e-42, 1e+42)
+        target_pdf_episode = tf.clip_by_value(tf.exp(target_log_pdf_episode), 1e-24, 1e+24)
         tf.add_to_collection('prints', tf.Print(target_pdf_episode, [target_pdf_episode], 'target_pdf', summarize=20))
-        behavioral_pdf_episode = tf.clip_by_value(tf.exp(behavioral_log_pdf_episode), 1e-42, 1e+42)
+        behavioral_pdf_episode = tf.clip_by_value(tf.exp(behavioral_log_pdf_episode), 1e-24, 1e+24)
         tf.add_to_collection('asserts', tf.assert_positive(target_pdf_episode, name='target_pdf_positive'))
         tf.add_to_collection('asserts', tf.assert_positive(behavioral_pdf_episode, name='behavioral_pdf_positive'))
         # Compute the merging matrix (reward-clustering) and the number of clusters
