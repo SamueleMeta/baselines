@@ -34,7 +34,7 @@ class SimpleCnnPolicy(object):
 
         stochastic = tf.placeholder(dtype=tf.bool, shape=())
         ac = self.pd.sample()
-        self._act = U.function([stochastic, ob], [ac, 0])
+        self._act = U.function([stochastic, ob], [ac, ac])
 
         #Evaluating
         self.ob = ob
@@ -47,7 +47,7 @@ class SimpleCnnPolicy(object):
 
     def act(self, stochastic, ob):
         ac1, vpred1 =  self._act(stochastic, ob)
-        return ac1, 0
+        return ac1, vpred1
 
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
