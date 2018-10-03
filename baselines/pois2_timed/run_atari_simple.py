@@ -10,7 +10,7 @@ import baselines.common.tf_util as U
 from baselines.common import set_global_seeds
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.common.vec_env.vec_frame_stack import VecFrameStack
-from baselines.pois2.cnn_policy import CnnPolicy
+from baselines.pois2.cnn_policy_simple import SimpleCnnPolicy
 from baselines.pois2_timed import pois2
 from baselines.envs.wrappers import FixedHorizonWrapper
 
@@ -27,10 +27,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=False), 4)
 
     def make_policy(name, ob_space, ac_space, nbatch):
-        return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space, nbatch=nbatch,
-                         gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                         output_W_init=tf.contrib.layers.xavier_initializer())
+        return SimpleCnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
 
     try:
         affinity = len(os.sched_getaffinity(0))
