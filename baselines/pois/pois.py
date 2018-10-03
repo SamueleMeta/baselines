@@ -474,7 +474,6 @@ def learn(make_env, make_policy, *,
         episode_clustering_matrix = tf.one_hot(reward_indexes, n_episodes)
         max_index = tf.reduce_max(reward_indexes) + 1
         tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
-        tf.add_to_collection('asserts', tf.assert_equal(max_index, reward_unique.shape[0], name='max_index'))
         # Get the clustered pdfs
         clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
         clustered_behavioral_pdf = tf.matmul(tf.reshape(behavioral_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
