@@ -480,12 +480,18 @@ def learn(make_env, make_policy, *,
         ratio_clustered = clustered_target_pdf / clustered_behavioral_pdf
         ratio_reward = ratio_clustered * reward_unique
         w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)
+        # Divergences
+        ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
+        sqrt_ess_classic = tf.linalg.norm(iw, 1) / tf.linalg.norm(iw, 2)
+        ess_renyi = n_episodes / empirical_d2
         # Summaries
         losses_with_name.extend([(tf.reduce_max(ratio_clustered), 'MaxIW'),
                                  (tf.reduce_min(ratio_clustered), 'MinIW'),
                                  (tf.reduce_mean(ratio_clustered), 'MeanIW'),
                                  (U.reduce_std(ratio_clustered), 'StdIW'),
-                                 (1-(max_index / n_episodes), 'RewardCompression')])
+                                 (1-(max_index / n_episodes), 'RewardCompression'),
+                                 (ess_classic, 'ESSClassic'),
+                                 (ess_renyi, 'ESSRenyi')])
     else:
         raise NotImplementedError()
 
