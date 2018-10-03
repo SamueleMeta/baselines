@@ -367,6 +367,7 @@ def learn(make_env, make_policy, *,
     rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes))
     log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
     target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes))
+    behavioral_log_pdf_split = tf.stack(tf.split(behavioral_log_pdf * mask_, n_episodes))
     mask_split = tf.stack(tf.split(mask_, n_episodes))
 
     # Renyi divergence
@@ -462,6 +463,29 @@ def learn(make_env, make_policy, *,
                                  (U.reduce_std(iw), 'StdIW'),
                                  (ess_classic, 'ESSClassic'),
                                  (ess_renyi, 'ESSRenyi')])
+    elif iw_method == 'rbis':
+        # Get pdfs for episodes
+        target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
+        behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
+        target_pdf_episode = tf.exp(target_log_pdf_episode)
+        behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode)
+        # Compute the merging matrix (reward-clustering) and the number of clusters
+        reward_unique, reward_indexes = tf.unique(ep_return)
+        episode_clustering_matrix = tf.one_hot(reward_indexes, n_episodes)
+        max_index = tf.reduce_max(reward_indexes) + 1
+        # Get the clustered pdfs
+        clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
+        clustered_behavioral_pdf = tf.matmul(tf.reshape(behavioral_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
+        # Compute the J
+        ratio_clustered = clustered_target_pdf / clustered_behavioral_pdf
+        ratio_reward = ratio_clustered * reward_unique
+        w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)
+        # Summaries
+        losses_with_name.extend([(tf.reduce_max(ratio_clustered), 'MaxIW'),
+                                 (tf.reduce_min(ratio_clustered), 'MinIW'),
+                                 (tf.reduce_mean(ratio_clustered), 'MeanIW'),
+                                 (U.reduce_std(ratio_clustered), 'StdIW'),
+                                 (1-(max_index / n_episodes), 'RewardCompression')]
     else:
         raise NotImplementedError()
 
