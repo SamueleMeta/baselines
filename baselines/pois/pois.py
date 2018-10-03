@@ -467,8 +467,8 @@ def learn(make_env, make_policy, *,
         # Get pdfs for episodes
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
-        target_pdf_episode = tf.exp(target_log_pdf_episode)
-        behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode)
+        target_pdf_episode = tf.exp(tf.cast(target_log_pdf_episode, tf.float64))
+        behavioral_pdf_episode = tf.exp(tf.cast(behavioral_log_pdf_episode), tf.float64)
         # Compute the merging matrix (reward-clustering) and the number of clusters
         reward_unique, reward_indexes = tf.unique(ep_return)
         episode_clustering_matrix = tf.one_hot(reward_indexes, n_episodes)
