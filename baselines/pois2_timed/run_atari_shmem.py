@@ -21,7 +21,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
             _env = make_atari(env)
             _env = FixedHorizonWrapper(_env, horizon)
             _env.seed(seed)
-            return wrap_deepmind(_env, frame_stack=4)
+            return wrap_deepmind(_env, frame_stack=4, scale=True)
         return _thunk
     parallel_env = ShmemVecEnv([make_env(i + seed) for i in range(njobs)], terminating=False)
 
