@@ -34,7 +34,7 @@ class SimpleCnnPolicy(object):
 
         stochastic = tf.placeholder(dtype=tf.bool, shape=())
         ac = self.pd.sample()
-        self._act = U.function([stochastic, ob], [ac, self.vpred])
+        self._act = U.function([stochastic, ob], [ac, 0])
 
         #Evaluating
         self.ob = ob
