@@ -465,10 +465,11 @@ def learn(make_env, make_policy, *,
                                  (ess_renyi, 'ESSRenyi')])
     elif iw_method == 'rbis':
         # Get pdfs for episodes
+        TOLERANCE = 1e-256
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
-        target_pdf_episode = tf.exp(tf.cast(target_log_pdf_episode, tf.float64))
-        behavioral_pdf_episode = tf.exp(tf.cast(behavioral_log_pdf_episode, tf.float64))
+        target_pdf_episode = tf.exp(tf.cast(target_log_pdf_episode, tf.float64)) + TOLERANCE
+        behavioral_pdf_episode = tf.exp(tf.cast(behavioral_log_pdf_episode, tf.float64)) + TOLERANCE
         # Compute the merging matrix (reward-clustering) and the number of clusters
         reward_unique, reward_indexes = tf.unique(ep_return)
         episode_clustering_matrix = tf.cast(tf.one_hot(reward_indexes, n_episodes), tf.float64)
