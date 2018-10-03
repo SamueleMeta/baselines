@@ -11,10 +11,11 @@ from baselines.common import set_global_seeds
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.common.vec_env.vec_frame_stack import VecFrameStack
 from baselines.pois2.cnn_policy import CnnPolicy
+from baselines.pois2.cnn_policy_simple import SimpleCnnPolicy
 from baselines.pois2_timed import pois2
 from baselines.envs.wrappers import FixedHorizonWrapper
 
-def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, entropy, njobs=1):
+def train(env, max_iters, policy, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, entropy, njobs=1):
 
     # Declare env and created the vectorized env
     def make_env(seed=0):
@@ -25,6 +26,11 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
             return wrap_deepmind(_env, scale=True)
         return _thunk
     parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)], terminating=False), 4)
+
+    if policy == 'cnn':
+        cnn_class = CnnPolicy
+    elif policy == 'simple-cnn':
+        cnn_class = SimpleCnnPolicy
 
     def make_policy(name, ob_space, ac_space, nbatch):
         return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space, nbatch=nbatch,
@@ -78,6 +84,7 @@ def main():
     # Start training
     train(env=args.env,
           max_iters=args.max_iters,
+          policy=args.policy,
           num_episodes=args.num_episodes,
           horizon=args.horizon,
           iw_method=args.iw_method,
