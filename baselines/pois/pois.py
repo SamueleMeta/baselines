@@ -485,7 +485,7 @@ def learn(make_env, make_policy, *,
                                  (tf.reduce_min(ratio_clustered), 'MinIW'),
                                  (tf.reduce_mean(ratio_clustered), 'MeanIW'),
                                  (U.reduce_std(ratio_clustered), 'StdIW'),
-                                 (1-(max_index / n_episodes), 'RewardCompression')]
+                                 (1-(max_index / n_episodes), 'RewardCompression')])
     else:
         raise NotImplementedError()
 
