@@ -465,14 +465,14 @@ def learn(make_env, make_policy, *,
                                  (ess_renyi, 'ESSRenyi')])
     elif iw_method == 'rbis':
         # Get pdfs for episodes
-        TOLERANCE = 1e-256
+        TOLERANCE = 1e-42
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
-        target_pdf_episode = tf.exp(tf.cast(target_log_pdf_episode, tf.float64)) + TOLERANCE
-        behavioral_pdf_episode = tf.exp(tf.cast(behavioral_log_pdf_episode, tf.float64)) + TOLERANCE
+        target_pdf_episode = tf.exp(target_log_pdf_episode) + TOLERANCE
+        behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode) + TOLERANCE
         # Compute the merging matrix (reward-clustering) and the number of clusters
         reward_unique, reward_indexes = tf.unique(ep_return)
-        episode_clustering_matrix = tf.cast(tf.one_hot(reward_indexes, n_episodes), tf.float64)
+        episode_clustering_matrix = tf.one_hot(reward_indexes, n_episodes)
         max_index = tf.reduce_max(reward_indexes) + 1
         tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
         # Get the clustered pdfs
@@ -482,7 +482,7 @@ def learn(make_env, make_policy, *,
         tf.add_to_collection('asserts', tf.assert_positive(clustered_behavioral_pdf, name='clust_behavioral_pdf_positive'))
         # Compute the J
         ratio_clustered = clustered_target_pdf / clustered_behavioral_pdf
-        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique
+        ratio_reward = ratio_clustered * reward_unique
         w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)
         # Divergences
         ess_classic = tf.linalg.norm(ratio_reward, 1) ** 2 / tf.linalg.norm(ratio_reward, 2) ** 2
