@@ -601,7 +601,7 @@ def learn(make_env, make_policy, *,
     compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list), assert_ops])
     compute_grad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops])
     compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [bound_, assert_ops])
-    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [losses, assert_ops])
+    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses)
     #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
 
     set_parameter = U.SetFromFlat(var_list)
@@ -657,7 +657,7 @@ def learn(make_env, make_policy, *,
         assign_old_eq_new()
 
         def evaluate_loss():
-            loss, _ = compute_bound(*args)
+            loss = compute_bound(*args)
             return loss[0]
 
         def evaluate_gradient():
