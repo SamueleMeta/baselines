@@ -469,7 +469,7 @@ def learn(make_env, make_policy, *,
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
         target_pdf_episode = tf.exp(target_log_pdf_episode) + TOLERANCE
-        tf.add_to_collection('prints', tf.Print(target_pdf_episode, [target_pdf_episode]))
+        tf.add_to_collection('prints', tf.Print(target_pdf_episode, [target_pdf_episode], summarize=20))
         behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode) + TOLERANCE
         tf.add_to_collection('asserts', tf.assert_positive(target_pdf_episode, name='target_pdf_positive'))
         tf.add_to_collection('asserts', tf.assert_positive(behavioral_pdf_episode, name='behavioral_pdf_positive'))
@@ -481,6 +481,7 @@ def learn(make_env, make_policy, *,
         tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
         # Get the clustered pdfs
         clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
+        tf.add_to_collection('prints', tf.Print(episode_clustering_matrix, [tf.reshape(clustered_target_pdf, (-1,))], summarize=20))
         clustered_behavioral_pdf = tf.matmul(tf.reshape(behavioral_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
         tf.add_to_collection('asserts', tf.assert_positive(clustered_target_pdf, name='clust_target_pdf_positive'))
         tf.add_to_collection('asserts', tf.assert_positive(clustered_behavioral_pdf, name='clust_behavioral_pdf_positive'))
