@@ -493,8 +493,7 @@ def learn(make_env, make_policy, *,
                                  (U.reduce_std(ratio_clustered), 'StdIW'),
                                  (1-(max_index / n_episodes), 'RewardCompression'),
                                  (ess_classic, 'ESSClassic'),
-                                 (ess_renyi, 'ESSRenyi')],
-                                 ())
+                                 (ess_renyi, 'ESSRenyi')])
     else:
         raise NotImplementedError()
 
