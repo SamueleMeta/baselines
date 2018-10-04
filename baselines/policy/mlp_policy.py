@@ -522,7 +522,6 @@ class MlpPolicy(object):
             self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
 
-        logstd = tf.get_default_session().run(self.logstd)
         self.get_parameter = U.GetFlat(self.var_list)
         self.set_parameter = U.SetFromFlat(self.var_list)
 
