@@ -1,0 +1,107 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/deep/nico/t3p/baselines/script",
+    "dependencies": [
+      "baselines==0.1.5",
+      "gym==0.9.6",
+      "numpy==1.14.1",
+      "rllab==0.1.0",
+      "sacred==0.7.4",
+      "tensorflow==1.5.0"
+    ],
+    "mainfile": "run_rllab_pois_sacred.py",
+    "name": "POIS",
+    "repositories": [
+      {
+        "commit": "0753630699cfbeef48e6051840f30e6768170655",
+        "dirty": true,
+        "url": "https://github.com/T3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "run_rllab_pois_sacred.py",
+        "_sources/run_rllab_pois_sacred_da4bbb548b3110fd0119e82c0a4c09b9.py"
+      ]
+    ]
+  },
+  "fail_trace": [
+    "Traceback (most recent call last):\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/common_shapes.py\", line 686, in _call_cpp_shape_fn_impl\n    input_tensors_as_shapes, status)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/errors_impl.py\", line 473, in __exit__\n    c_api.TF_GetCode(self.status.status))\n",
+    "tensorflow.python.framework.errors_impl.InvalidArgumentError: Shape must be rank 1 but is rank 0 for 'Reshape' (op: 'Reshape') with input shapes: [4,4], [].\n",
+    "\nDuring handling of the above exception, another exception occurred:\n\n",
+    "Traceback (most recent call last):\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/sacred/config/captured_function.py\", line 46, in captured_function\n    result = wrapped(*args, **kwargs)\n",
+    "  File \"script/run_rllab_pois_sacred.py\", line 156, in main\n    positive_return=positive_return)\n",
+    "  File \"script/run_rllab_pois_sacred.py\", line 130, in train\n    clipping=clipping, entropy=entropy, positive_return=positive_return)\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/pois/pois.py\", line 479, in learn\n    tf.add_to_collection('prints', tf.Print(episode_clustering_matrix, [tf.reshape(episode_clustering_matrix, (-1))]))\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/gen_array_ops.py\", line 3997, in reshape\n    \"Reshape\", tensor=tensor, shape=shape, name=name)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/op_def_library.py\", line 787, in _apply_op_helper\n    op_def=op_def)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/ops.py\", line 3162, in create_op\n    compute_device=compute_device)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/ops.py\", line 3208, in _create_op_helper\n    set_shapes_for_outputs(op)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/ops.py\", line 2427, in set_shapes_for_outputs\n    return _set_shapes_for_outputs(op)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/ops.py\", line 2400, in _set_shapes_for_outputs\n    shapes = shape_func(op)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/ops.py\", line 2330, in call_with_requiring\n    return call_cpp_shape_fn(op, require_shape_fn=True)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/common_shapes.py\", line 627, in call_cpp_shape_fn\n    require_shape_fn)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/common_shapes.py\", line 691, in _call_cpp_shape_fn_impl\n    raise ValueError(err.message)\n",
+    "ValueError: Shape must be rank 1 but is rank 0 for 'Reshape' (op: 'Reshape') with input shapes: [4,4], [].\n"
+  ],
+  "heartbeat": "2018-10-03T19:34:07.818633",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E5-4610 v2 @ 2.30GHz",
+    "hostname": "bellman",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-134-generic-x86_64-with-Ubuntu-16.04-xenial"
+    ],
+    "python_version": "3.5.2"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": false,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "env=cartpole",
+        "policy=linear",
+        "iw_method=rbis",
+        "logdir=cp_linear",
+        "bound=max-d2",
+        "delta=0.4",
+        "gamma=0.99",
+        "center=True",
+        "njobs=1",
+        "seed=904",
+        "num_episodes=4"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2018-10-03T19:34:04.946573",
+  "status": "FAILED",
+  "stop_time": "2018-10-03T19:34:07.822715"
+}

@@ -1,0 +1,106 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/deep/nico/t3p/baselines/script",
+    "dependencies": [
+      "baselines==0.1.5",
+      "gym==0.9.6",
+      "numpy==1.14.1",
+      "rllab==0.1.0",
+      "sacred==0.7.4",
+      "tensorflow==1.5.0"
+    ],
+    "mainfile": "run_rllab_pois_sacred.py",
+    "name": "POIS",
+    "repositories": [
+      {
+        "commit": "bd7b23cee7db4b7802a6472550dc04ee16911f68",
+        "dirty": false,
+        "url": "https://github.com/T3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "run_rllab_pois_sacred.py",
+        "_sources/run_rllab_pois_sacred_da4bbb548b3110fd0119e82c0a4c09b9.py"
+      ]
+    ]
+  },
+  "fail_trace": [
+    "Traceback (most recent call last):\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/client/session.py\", line 1350, in _do_call\n    return fn(*args)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/client/session.py\", line 1329, in _run_fn\n    status, run_metadata)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/errors_impl.py\", line 473, in __exit__\n    c_api.TF_GetCode(self.status.status))\n",
+    "tensorflow.python.framework.errors_impl.InvalidArgumentError: assertion failed: [] [Condition x > 0 did not hold element-wise:] [x (strided_slice_4:0) = ] [4.2201757456883954e-202 0 0...]\n\t [[Node: clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert = Assert[T=[DT_STRING, DT_STRING, DT_STRING, DT_DOUBLE], summarize=3, _device=\"/job:localhost/replica:0/task:0/device:CPU:0\"](clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/Switch, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/data_0, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/data_1, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/data_2, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/Switch_1)]]\n",
+    "\nDuring handling of the above exception, another exception occurred:\n\n",
+    "Traceback (most recent call last):\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/sacred/config/captured_function.py\", line 46, in captured_function\n    result = wrapped(*args, **kwargs)\n",
+    "  File \"script/run_rllab_pois_sacred.py\", line 156, in main\n    positive_return=positive_return)\n",
+    "  File \"script/run_rllab_pois_sacred.py\", line 130, in train\n    clipping=clipping, entropy=entropy, positive_return=positive_return)\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/pois/pois.py\", line 700, in learn\n    max_offline_ite=max_offline_iters)\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/pois/pois.py\", line 275, in optimize_offline\n    theta, epsilon, delta_bound, num_line_search = line_search(theta, alpha, natural_gradient, set_parameter, evaluate_loss)\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/pois/pois.py\", line 139, in line_search_parabola\n    bound = evaluate_bound()\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/pois/pois.py\", line 661, in evaluate_loss\n    loss = compute_bound(*args)\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/common/tf_util.py\", line 195, in __call__\n    results = tf.get_default_session().run(self.outputs_update, feed_dict=feed_dict)[:-1]\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/client/session.py\", line 895, in run\n    run_metadata_ptr)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/client/session.py\", line 1128, in _run\n    feed_dict_tensor, options, run_metadata)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/client/session.py\", line 1344, in _do_run\n    options, run_metadata)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/client/session.py\", line 1363, in _do_call\n    raise type(e)(node_def, op, message)\n",
+    "tensorflow.python.framework.errors_impl.InvalidArgumentError: assertion failed: [] [Condition x > 0 did not hold element-wise:] [x (strided_slice_4:0) = ] [4.2201757456883954e-202 0 0...]\n\t [[Node: clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert = Assert[T=[DT_STRING, DT_STRING, DT_STRING, DT_DOUBLE], summarize=3, _device=\"/job:localhost/replica:0/task:0/device:CPU:0\"](clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/Switch, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/data_0, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/data_1, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/data_2, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/Switch_1)]]\n\nCaused by op 'clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert', defined at:\n  File \"script/run_rllab_pois_sacred.py\", line 134, in <module>\n    @ex.automain\n  File \"/home/deep/.local/lib/python3.5/site-packages/sacred/experiment.py\", line 137, in automain\n    self.run_commandline()\n  File \"/home/deep/.local/lib/python3.5/site-packages/sacred/experiment.py\", line 260, in run_commandline\n    return self.run(cmd_name, config_updates, named_configs, {}, args)\n  File \"/home/deep/.local/lib/python3.5/site-packages/sacred/experiment.py\", line 209, in run\n    run()\n  File \"/home/deep/.local/lib/python3.5/site-packages/sacred/run.py\", line 221, in __call__\n    self.result = self.main_function(*args)\n  File \"/home/deep/.local/lib/python3.5/site-packages/sacred/config/captured_function.py\", line 46, in captured_function\n    result = wrapped(*args, **kwargs)\n  File \"script/run_rllab_pois_sacred.py\", line 156, in main\n    positive_return=positive_return)\n  File \"script/run_rllab_pois_sacred.py\", line 130, in train\n    clipping=clipping, entropy=entropy, positive_return=positive_return)\n  File \"/home/deep/nico/t3p/baselines/baselines/pois/pois.py\", line 480, in learn\n    tf.add_to_collection('asserts', tf.assert_positive(clustered_target_pdf, name='clust_target_pdf_positive'))\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/check_ops.py\", line 215, in assert_positive\n    return assert_less(zero, x, data=data, summarize=summarize)\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/check_ops.py\", line 489, in assert_less\n    return control_flow_ops.Assert(condition, data, summarize=summarize)\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/util/tf_should_use.py\", line 118, in wrapped\n    return _add_should_use_warning(fn(*args, **kwargs))\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/control_flow_ops.py\", line 176, in Assert\n    condition, no_op, true_assert, name=\"AssertGuard\")\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/util/deprecation.py\", line 316, in new_func\n    return func(*args, **kwargs)\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/control_flow_ops.py\", line 1903, in cond\n    orig_res_f, res_f = context_f.BuildCondBranch(false_fn)\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/control_flow_ops.py\", line 1752, in BuildCondBranch\n    original_result = fn()\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/control_flow_ops.py\", line 174, in true_assert\n    condition, data, summarize, name=\"Assert\")\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/gen_logging_ops.py\", line 48, in _assert\n    name=name)\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/op_def_library.py\", line 787, in _apply_op_helper\n    op_def=op_def)\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/ops.py\", line 3160, in create_op\n    op_def=op_def)\n  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/ops.py\", line 1625, in __init__\n    self._traceback = self._graph._extract_stack()  # pylint: disable=protected-access\n\nInvalidArgumentError (see above for traceback): assertion failed: [] [Condition x > 0 did not hold element-wise:] [x (strided_slice_4:0) = ] [4.2201757456883954e-202 0 0...]\n\t [[Node: clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert = Assert[T=[DT_STRING, DT_STRING, DT_STRING, DT_DOUBLE], summarize=3, _device=\"/job:localhost/replica:0/task:0/device:CPU:0\"](clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/Switch, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/data_0, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/data_1, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/data_2, clust_target_pdf_positive/assert_less/Assert/AssertGuard/Assert/Switch_1)]]\n\n"
+  ],
+  "heartbeat": "2018-10-03T18:55:37.991455",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E5-4610 v2 @ 2.30GHz",
+    "hostname": "bellman",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-134-generic-x86_64-with-Ubuntu-16.04-xenial"
+    ],
+    "python_version": "3.5.2"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": true,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "env=cartpole",
+        "policy=linear",
+        "iw_method=rbis",
+        "logdir=cp_linear",
+        "bound=max-d2",
+        "delta=0.4",
+        "gamma=0.99",
+        "center=True",
+        "njobs=5",
+        "seed=109"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2018-10-03T18:55:30.301557",
+  "status": "FAILED",
+  "stop_time": "2018-10-03T18:55:37.999037"
+}
