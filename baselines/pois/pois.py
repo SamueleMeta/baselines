@@ -467,8 +467,13 @@ def learn(make_env, make_policy, *,
         # Get pdfs for episodes
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
-        target_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(target_log_pdf_episode), tf.float64), 1e-256, 1e+256)
-        behavioral_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(behavioral_log_pdf_episode), tf.float64), 1e-256, 1e+256)
+        # Normalize log_proba (avoid as overflows as possible)
+        normalization_factor = tf.reduce_mean(tf.stack([target_log_pdf_episode, behavioral_log_pdf_episode]))
+        target_norm_log_pdf_episode = target_log_pdf_episode - normalization_factor
+        behavioral_norm_log_pdf_episode = behavioral_pdf_episode - normalization_factor
+        # Exponentiate
+        target_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(target_norm_log_pdf_episode), tf.float64), 1e-300, 1e+300)
+        behavioral_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(behavioral_norm_log_pdf_episode), tf.float64), 1e-300, 1e+300)
         tf.add_to_collection('asserts', tf.assert_positive(target_pdf_episode, name='target_pdf_positive'))
         tf.add_to_collection('asserts', tf.assert_positive(behavioral_pdf_episode, name='behavioral_pdf_positive'))
         # Compute the merging matrix (reward-clustering) and the number of clusters
