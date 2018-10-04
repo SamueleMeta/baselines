@@ -87,7 +87,7 @@ class MlpPolicy(object):
 
         #Evaluating
         self.ob = ob
-        self.ac_in = U.get_placeholder(name="ac_in", dtype=tf.float32,
+        self.ac_in = U.get_placeholder(name="ac_in", dtype=ac_space.dtype,
                                        shape=[sequence_length] +
                                        list(ac_space.shape))
         self.gamma = U.get_placeholder(name="gamma",
@@ -95,7 +95,7 @@ class MlpPolicy(object):
         self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
                                        shape=[sequence_length]+[1])
         self.logprobs = self.pd.logp(self.ac_in) #  [\log\pi(a|s)]
-        
+
         #Fisher
         with tf.variable_scope('pol') as vs:
             self.weights = weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
@@ -103,28 +103,28 @@ class MlpPolicy(object):
         self.flat_weights = flat_weights = tf.concat([tf.reshape(w, [-1]) for w in weights], axis=0)
         self.n_weights = flat_weights.shape[0].value
         self.score = score = U.flatgrad(self.logprobs, weights) # \nabla\log p(\tau)
-        self.fisher = tf.einsum('i,j->ij', score, score)        
-      
+        self.fisher = tf.einsum('i,j->ij', score, score)
+
         #Performance graph initializations
         self._setting = []
 
-    #Acting    
+    #Acting
     def act(self, stochastic, ob):
         """
         Actions sampled from the policy
-           
+
         Params:
                stochastic: use noise
                ob: current state
         """
         ac1, vpred1 =  self._act(stochastic, ob[None])
         return ac1[0], vpred1[0]
-    
+
 
     #Divergence
     def eval_renyi(self, states, other, order=2):
         """Exponentiated Renyi divergence exp(Renyi(self, other)) for each state
-        
+
         Params:
             states: flat list of states
             other: other policy
@@ -144,14 +144,14 @@ class MlpPolicy(object):
         e_renyi = tf.exp(renyi)
         fun = U.function([self.ob],[e_renyi])
         return fun(states)[0]
-        
-    
+
+
     #Performance evaluation
-    def eval_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, behavioral=None, per_decision=False, 
-                   normalize=False, truncate_at=np.infty):        
+    def eval_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, behavioral=None, per_decision=False,
+                   normalize=False, truncate_at=np.infty):
         """
         Performance evaluation, possibly off-policy
-        
+
         Params:
             states, actions, rewards as lists, flat wrt time
             lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
@@ -159,26 +159,26 @@ class MlpPolicy(object):
             behavioral: policy used to collect (s, a, r) tuples
             per_decision: whether to use Per-Decision IS in place of regular episodic IS
             gamma: discount factor
-        
+
         Returns:
-            sample variance of episodic performance Var_J_hat, 
+            sample variance of episodic performance Var_J_hat,
         """
         #Prepare data
         batch_size, horizon, _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon)
-        
+
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
         self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
-        
+
         #Evaluate performance stats
         result = self._get_avg_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.asscalar(result)
 
-    def eval_var_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None,  gamma=.99, 
-                   behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):        
+    def eval_var_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None,  gamma=.99,
+                   behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):
         """
         Performance variance evaluation, possibly off-policy
-        
+
         Params:
             states, actions, rewards as lists, flat wrt time
             lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
@@ -186,17 +186,17 @@ class MlpPolicy(object):
             behavioral: policy used to collect (s, a, r) tuples
             per_decision: whether to use Per-Decision IS in place of regular episodic IS
             gamma: discount factor
-        
+
         Returns:
             sample variance of episodic performance J_hat
         """
         #Prepare data
         batch_size, horizon, _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon)
-        
+
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
         self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
-        
+
         #Evaluate performance stats
         result = self._get_var_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.asscalar(result)
@@ -219,8 +219,8 @@ class MlpPolicy(object):
     def eval_grad_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
                     behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):
         """
-        Gradients of performance 
-        
+        Gradients of performance
+
         Params:
             states, actions, rewards as lists, flat wrt time
             lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
@@ -228,17 +228,17 @@ class MlpPolicy(object):
             behavioral: policy used to collect (s, a, r) tuples
             per_decision: whether to use Per-Decision IS in place of regular episodic IS
             gamma: discount factor
-        
+
         Returns:
-            gradient of average episodic performance wrt actor weights, 
+            gradient of average episodic performance wrt actor weights,
         """
         #Prepare data
         batch_size, horizon, _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon)
-        
+
         #Build performance evaluation graph (lazy)
         assert batch_size>0
         self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
-        
+
         #Evaluate gradients
         result = self._get_grad_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.ravel(result)
@@ -247,7 +247,7 @@ class MlpPolicy(object):
                         behavioral=None, per_decision=False, normalize=False, truncate_at=np.infty):
         """
         Gradients of performance stats
-        
+
         Params:
             states, actions, rewards as lists, flat wrt time
             lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
@@ -255,17 +255,17 @@ class MlpPolicy(object):
             behavioral: policy used to collect (s, a, r) tuples
             per_decision: whether to use Per-Decision IS in place of regular episodic IS
             gamma: discount factor
-        
+
         Returns:
-            gradient of sample variance of episodic performance wrt actor weights 
+            gradient of sample variance of episodic performance wrt actor weights
         """
         #Prepare data
         batch_size, horizon, _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon)
-        
+
         #Build performance evaluation graph (lazy)
         assert batch_size>0
         self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
-        
+
         #Evaluate gradients
         result = self._get_grad_var_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.ravel(result)
@@ -275,7 +275,7 @@ class MlpPolicy(object):
                    truncate_at=np.infty, delta=0.2, use_ess=False):
         """
         Student-t bound on performance
-        
+
         Params:
             states, actions, rewards as lists, flat wrt time
             lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
@@ -291,9 +291,9 @@ class MlpPolicy(object):
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
         self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
-        
+
         #Evaluate bound
-        N = self._get_ess(_states, _actions, _rewards, gamma, _mask)[0] if use_ess else batch_size 
+        N = self._get_ess(_states, _actions, _rewards, gamma, _mask)[0] if use_ess else batch_size
         N = max(N, 2)
         bound = self._avg_J - sts.t.ppf(1 - delta, N - 1) / np.sqrt(N) * tf.sqrt(self._var_J)
         return np.asscalar(U.function([self.ob, self.ac_in, self.rew,
@@ -304,12 +304,12 @@ class MlpPolicy(object):
                                        gamma,
                                        _mask)[0])
 
-    def eval_grad_bound(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, 
+    def eval_grad_bound(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99,
                         behavioral=None, per_decision=False, normalize=False,
                         truncate_at=np.infty, delta=.2, use_ess=False):
         """
         Gradient of student-t bound
-        
+
         Params:
             states, actions, rewards as lists, flat wrt time
             lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
@@ -324,14 +324,14 @@ class MlpPolicy(object):
         """
          #Prepare data
         batch_size, horizon, _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon)
-        
+
         #Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
         self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
-        
+
         #Evaluate bound gradient
-        N = self._get_ess(_states, _actions, _rewards, gamma, _mask)[0] if use_ess else batch_size 
-        N = max(N, 2) 
+        N = self._get_ess(_states, _actions, _rewards, gamma, _mask)[0] if use_ess else batch_size
+        N = max(N, 2)
         bound = self._avg_J - sts.t.ppf(1 - delta, N - 1) / np.sqrt(N) * tf.sqrt(self._var_J)
         grad_bound = U.flatgrad(bound, self.get_param())
         return np.ravel(U.function([self.ob, self.ac_in, self.rew,
@@ -348,7 +348,7 @@ class MlpPolicy(object):
         if actions is not None:
             assert len(actions)==len(states)
         if type(lens_or_batch_size) is list:
-            lens = lens_or_batch_size    
+            lens = lens_or_batch_size
             no_of_samples = sum(lens)
             assert no_of_samples > 0
             batch_size = len(lens)
@@ -363,9 +363,9 @@ class MlpPolicy(object):
                 horizon = len(states)/batch_size
             no_of_samples = horizon * batch_size
             lens = [horizon] * batch_size
-               
+
         mask = np.ones(no_of_samples) if do_pad else None
-        
+
         indexes = np.cumsum(lens)
         to_resize = [states, actions, rewards, mask]
         to_resize = [x for x in to_resize if x is not None]
@@ -399,12 +399,12 @@ class MlpPolicy(object):
             disc = tf.cumprod(disc, axis=1, exclusive=True)
             disc_rews = rews_by_episode * disc
             rets = tf.reduce_sum(disc_rews, axis=1)
-            
+
             if behavioral is None:
                 #On policy
                 avg_J, var_J = tf.nn.moments(tf.reduce_sum(disc_rews, axis=1), axes=[0])
                 grad_avg_J = tf.constant(0)
-                grad_var_J = tf.constant(0)    
+                grad_var_J = tf.constant(0)
                 avg_iw = tf.constant(1)
                 var_iw = tf.constant(0)
                 max_iw = tf.constant(1)
@@ -452,21 +452,21 @@ class MlpPolicy(object):
                         #Per-trajectory, self-normalized
                         iw = batch_size*iw/tf.reduce_sum(iw, axis=0)
                         avg_J = tf.reduce_mean(rets*iw, axis=0)
-                        var_J = 1./batch_size * tf.reduce_mean(iw**2 * 
+                        var_J = 1./batch_size * tf.reduce_mean(iw**2 *
                                                     (rets - avg_J)**2)
                         avg_iw = tf.reduce_mean(iw, axis=0)
                         var_iw = 1./batch_size * tf.reduce_mean((iw - 1)**2)
-                        
+
                     ess = tf.round(tf.reduce_sum(iw)**2 / tf.reduce_sum(iw**2))
                     max_iw = tf.reduce_max(iw)
-                
+
 
                 grad_avg_J = U.flatgrad(avg_J, self.get_param())
                 grad_var_J = U.flatgrad(var_J, self.get_param())
-            
+
                 avg_ret, var_ret = tf.nn.moments(tf.reduce_sum(disc_rews, axis=1), axes=[0])
                 max_ret = tf.reduce_max(tf.reduce_sum(disc_rews, axis=1))
-            
+
             self._avg_J = avg_J
             self._var_J = var_J
             self._grad_avg_J = grad_avg_J
@@ -487,11 +487,11 @@ class MlpPolicy(object):
             #print('Recompile time:', time.time() - checkpoint)
 
 
-    #Fisher    
+    #Fisher
     def eval_fisher(self, states, actions, lens_or_batch_size, horizon=None, behavioral=None):
         """
         Fisher information matrix
-        
+
         Params:
             states, actions as lists, flat wrt time
             lens_or_batch_size: list with episode lengths or scalar representing the number of (equally long) episodes
@@ -499,10 +499,10 @@ class MlpPolicy(object):
             behavioral: policy used to collect (s, a, r) tuples
         """
         #Prepare data
-        batch_size, horizon, _states, _actions = self._prepare_data(states, 
-                                                      actions, 
-                                                      None, 
-                                                      lens_or_batch_size, 
+        batch_size, horizon, _states, _actions = self._prepare_data(states,
+                                                      actions,
+                                                      None,
+                                                      lens_or_batch_size,
                                                       horizon,
                                                       do_pad=False,
                                                       do_concat=False)
@@ -512,7 +512,7 @@ class MlpPolicy(object):
                 log_ratios = self.logprobs - behavioral.pd.logp(self.ac_in)
                 iw = tf.exp(tf.reduce_sum(log_ratios))
                 fisher = tf.multiply(iw, fisher)
-            
+
         fun =  U.function([self.ob, self.ac_in], [fisher])
         fisher_samples = np.array([fun(s, a)[0] for (s,a) in zip(_states, _actions)]) #one call per EPISODE
         return np.mean(fisher_samples, axis=0)
@@ -531,7 +531,7 @@ class MlpPolicy(object):
     def eval_param(self):
         """"Policy parameters (numeric,flat)"""
         return self.get_parameter()
-    
+
     def get_param(self):
         return self.weights
 
