@@ -470,7 +470,7 @@ def learn(make_env, make_policy, *,
         # Normalize log_proba (avoid as overflows as possible)
         normalization_factor = tf.reduce_mean(tf.stack([target_log_pdf_episode, behavioral_log_pdf_episode]))
         target_norm_log_pdf_episode = target_log_pdf_episode - normalization_factor
-        behavioral_norm_log_pdf_episode = behavioral_pdf_episode - normalization_factor
+        behavioral_norm_log_pdf_episode = behavioral_log_pdf_episode - normalization_factor
         # Exponentiate
         target_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(target_norm_log_pdf_episode), tf.float64), 1e-300, 1e+300)
         behavioral_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(behavioral_norm_log_pdf_episode), tf.float64), 1e-300, 1e+300)
