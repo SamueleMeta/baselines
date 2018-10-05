@@ -16,8 +16,18 @@ from baselines.envs.wrappers import FixedHorizonWrapper
 
 class StepRewardWrapper(gym.RewardWrapper):
 
+    def __init__(self):
+        super().__init__()
+        self.current_reward = 0
+
+    def reset(self):
+        self.current_reward = 0
+        return super().reset()
+
     def reward(self, reward):
-        return reward + 1
+        if reward > 0:
+            self.current_reward += 1
+        return self.current_reward
 
 def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, entropy, njobs=1):
 
