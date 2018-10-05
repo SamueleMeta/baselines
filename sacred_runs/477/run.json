@@ -1,0 +1,100 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/deep/nico/t3p/baselines/script",
+    "dependencies": [
+      "baselines==0.1.5",
+      "gym==0.9.6",
+      "numpy==1.14.1",
+      "sacred==0.7.4",
+      "tensorflow==1.5.0"
+    ],
+    "mainfile": "run_gym_pois_sacred.py",
+    "name": "POIS",
+    "repositories": [
+      {
+        "commit": "d15d4a222495d18c148be88f572335bb610f293f",
+        "dirty": false,
+        "url": "https://github.com/T3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "run_gym_pois_sacred.py",
+        "_sources/run_gym_pois_sacred_9c1deb6976acecabb2e9ae1d0e858624.py"
+      ]
+    ]
+  },
+  "fail_trace": [
+    "Traceback (most recent call last):\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/sacred/config/captured_function.py\", line 46, in captured_function\n    result = wrapped(*args, **kwargs)\n",
+    "  File \"script/run_gym_pois_sacred.py\", line 115, in main\n    positive_return=positive_return)\n",
+    "  File \"script/run_gym_pois_sacred.py\", line 89, in train\n    clipping=clipping, entropy=entropy, positive_return=positive_return)\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/pois/pois.py\", line 341, in learn\n    pi = make_policy('pi', ob_space, ac_space)\n",
+    "  File \"script/run_gym_pois_sacred.py\", line 73, in make_policy\n    output_W_init=tf.contrib.layers.xavier_initializer())\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/policy/mlp_policy.py\", line 16, in __init__\n    self._init(*args, **kwargs)\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/policy/mlp_policy.py\", line 97, in _init\n    self.logprobs = self.pd.logp(self.ac_in) #  [\\log\\pi(a|s)]\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/common/distributions.py\", line 24, in logp\n    return - self.neglogp(x)\n",
+    "  File \"/home/deep/nico/t3p/baselines/baselines/common/distributions.py\", line 171, in neglogp\n    one_hot_actions = tf.one_hot(x, self.logits.get_shape().as_list()[-1])\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/array_ops.py\", line 2364, in one_hot\n    name)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/ops/gen_array_ops.py\", line 2831, in _one_hot\n    off_value=off_value, axis=axis, name=name)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/op_def_library.py\", line 609, in _apply_op_helper\n    param_name=input_name)\n",
+    "  File \"/home/deep/.local/lib/python3.5/site-packages/tensorflow/python/framework/op_def_library.py\", line 60, in _SatisfiesTypeConstraint\n    \", \".join(dtypes.as_dtype(x).name for x in allowed_list)))\n",
+    "TypeError: Value passed to parameter 'indices' has DataType float32 not in list of allowed values: uint8, int32, int64\n"
+  ],
+  "heartbeat": "2018-10-04T18:32:41.125816",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E5-4610 v2 @ 2.30GHz",
+    "hostname": "bellman",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-134-generic-x86_64-with-Ubuntu-16.04-xenial"
+    ],
+    "python_version": "3.5.2"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": true,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "env=MountainCar-v0",
+        "policy=linear",
+        "iw_method=is",
+        "logdir=mcc_linear",
+        "bound=max-d2",
+        "delta=0.9",
+        "gamma=0.99",
+        "center=False",
+        "njobs=5",
+        "seed=904"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2018-10-04T18:32:38.238714",
+  "status": "FAILED",
+  "stop_time": "2018-10-04T18:32:41.128792"
+}
