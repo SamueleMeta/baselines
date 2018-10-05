@@ -40,7 +40,10 @@ for key, value in my_runs.items():
         print("Removed run:", key)
     elif args.cout:
         # Try to remove the cout file
-        os.remove(base_directory + str(key) + '/cout.txt')
-        print("Removed cout for run:", key)
+        try:
+            os.remove(base_directory + str(key) + '/cout.txt')
+            print("Removed cout for run:", key)
+        except:
+            pass
 
 print("Completed")
