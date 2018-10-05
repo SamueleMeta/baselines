@@ -16,8 +16,8 @@ from baselines.envs.wrappers import FixedHorizonWrapper
 
 class StepRewardWrapper(gym.RewardWrapper):
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, env):
+        super().__init__(env)
         self.current_reward = 0
 
     def reset(self):
