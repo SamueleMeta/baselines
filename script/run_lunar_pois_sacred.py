@@ -65,8 +65,11 @@ class SparseReward(gym.RewardWrapper):
 def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entropy='none', max_iters=500, positive_return=False):
 
     def make_env():
-        _env = gym.make(env)
-        _env = SparseReward(_env)
+        if env == 'lunarlander-sparse':
+            _env = gym.make('LunarLanderContinuous-v2')
+            _env = SparseReward(_env)
+        else:
+            _env = gym.make(env)
         return _env
 
     if policy == 'linear':
