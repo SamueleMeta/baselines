@@ -57,10 +57,12 @@ def custom_config():
 class SparseReward(gym.RewardWrapper):
 
     def reward(self, reward):
-        if abs(reward) != 100:
-            return 0
+        if reward > 90:
+            return 100
+        elif reward <= -90:
+            return - 100
         else:
-            return reward
+            return 0
 
 def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, gamma, center_return, clipping=False, njobs=1, entropy='none', max_iters=500, positive_return=False):
 
