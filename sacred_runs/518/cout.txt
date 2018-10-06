@@ -1,0 +1,104 @@
+INFO - POIS - Running command 'main'
+INFO - POIS - Started run with ID "518"
+Logging to lunar
+Using 5 CPUs
+2018-10-05 17:44:04.979316: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2018-10-05 17:44:04.979474: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2018-10-05 17:44:04.986977: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2018-10-05 17:44:04.987986: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2018-10-05 17:44:04.988199: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+2018-10-05 17:44:04.990807: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+Worker 82094 - Running with seed 573
+Worker 82079 - Running with seed 571
+Worker 82075 - Running with seed 570
+Worker 82096 - Running with seed 574
+********** Iteration 1 ************
+[35msampling[0m
+Process Worker-5:
+Traceback (most recent call last):
+  File "/usr/lib/python3.5/multiprocessing/process.py", line 249, in _bootstrap
+    self.run()
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 120, in run
+    samples = self.traj_segment_generator(pi, env)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 149, in <lambda>
+    f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 55, in traj_segment_function
+    ob, rew, new, _ = env.step(ac)
+  File "/usr/local/lib/python3.5/dist-packages/gym/wrappers/time_limit.py", line 31, in step
+    observation, reward, done, info = self.env.step(action)
+  File "/usr/local/lib/python3.5/dist-packages/gym/envs/box2d/lunar_lander.py", line 238, in step
+    assert self.action_space.contains(action), "%r (%s) invalid " % (action,type(action))
+AssertionError: array([-0.5193055, -1.6667601], dtype=float32) (<class 'numpy.ndarray'>) invalid 
+Process Worker-1:
+Traceback (most recent call last):
+  File "/usr/lib/python3.5/multiprocessing/process.py", line 249, in _bootstrap
+    self.run()
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 120, in run
+    samples = self.traj_segment_generator(pi, env)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 149, in <lambda>
+    f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 55, in traj_segment_function
+    ob, rew, new, _ = env.step(ac)
+  File "/usr/local/lib/python3.5/dist-packages/gym/wrappers/time_limit.py", line 31, in step
+    observation, reward, done, info = self.env.step(action)
+  File "/usr/local/lib/python3.5/dist-packages/gym/envs/box2d/lunar_lander.py", line 238, in step
+    assert self.action_space.contains(action), "%r (%s) invalid " % (action,type(action))
+AssertionError: array([-0.21168484,  1.2146738 ], dtype=float32) (<class 'numpy.ndarray'>) invalid 
+Process Worker-2:
+Traceback (most recent call last):
+  File "/usr/lib/python3.5/multiprocessing/process.py", line 249, in _bootstrap
+    self.run()
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 120, in run
+    samples = self.traj_segment_generator(pi, env)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 149, in <lambda>
+    f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 55, in traj_segment_function
+    ob, rew, new, _ = env.step(ac)
+  File "/usr/local/lib/python3.5/dist-packages/gym/wrappers/time_limit.py", line 31, in step
+    observation, reward, done, info = self.env.step(action)
+  File "/usr/local/lib/python3.5/dist-packages/gym/envs/box2d/lunar_lander.py", line 238, in step
+    assert self.action_space.contains(action), "%r (%s) invalid " % (action,type(action))
+AssertionError: array([ 1.9916693 , -0.39167964], dtype=float32) (<class 'numpy.ndarray'>) invalid 
+Process Worker-4:
+Traceback (most recent call last):
+  File "/usr/lib/python3.5/multiprocessing/process.py", line 249, in _bootstrap
+    self.run()
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 120, in run
+    samples = self.traj_segment_generator(pi, env)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 149, in <lambda>
+    f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 55, in traj_segment_function
+    ob, rew, new, _ = env.step(ac)
+  File "/usr/local/lib/python3.5/dist-packages/gym/wrappers/time_limit.py", line 31, in step
+    observation, reward, done, info = self.env.step(action)
+  File "/usr/local/lib/python3.5/dist-packages/gym/envs/box2d/lunar_lander.py", line 238, in step
+    assert self.action_space.contains(action), "%r (%s) invalid " % (action,type(action))
+AssertionError: array([1.0946844, 1.2493207], dtype=float32) (<class 'numpy.ndarray'>) invalid 
+Worker 82088 - Running with seed 572
+Process Worker-3:
+Traceback (most recent call last):
+  File "/usr/lib/python3.5/multiprocessing/process.py", line 249, in _bootstrap
+    self.run()
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 120, in run
+    samples = self.traj_segment_generator(pi, env)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 149, in <lambda>
+    f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
+  File "/home/pois/nico/t3p/baselines/baselines/pois/parallel_sampler.py", line 55, in traj_segment_function
+    ob, rew, new, _ = env.step(ac)
+  File "/usr/local/lib/python3.5/dist-packages/gym/wrappers/time_limit.py", line 31, in step
+    observation, reward, done, info = self.env.step(action)
+  File "/usr/local/lib/python3.5/dist-packages/gym/envs/box2d/lunar_lander.py", line 238, in step
+    assert self.action_space.contains(action), "%r (%s) invalid " % (action,type(action))
+AssertionError: array([ 0.62871265, -2.954547  ], dtype=float32) (<class 'numpy.ndarray'>) invalid 
