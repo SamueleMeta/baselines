@@ -69,7 +69,7 @@ def main():
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
     parser.add_argument('--logdir', type=str, default='.')
     args = parser.parse_args()
-    logger.configure(dir=args.logdir,format_strs=['stdout','csv', 'tensorboard'])
+    logger.configure(dir=args.logdir,format_strs=['stdout','csv', 'tensorboard'], file_name='trpo_lunar')
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed, save_dir=args.logdir)
 
 
