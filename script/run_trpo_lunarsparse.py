@@ -67,13 +67,10 @@ def main():
     parser.add_argument('--env', help='environment ID', default=TASK)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--num-timesteps', type=int, default=int(ITERATIONS*BATCH_SIZE*HORIZON))
+    parser.add_argument('--logdir', type=str, default='.')
     args = parser.parse_args()
-    save_dir = PREFIX + '_' +  str(args.seed)
-    import os
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    logger.configure(dir=save_dir,format_strs=['stdout','csv', 'tensorboard'])
-    train(args.env, num_timesteps=args.num_timesteps, seed=args.seed, save_dir=save_dir)
+    logger.configure(dir=args.logdir,format_strs=['stdout','csv', 'tensorboard'])
+    train(args.env, num_timesteps=args.num_timesteps, seed=args.seed, save_dir=args.logdir)
 
 
 if __name__ == '__main__':
