@@ -69,7 +69,7 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
 
             # Save the current properties
             obs[ci_memory, ct,:] = ob[ci_ob]
-            vpreds[ci_memory, ct] = np.reshape(np.array(vpred), (-1,))[ci_ob]
+            #vpreds[ci_memory, ct] = np.reshape(np.array(vpred), (-1,))[ci_ob]
             acs[ci_memory, ct] = ac[ci_ob]
             prevacs[ci_memory, ct] = prevac[ci_ob]
 
