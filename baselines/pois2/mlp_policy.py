@@ -83,7 +83,7 @@ class MlpPolicy(object):
         if use_critic:
             self._act = U.function([stochastic, ob], [ac, self.vpred])
         else:
-            self._act = U.function([stochastic, ob], [ac, tf.zeros((1,1))])
+            self._act = U.function([stochastic, ob], [ac, tf.zeros(1)])
 
         #Evaluating
         self.ob = ob
