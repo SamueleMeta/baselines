@@ -54,7 +54,21 @@ def custom_config():
     else:
         file_name = file_name
 
+HORIZON = 500
+
 class SparseReward(gym.RewardWrapper):
+
+    def reset(self):
+        self.current_timestep = 0
+        return self.env.reset()
+
+    def step(self, action):
+        observation, reward, done, info = self.env.step(action)
+        self.current_timestep += 1
+        if done or (self.current_timestep >= HORIZON):
+            return observation, -100, True, info
+        else:
+            return observation, self.reward(reward), done, info
 
     def reward(self, reward):
         if reward > 90:
