@@ -1,0 +1,83 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/pois/nico/t3p/baselines/script",
+    "dependencies": [
+      "baselines==0.1.5",
+      "gym==0.10.8",
+      "numpy==1.14.3",
+      "sacred==0.7.4",
+      "tensorflow==1.10.1"
+    ],
+    "mainfile": "run_lunar_pois_sacred.py",
+    "name": "POIS",
+    "repositories": [
+      {
+        "commit": "0bd14f9bbeaa5528e9839d4d20bb84487417039e",
+        "dirty": false,
+        "url": "https://github.com/t3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "run_lunar_pois_sacred.py",
+        "_sources/run_lunar_pois_sacred_6418f1b1ad215464f76a3bb30f415dcb.py"
+      ]
+    ]
+  },
+  "heartbeat": "2018-10-07T16:55:01.261239",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E7-8880 v4 @ 2.20GHz",
+    "hostname": "turing",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-134-generic-x86_64-with-Ubuntu-16.04-xenial"
+    ],
+    "python_version": "3.5.2"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": true,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "env=lunarlander-sparse",
+        "policy=nn",
+        "iw_method=is",
+        "logdir=lunar",
+        "bound=max-d2",
+        "delta=0.9",
+        "gamma=1.0",
+        "center=False",
+        "njobs=5",
+        "seed=160"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2018-10-07T11:30:23.259261",
+  "status": "COMPLETED",
+  "stop_time": "2018-10-07T16:55:01.254445"
+}
