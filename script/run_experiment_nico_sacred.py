@@ -14,6 +14,7 @@ parser.add_argument('--experiment', help='Experiment CSV file to load.', type=st
 parser.add_argument('--condaenv', help='Conda environment to activate.', type=str, default=None)
 parser.add_argument('--dirty', action='store_true', default=False, help='Enable sacred dirty running.')
 parser.add_argument('--pythonv', help='Python version to use', type=str, default='python3')
+parser.add_argument('--pythonpath', help='Pythonpath to use for script.', type=str, default=None)
 args = parser.parse_args()
 
 if args.experiment is not None:
@@ -22,6 +23,8 @@ if args.experiment is not None:
     cmd_base = args.pythonv + ' script/'
     if args.condaenv is not None:
         cmd_base = 'source activate baselines && ' + cmd_base
+    if args.pythonpath:
+        cmd_base = "PYTHONPATH='PYTHONPATH:" + args.pythonpath + "'" + cmd_base
     param_cols = list(experiment)
     param_cols.remove('script')
     cmds = []
