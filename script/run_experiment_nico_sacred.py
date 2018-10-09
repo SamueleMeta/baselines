@@ -24,7 +24,7 @@ if args.experiment is not None:
     if args.condaenv is not None:
         cmd_base = 'source activate baselines && ' + cmd_base
     if args.pythonpath:
-        cmd_base = "PYTHONPATH='PYTHONPATH:" + args.pythonpath + "'" + cmd_base
+        cmd_base = "PYTHONPATH='PYTHONPATH:" + args.pythonpath + "' " + cmd_base
     param_cols = list(experiment)
     param_cols.remove('script')
     cmds = []
