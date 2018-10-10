@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # noinspection PyUnresolvedReferences
 import sys
-sys.path.remove('/home/alberto/baselines')
-sys.path.append('/home/alberto/baselines_ours')
-sys.path.append('/home/alberto/rllab')
 
 from baselines.common import set_global_seeds
 import gym
@@ -16,51 +13,54 @@ import time
 import os
 import tensorflow as tf
 from baselines.pois.parallel_sampler import ParallelSampler
-from rllab.envs.box2d.cartpole_env import CartpoleEnv
 from baselines.envs.rllab_wrappers import Rllab2GymWrapper
-'''
-from rllab.envs.mujoco.swimmer_env import SwimmerEnv
-from rllab.envs.mujoco.ant_env import AntEnv
-from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
-from rllab.envs.mujoco.hopper_env import HopperEnv
-from rllab.envs.mujoco.humanoid_env import HumanoidEnv
-from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
-from rllab.envs.mujoco.simple_humanoid_env import SimpleHumanoidEnv
-from rllab.envs.mujoco.walker2d_env import Walker2DEnv
 
-from rllab.envs.box2d.mountain_car_env import MountainCarEnv
-from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
-from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
-'''
+def rllab_env_from_name(env):
+    if env == 'swimmer':
+        from rllab.envs.mujoco.swimmer_env import SwimmerEnv
+        return SwimmerEnv
+    elif env == 'ant':
+        from rllab.envs.mujoco.ant_env import AntEnv
+        return AntEnv
+    elif env == 'half-cheetah':
+        from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
+        return HalfCheetahEnv
+    elif env == 'hopper':
+        from rllab.envs.mujoco.hopper_env import HopperEnv
+        return HopperEnv
+    elif env == 'simple-humanoid':
+        from rllab.envs.mujoco.simple_humanoid_env import SimpleHumanoidEnv
+        return SimpleHumanoidEnv
+    elif env == 'full-humanoid':
+        from rllab.envs.mujoco.humanoid_env import HumanoidEnv
+        return HumanoidEnv
+    elif env == 'walker':
+        from rllab.envs.mujoco.walker2d_env import Walker2DEnv
+        return Walker2DEnv
+    elif env == 'cartpole':
+        from rllab.envs.box2d.cartpole_env import CartpoleEnv
+        return CartpoleEnv
+    elif env == 'mountain-car':
+        from rllab.envs.box2d.mountain_car_env import MountainCarEnv
+        return MountainCarEnv
+    elif env == 'inverted-pendulum':
+        from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
+        return InvertedPendulumEnv
+    elif env == 'acrobot':
+        from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
+        return AcrobotEnv
+    elif env == 'inverted-double-pendulum':
+        from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
+        return InvertedPendulumEnv
+    else:
+        raise Exception('Unrecognized rllab environment.')
+
 def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, seed, policy, max_offline_iters, njobs=1):
 
-    if env == 'swimmer':
-        make_env_rllab = SwimmerEnv
-    elif env == 'ant':
-        make_env_rllab = AntEnv
-    elif env == 'half-cheetah':
-        make_env_rllab = HalfCheetahEnv
-    elif env == 'hopper':
-        make_env_rllab = HopperEnv
-    elif env == 'simple-humanoid':
-        make_env_rllab = SimpleHumanoidEnv
-    elif env == 'full-humanoid':
-        make_env_rllab = HumanoidEnv
-    elif env == 'walker':
-        make_env_rllab = Walker2DEnv
-    elif env == 'cartpole':
-        make_env_rllab = CartpoleEnv
-    elif env == 'mountain-car':
-        make_env_rllab = MountainCarEnv
-    elif env == 'inverted-pendulum':
-        make_env_rllab = InvertedPendulumEnv
-    elif env == 'acrobot':
-        make_env_rllab = AcrobotEnv
-    elif env == 'inverted-double-pendulum':
-        make_env_rllab = InvertedDoublePendulumEnv
+    env_rllab_class = rllab_env_from_name(env)
 
     def make_env():
-        env_rllab = make_env_rllab()
+        env_rllab = env_rllab_class()
         env = Rllab2GymWrapper(env_rllab)
         return env
 
@@ -73,10 +73,10 @@ def train(env, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta,
     def make_policy(name, ob_space, ac_space):
         return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                          hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         clip_ob=False, use_rms=False, hidden_W_init=tf.contrib.layers.xavier_initializer(),
+                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
                          output_W_init=tf.contrib.layers.xavier_initializer())
 
-    sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed, unit='samples')
+    sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed)
 
     affinity = len(os.sched_getaffinity(0))
     sess = U.make_session(affinity)
