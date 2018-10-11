@@ -14,7 +14,7 @@ def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, poli
     
     # Create the environment
     def make_env():
-        env_gym = gym.make(env)
+        env_gym = gym.make(env).unwrapped
         return env_gym
 
     # Create the policy
@@ -51,7 +51,6 @@ def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, poli
           n_episodes=num_episodes,
           horizon=horizon,
           max_iters=max_iters,
-          save_to='.',
           verbose=2,
           feature_fun=np.ravel,
           bound = bound,
@@ -66,15 +65,15 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--env', type=str, default='cartpole')
+    parser.add_argument('--env', type=str, default='MountainCarContinuous-v0')
     parser.add_argument('--num_episodes', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--file_name', type=str, default='progress')
-    parser.add_argument('--bound', type=str, default='max-ess')
+    parser.add_argument('--bound', type=str, default='max-d2')
     parser.add_argument('--delta', type=float, default=0.99)
     parser.add_argument('--njobs', type=int, default=-1)
-    parser.add_argument('--policy', type=str, default='nn')
-    parser.add_argument('--max_offline_iters', type=int, default=20)
+    parser.add_argument('--policy', type=str, default='linear')
+    parser.add_argument('--max_offline_iters', type=int, default=100)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
     args = parser.parse_args()
@@ -87,7 +86,6 @@ def main():
           max_iters=args.max_iters,
           num_episodes=args.num_episodes,
           horizon=args.horizon,
-          iw_norm=args.iw_norm,
           bound=args.bound,
           delta=args.delta,
           gamma=args.gamma,

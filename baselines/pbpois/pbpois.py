@@ -451,7 +451,7 @@ def learn(env_maker, pol_maker, sampler,
         logger.record_tabular('SamplesThisIter', samples_this_iter)
         
         if save_weights:
-            logger.record_tabular('Weights', w_to_save)
+            logger.record_tabular('Weights', str(w_to_save))
         
         logger.dump_tabular()
         
