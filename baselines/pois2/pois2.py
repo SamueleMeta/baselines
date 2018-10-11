@@ -295,8 +295,8 @@ def learn(env, make_policy, *,
     ac_space = env.action_space
 
     # Building the policy
-    pi = make_policy('pi', ob_space, ac_space, env.num_envs)
-    oldpi = make_policy('oldpi', ob_space, ac_space, env.num_envs)
+    pi = make_policy('pi', ob_space, ac_space)
+    oldpi = make_policy('oldpi', ob_space, ac_space)
 
     all_var_list = pi.get_trainable_variables()
     var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]

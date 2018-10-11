@@ -71,8 +71,8 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
         hid_size = [100, 50, 25]
         num_hid_layers = 3
 
-    def make_policy(name, ob_space, ac_space, nbatch):
-        return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space, nbatch=nbatch,
+    def make_policy(name, ob_space, ac_space):
+        return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                          hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
                          hidden_W_init=tf.contrib.layers.xavier_initializer(),
                          output_W_init=tf.contrib.layers.xavier_initializer())
@@ -106,12 +106,13 @@ def main():
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--bound', type=str, default='max-d2')
     parser.add_argument('--delta', type=float, default=0.99)
-    parser.add_argument('--njobs', type=int, default=-1)
+    parser.add_argument('--njobs', type=int, default=2)
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
     args = parser.parse_args()
+    assert args.njobs > 1, "Njobs must be more than 1, use POIS1 otherwise."
     # Configure logging
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
