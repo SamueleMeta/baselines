@@ -117,8 +117,13 @@ class MlpPolicy(object):
                stochastic: use noise
                ob: current state
         """
-        ac1, vpred1 =  self._act(stochastic, ob[None])
-        return ac1[0], vpred1[0]
+        oneD = len(ob.shape) == 1
+        if oneD:
+            ob = ob[None]
+        ac1, vpred1 =  self._act(stochastic, ob)
+        if oneD:
+            ac1, vpred1 = ac1[0], vpred1[0]
+        return ac1, vpred1
 
 
     #Divergence
