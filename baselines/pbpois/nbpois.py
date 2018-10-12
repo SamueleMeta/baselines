@@ -373,8 +373,8 @@ def learn(env_maker, pol_maker, sampler,
             logger.log("Performance (plain, undiscounted): ", np.mean(rets[-n_episodes:]))
             #Data regarding the episodes collected in this iteration
             logger.record_tabular("Iteration", it)
-            logger.record_tabular("InitialBound", newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta))
+            logger.record_tabular("InitialBound", str(newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)))
             logger.record_tabular("EpLenMean", np.mean(lens[-n_episodes:]))
             logger.record_tabular("EpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
             logger.record_tabular("UndEpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
@@ -445,7 +445,7 @@ def learn(env_maker, pol_maker, sampler,
             #Data regarding the whole batch
             logger.record_tabular('BatchSize', batch_size)
             logger.record_tabular('IterType', iter_type)
-            logger.record_tabular('Bound', bound)
+            logger.record_tabular('Bound', str(bound))
             #Discounted, [centered]
             logger.record_tabular('InitialReturnMean', np.mean(norm_disc_rets))
             logger.record_tabular('InitialReturnMax', np.max(norm_disc_rets))
@@ -465,8 +465,8 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('PlainReturnStd', np.std(rets))
             logger.record_tabular('PlainReturnMin', np.min(rets))
             #Iws
-            logger.record_tabular('D2', renyi)
-            logger.record_tabular('ReturnMeanIw', J)
+            logger.record_tabular('D2', str(renyi))
+            logger.record_tabular('ReturnMeanIw', str(J))
             logger.record_tabular('MaxIWNorm', np.max(iws))
             logger.record_tabular('MinIWNorm', np.min(iws))
             logger.record_tabular('MeanIWNorm', np.mean(iws))
@@ -475,8 +475,8 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('MinIW', np.min(unn_iws))
             logger.record_tabular('MeanIW', np.mean(unn_iws))
             logger.record_tabular('StdIW', np.std(unn_iws))
-            logger.record_tabular('ESSClassic', ess)
-            logger.record_tabular('ESSRenyi', batch_size/np.exp(renyi))
+            logger.record_tabular('ESSClassic', str(ess))
+            logger.record_tabular('ESSRenyi', str(batch_size/np.exp(renyi)))
                     
         logger.dump_tabular()
         
