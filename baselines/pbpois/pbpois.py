@@ -205,7 +205,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
 def learn(env_maker, pol_maker, sampler,
           gamma, n_episodes, horizon, max_iters, 
           feature_fun=None, 
-          iw_norm=True, 
+          iw_norm='sn', 
           bound='max-ess',
           max_offline_iters=100, 
           max_search_ite=30,
@@ -223,7 +223,7 @@ def learn(env_maker, pol_maker, sampler,
     newpol.set_params(pol.eval_params())
     old_rho = pol.eval_params()
     batch_size = n_episodes
-    normalize = iw_norm
+    normalize = True if iw_norm=='sn' else False
     
     if bound == 'std-d2':
         use_rmax = False

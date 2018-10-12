@@ -11,7 +11,7 @@ from baselines.policy.weight_hyperpolicy import PeMlpPolicy
 from baselines.pbpois import pbpois, nbpois
 from baselines.pbpois.parallel_sampler import ParallelSampler
 
-def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, policy, max_offline_iters, aggregate, adaptive_batch, njobs=1):
+def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, seed, policy, max_offline_iters, aggregate, adaptive_batch, njobs=1):
     
     # Create the environment
     def make_env():
@@ -67,6 +67,7 @@ def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, poli
           max_iters=max_iters,
           verbose=2,
           feature_fun=np.ravel,
+          iw_norm=iw_norm,
           bound = bound,
           max_offline_iters=max_offline_iters,
           delta=delta,
@@ -83,6 +84,7 @@ def main():
     parser.add_argument('--env', type=str, default='MountainCarContinuous-v0')
     parser.add_argument('--num_episodes', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
+    parser.add_argument('--iw_norm', type=str, default='sn')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--bound', type=str, default='max-d2')
     parser.add_argument('--aggregate', type=str, default='none')
@@ -103,6 +105,7 @@ def main():
           max_iters=args.max_iters,
           num_episodes=args.num_episodes,
           horizon=args.horizon,
+          iw_norm=args.iw_norm,
           bound=args.bound,
           delta=args.delta,
           gamma=args.gamma,
