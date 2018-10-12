@@ -294,6 +294,7 @@ def learn(env_maker, pol_maker, sampler,
         timesteps_so_far+=sum(lens[-n_episodes:])
         
         with timed('summaries before'):
+            logger.log("Performance (plain, undiscounted):", np.mean(rets[-n_episodes:]))
             #Data regarding the episodes collected in this iteration
             logger.record_tabular("Iteration", it)
             logger.record_tabular("InitialBound", newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
@@ -353,7 +354,6 @@ def learn(env_maker, pol_maker, sampler,
             newpol.set_params(rho) #Policy stays the same
             
         #Save data
-        
         if save_weights:
             logger.record_tabular('Weights', str(w_to_save))
         
@@ -370,16 +370,25 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('BatchSize', batch_size)
             logger.record_tabular('IterType', iter_type)
             logger.record_tabular('Bound', bound)
+            #Discounted, [centered]
             logger.record_tabular('InitialReturnMean', np.mean(norm_disc_rets))
             logger.record_tabular('InitialReturnMax', np.max(norm_disc_rets))
             logger.record_tabular('InitialReturnMin', np.min(norm_disc_rets))
             logger.record_tabular('InitialReturnStd', np.std(norm_disc_rets))
             logger.record_tabular('InitialReturnMin', np.min(norm_disc_rets))
+            #Discounted, uncentered
+            logger.record_tabular('UncReturnMean', np.mean(disc_rets))
+            logger.record_tabular('UncReturnMax', np.max(disc_rets))
+            logger.record_tabular('UncReturnMin', np.min(disc_rets))
+            logger.record_tabular('UncReturnStd', np.std(disc_rets))
+            logger.record_tabular('UncReturnMin', np.min(disc_rets))
+            #Undiscounted, uncentered
             logger.record_tabular('PlainReturnMean', np.mean(rets))
             logger.record_tabular('PlainReturnMax', np.max(rets))
             logger.record_tabular('PlainReturnMin', np.min(rets))
             logger.record_tabular('PlainReturnStd', np.std(rets))
             logger.record_tabular('PlainReturnMin', np.min(rets))
+            #Iws
             logger.record_tabular('D2', renyi)
             logger.record_tabular('ReturnMeanIw', J)
             logger.record_tabular('MaxIWNorm', np.max(iws))
