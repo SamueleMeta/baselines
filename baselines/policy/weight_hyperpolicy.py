@@ -297,7 +297,7 @@ class PeMlpPolicy(object):
             exponentiate: if true, actually returns e^Renyi(self||other)
         """
         if other is not self._renyi_other:
-            if self.verbose: print('EXTENDING!!')
+            if self.verbose: print('Building graph')
             self._renyi_order = tf.placeholder(name='renyi_order', dtype=tf.float32, shape=[])
             self._renyi_other = other
             if order<1:
@@ -515,7 +515,7 @@ class PeMlpPolicy(object):
         return bound_and_grad_getter(actor_params, rets, batch_size, ppf, rmax)
     
     def _build_iw_graph(self, behavioral):
-        if self.verbose: print('EXTENDING!!')
+        if self.verbose: print('Building graph')
         self._batch_size = batch_size = tf.placeholder(name='batchsize', dtype=tf.float32, shape=[])
         
         #Self-normalized importance weights

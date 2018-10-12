@@ -294,7 +294,7 @@ def learn(env_maker, pol_maker, sampler,
         timesteps_so_far+=sum(lens[-n_episodes:])
         
         with timed('summaries before'):
-            logger.log("Performance (plain, undiscounted):", np.mean(rets[-n_episodes:]))
+            logger.log("Performance (plain, undiscounted): ", np.mean(rets[-n_episodes:]))
             #Data regarding the episodes collected in this iteration
             logger.record_tabular("Iteration", it)
             logger.record_tabular("InitialBound", newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,

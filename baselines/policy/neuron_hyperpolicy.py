@@ -46,7 +46,7 @@ class MultiPeMlpPolicy(object):
         self.ob_dim = ob_space.shape[0]
         self.linear = not hid_layers
         
-        print('Building graph for %s' % self.name)
+        print('Building graph')
 
         if seed is not None:
             set_global_seeds(seed)
@@ -84,7 +84,7 @@ class MultiPeMlpPolicy(object):
                                          scope=scope.name)
             self.layers = [v for w in self.actor_weights for v in (tf.unstack(w, axis=1) if len(w.shape)>1 else [w])]
             self.layer_lens = [w.shape[0].value for w in self.layers]
-            print('# Independent Gaussians:', len(self.layer_lens))
+            #print('# Independent Gaussians:', len(self.layer_lens))
             self.flat_actor_weights = tf.concat([tf.reshape(w, [-1]) for w in \
                                             self.actor_weights], axis=0) #flatten
             self._n_actor_weights = n_actor_weights = self.flat_actor_weights.shape[0]
@@ -259,7 +259,7 @@ class MultiPeMlpPolicy(object):
             other: policy to evaluate the distance from
         """
         if self._get_renyi is None or other is not self._renyi_other or other is not self._behavioral:
-            print('Extending the graph for Renyi computation (%s, %s)' % (self.name, other.name))
+            print('Building graph')
             self._renyi_other = other
             renyi = self.pd.renyi(other.pd, alpha=2) 
             self._get_renyi = U.function([], [renyi])
@@ -336,7 +336,7 @@ class MultiPeMlpPolicy(object):
         return bound, grad
     
     def _build_iw_graph(self, behavioral, bound_index):
-        print('Extending the graph for off-policy stuff (%s, %s)' % (self.name, behavioral.name))
+        print('Building graph')
         self._batch_size = batch_size = tf.placeholder(name='batchsize', dtype=tf.float32, shape=[])
         
         #Self-normalized importance weights
