@@ -168,7 +168,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
             natgrad = grad/(newpol.eval_fisher() + 1e-24)
         else:
             raise NotImplementedError
-        assert np.dot(grad, natgrad) >= 0
+        #assert np.dot(grad, natgrad) >= 0
 
         grad_norm = np.sqrt(np.dot(grad, natgrad))
         if grad_norm < grad_tol:
@@ -325,7 +325,7 @@ def learn(env_maker, pol_maker, sampler,
                                                     use_parabola=use_parabola,
                                                     verbose=verbose)
                 newpol.set_params(rho)
-                assert(improvement>=0.)
+                #assert(improvement>=0.)
                 #Expected performance
                 promise = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)

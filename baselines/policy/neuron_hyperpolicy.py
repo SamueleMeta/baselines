@@ -25,7 +25,7 @@ class MultiPeMlpPolicy(object):
     def _init(self, ob_space, ac_space, hid_layers=[],
               deterministic=True, diagonal=True,
               use_bias=True, use_critic=False, 
-              seed=None):
+              seed=None, verbose=True):
         """Params:
             ob_space: task observation space
             ac_space : task action space

@@ -7,10 +7,11 @@ import numpy as np
 import baselines.common.tf_util as U
 from baselines.common import set_global_seeds
 from baselines.policy.neuron_hyperpolicy import MultiPeMlpPolicy
+from baselines.policy.weight_hyperpolicy import PeMlpPolicy
 from baselines.pbpois import pbpois, nbpois
 from baselines.pbpois.parallel_sampler import ParallelSampler
 
-def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1, aggregate, adaptive_batch):
+def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, policy, max_offline_iters, aggregate, adaptive_batch, njobs=1):
     
     # Create the environment
     def make_env():
@@ -22,8 +23,20 @@ def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, poli
         hid_layers = []
     elif policy == 'nn':
         hid_layers = [100, 50, 25]
+
+    
+    if aggregate=='none':
+        learner = pbpois
+        PolicyClass = PeMlpPolicy
+    elif aggregate=='neuron':
+        learner = nbpois
+        PolicyClass = MultiPemlpPolicy
+    else:
+        print("Unknown aggregation method, defaulting to none")
+        learner = pbpois
+        PolicyClass = PeMlpPolicy
         
-    make_policy = lambda name, observation_space, action_space: MultiPeMlpPolicy(name,
+    make_policy = lambda name, observation_space, action_space: PolicyClass(name,
                       observation_space,
                       action_space,
                       hid_layers,
@@ -43,13 +56,6 @@ def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, poli
 
     gym.logger.setLevel(logging.WARN)
     
-    if aggregate=='none':
-        learner = pbpois
-    elif aggregate=='neuron':
-        learner = nbpois
-    else:
-        print("Unknown aggregation method, defaulting to none")
-        learner = pbpois
     
     learner.learn(
           make_env, 
