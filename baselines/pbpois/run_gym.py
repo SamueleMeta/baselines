@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-from baselines import bench, logger
+from baselines import logger
 import time, os, gym, logging
-import tensorflow as tf
 import numpy as np
 
 import baselines.common.tf_util as U
@@ -65,7 +64,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
           n_episodes=num_episodes,
           horizon=horizon,
           max_iters=max_iters,
-          verbose=2,
+          verbose=1,
           feature_fun=np.ravel,
           iw_norm=iw_norm,
           bound = bound,
