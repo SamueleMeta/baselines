@@ -274,7 +274,6 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
 def learn(env_maker, pol_maker, sampler,
           gamma, n_episodes, horizon, max_iters, 
           feature_fun=None, 
-          rmax=None,
           iw_norm=True, 
           bound='max-ess',
           max_offline_iters=100, 

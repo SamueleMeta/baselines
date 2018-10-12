@@ -30,7 +30,7 @@ def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, poli
         PolicyClass = PeMlpPolicy
     elif aggregate=='neuron':
         learner = nbpois
-        PolicyClass = MultiPemlpPolicy
+        PolicyClass = MultiPeMlpPolicy
     else:
         print("Unknown aggregation method, defaulting to none")
         learner = pbpois
