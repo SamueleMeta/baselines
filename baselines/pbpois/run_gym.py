@@ -7,10 +7,10 @@ import numpy as np
 import baselines.common.tf_util as U
 from baselines.common import set_global_seeds
 from baselines.policy.neuron_hyperpolicy import MultiPeMlpPolicy
-from baselines.pbpois import pbpois
+from baselines.pbpois import pbpois, nbpois
 from baselines.pbpois.parallel_sampler import ParallelSampler
 
-def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
+def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1, aggregate, adaptive_batch):
     
     # Create the environment
     def make_env():
@@ -43,7 +43,15 @@ def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, poli
 
     gym.logger.setLevel(logging.WARN)
     
-    pbpois.learn(
+    if aggregate=='none':
+        learner = pbpois
+    elif aggregate=='neuron':
+        learner = nbpois
+    else:
+        print("Unknown aggregation method, defaulting to none")
+        learner = pbpois
+    
+    learner.learn(
           make_env, 
           make_policy,
           sampler,
@@ -57,7 +65,8 @@ def train(env, max_iters, num_episodes, horizon, bound, delta, gamma, seed, poli
           max_offline_iters=max_offline_iters,
           delta=delta,
           center_return=False,
-          line_search_type='parabola')
+          line_search_type='parabola',
+          adaptive_batch=adaptive_batch)
 
     sampler.close()
 
@@ -70,6 +79,8 @@ def main():
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--bound', type=str, default='max-d2')
+    parser.add_argument('--aggregate', type=str, default='none')
+    parser.add_argument('--adaptive_batch', type=int, default=0)
     parser.add_argument('--delta', type=float, default=0.99)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
@@ -92,7 +103,9 @@ def main():
           seed=args.seed,
           policy=args.policy,
           max_offline_iters=args.max_offline_iters,
-          njobs=args.njobs)
+          njobs=args.njobs,
+          aggregate=args.aggregate,
+          adaptive_batch=args.adaptive_batch)
 
 if __name__ == '__main__':
     main()
