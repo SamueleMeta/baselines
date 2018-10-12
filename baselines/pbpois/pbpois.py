@@ -224,6 +224,9 @@ def learn(env_maker, pol_maker, sampler,
     old_rho = pol.eval_params()
     batch_size = n_episodes
     normalize = True if iw_norm=='sn' else False
+    episodes_so_far = 0
+    timesteps_so_far = 0
+    tstart = time.time()
     
     if bound == 'std-d2':
         use_rmax = False
@@ -287,7 +290,22 @@ def learn(env_maker, pol_maker, sampler,
         rmax = np.max(abs(norm_disc_rets))
         #Estimate online performance
         perf = np.mean(norm_disc_rets)
-        print('Performance: ', perf)
+        episodes_so_far+=n_episodes
+        timesteps_so_far+=sum(lens[-n_episodes:])
+        
+        with timed('summaries before'):
+            #Data regarding the episodes collected in this iteration
+            logger.record_tabular("Iteration", it)
+            logger.record_tabular("InitialBound", newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta))
+            logger.record_tabular("EpLenMean", np.mean(lens[-n_episodes:]))
+            logger.record_tabular("EpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
+            logger.record_tabular("UndEpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
+            logger.record_tabular("EpThisIter", n_episodes)
+            logger.record_tabular("EpisodesSoFar", episodes_so_far)
+            logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+            logger.record_tabular("BatchSize", batch_size)
+            logger.record_tabular("TimeElapsed", time.time() - tstart)
         
         if adaptive_batch and complete and perf<promise and batch_size<5*n_episodes:
             #The policy is rejected (unless batch size is already maximal)
@@ -312,7 +330,7 @@ def learn(env_maker, pol_maker, sampler,
             old_rets = rets
             old_disc_rets = disc_rets
             old_lens = lens
-            with timed('Optimizing offline', verbose):
+            with timed('offline optimization', verbose):
                 rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
                                                     normalize=normalize,
                                                     use_rmax=use_rmax,
@@ -335,42 +353,46 @@ def learn(env_maker, pol_maker, sampler,
             newpol.set_params(rho) #Policy stays the same
             
         #Save data
-        logger.log('Recap of iteration %i' % it)
-        unn_iws = newpol.eval_iws(actor_params, behavioral=pol, normalize=False)
-        iws = unn_iws/np.sum(unn_iws)
-        ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
-        J, varJ = newpol.eval_performance(actor_params, norm_disc_rets, behavioral=pol)
-        eRenyi = np.exp(newpol.eval_renyi(pol))
-        bound = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta)
-        logger.record_tabular('IterType', iter_type)
-        logger.record_tabular('Bound', bound)
-        logger.record_tabular('ESSClassic', ess)
-        logger.record_tabular('Delta', delta)
-        logger.record_tabular('ESSRenyi', batch_size/eRenyi)
-        logger.record_tabular('MaxVanillaIw', np.max(unn_iws))
-        logger.record_tabular('MinVanillaIw', np.min(unn_iws))
-        logger.record_tabular('AvgVanillaIw', np.mean(unn_iws))
-        logger.record_tabular('VarVanillaIw', np.var(unn_iws, ddof=1))
-        logger.record_tabular('MaxNormIw', np.max(iws))
-        logger.record_tabular('MinNormIw', np.min(iws))
-        logger.record_tabular('AvgNormIw', np.mean(iws))
-        logger.record_tabular('VarNormIw', np.var(iws, ddof=1))
-        logger.record_tabular('eRenyi2', eRenyi)
-        logger.record_tabular('AvgRet', np.mean(rets[-n_episodes:]))
-        logger.record_tabular('VanillaAvgRet', np.mean(rets[-n_episodes:]))
-        logger.record_tabular('VarRet', np.var(rets[-n_episodes:], ddof=1))
-        logger.record_tabular('VarDiscRet', np.var(norm_disc_rets[-n_episodes:], ddof=1))
-        logger.record_tabular('AvgDiscRet', np.mean(norm_disc_rets[-n_episodes:]))
-        logger.record_tabular('J', J)
-        logger.record_tabular('VarJ', varJ)
-        logger.record_tabular('EpsThisIter', n_episodes)
-        logger.record_tabular('BatchSize', batch_size)
-        logger.record_tabular('AvgEpLen', np.mean(lens[-n_episodes:]))
         
         if save_weights:
             logger.record_tabular('Weights', str(w_to_save))
         
+        with timed('summaries after'):
+            unn_iws = newpol.eval_iws(actor_params, behavioral=pol, normalize=False)
+            iws = unn_iws/np.sum(unn_iws)
+            ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
+            J, varJ = newpol.eval_performance(actor_params, norm_disc_rets, behavioral=pol)
+            renyi = newpol.eval_renyi(pol)
+            bound = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
+                                                             normalize, use_rmax, use_renyi, delta)
+            
+            #Data regarding the whole batch
+            logger.record_tabular('BatchSize', batch_size)
+            logger.record_tabular('IterType', iter_type)
+            logger.record_tabular('Bound', bound)
+            logger.record_tabular('InitialReturnMean', np.mean(norm_disc_rets))
+            logger.record_tabular('InitialReturnMax', np.max(norm_disc_rets))
+            logger.record_tabular('InitialReturnMin', np.min(norm_disc_rets))
+            logger.record_tabular('InitialReturnStd', np.std(norm_disc_rets))
+            logger.record_tabular('InitialReturnMin', np.min(norm_disc_rets))
+            logger.record_tabular('PlainReturnMean', np.mean(rets))
+            logger.record_tabular('PlainReturnMax', np.max(rets))
+            logger.record_tabular('PlainReturnMin', np.min(rets))
+            logger.record_tabular('PlainReturnStd', np.std(rets))
+            logger.record_tabular('PlainReturnMin', np.min(rets))
+            logger.record_tabular('D2', renyi)
+            logger.record_tabular('ReturnMeanIw', J)
+            logger.record_tabular('MaxIWNorm', np.max(iws))
+            logger.record_tabular('MinIWNorm', np.min(iws))
+            logger.record_tabular('MeanIWNorm', np.mean(iws))
+            logger.record_tabular('StdIWNorm', np.std(iws))
+            logger.record_tabular('MaxIW', np.max(unn_iws))
+            logger.record_tabular('MinIW', np.min(unn_iws))
+            logger.record_tabular('MeanIW', np.mean(unn_iws))
+            logger.record_tabular('StdIW', np.std(unn_iws))
+            logger.record_tabular('ESSClassic', ess)
+            logger.record_tabular('ESSRenyi', batch_size/np.exp(renyi))
+                    
         logger.dump_tabular()
         
         #Update behavioral
