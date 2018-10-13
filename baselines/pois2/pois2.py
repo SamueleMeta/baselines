@@ -601,7 +601,7 @@ def learn(env, make_policy, *,
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
 
-        args = ob, ac, disc_rew, mask = seg['ob'], seg['ac'], seg['disc_rew'], seg['mask']
+        args = ob, ac, rew, disc_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
 
         assign_old_eq_new()
 
