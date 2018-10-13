@@ -295,7 +295,6 @@ def learn(make_env, make_policy, *,
         raise ValueError()
 
     # Building the environment
-    env = make_env()
     ob_space = env.observation_space
     ac_space = env.action_space
 
