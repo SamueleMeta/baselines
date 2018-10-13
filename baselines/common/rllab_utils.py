@@ -2,6 +2,8 @@
     Utils for utilize RLLAB
 '''
 
+import gym
+
 def rllab_env_from_name(env):
     if env == 'swimmer':
         from rllab.envs.mujoco.swimmer_env import SwimmerEnv
@@ -44,7 +46,7 @@ def rllab_env_from_name(env):
 
 def convert_rllab_space(space):
 
-    import rllab, gym
+    import rllab
     import gym.spaces
 
     if isinstance(space, rllab.spaces.Box):
@@ -58,7 +60,7 @@ def convert_rllab_space(space):
 
 class Rllab2GymWrapper(gym.Env):
 
-    import rllab, gym
+    import rllab
     from rllab.envs.normalized_env import normalize
     import gym.spaces
 
