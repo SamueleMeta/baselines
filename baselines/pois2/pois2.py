@@ -261,7 +261,7 @@ def render(env, pi, horizon):
         t += 1
 
 
-def learn(make_env, make_policy, *,
+def learn(env, make_policy, *,
           n_episodes,
           horizon,
           delta,
