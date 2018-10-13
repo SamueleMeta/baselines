@@ -60,11 +60,9 @@ def convert_rllab_space(space):
 
 class Rllab2GymWrapper(gym.Env):
 
-    import rllab
-    from rllab.envs.normalized_env import normalize
-    import gym.spaces
-
     def __init__(self, rllab_env):
+        import rllab
+        from rllab.envs.normalized_env import normalize
         self.rllab_env = normalize(rllab_env)
         self.observation_space = convert_rllab_space(rllab_env.observation_space)
         self.action_space = convert_rllab_space(rllab_env.action_space)
