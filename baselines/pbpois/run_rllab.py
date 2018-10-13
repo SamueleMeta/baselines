@@ -9,50 +9,10 @@ from baselines.policy.neuron_hyperpolicy import MultiPeMlpPolicy
 from baselines.policy.weight_hyperpolicy import PeMlpPolicy
 from baselines.pbpois import pbpois, nbpois
 from baselines.pbpois.parallel_sampler import ParallelSampler
-from baselines.envs.rllab_wrappers import Rllab2GymWrapper
-
-def rllab_env_from_name(env):
-    if env == 'swimmer':
-        from rllab.envs.mujoco.swimmer_env import SwimmerEnv
-        return SwimmerEnv
-    elif env == 'ant':
-        from rllab.envs.mujoco.ant_env import AntEnv
-        return AntEnv
-    elif env == 'half-cheetah':
-        from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
-        return HalfCheetahEnv
-    elif env == 'hopper':
-        from rllab.envs.mujoco.hopper_env import HopperEnv
-        return HopperEnv
-    elif env == 'simple-humanoid':
-        from rllab.envs.mujoco.simple_humanoid_env import SimpleHumanoidEnv
-        return SimpleHumanoidEnv
-    elif env == 'full-humanoid':
-        from rllab.envs.mujoco.humanoid_env import HumanoidEnv
-        return HumanoidEnv
-    elif env == 'walker':
-        from rllab.envs.mujoco.walker2d_env import Walker2DEnv
-        return Walker2DEnv
-    elif env == 'cartpole':
-        from rllab.envs.box2d.cartpole_env import CartpoleEnv
-        return CartpoleEnv
-    elif env == 'mountain-car':
-        from rllab.envs.box2d.mountain_car_env import MountainCarEnv
-        return MountainCarEnv
-    elif env == 'inverted-pendulum':
-        from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
-        return InvertedPendulumEnv
-    elif env == 'acrobot':
-        from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
-        return AcrobotEnv
-    elif env == 'inverted-double-pendulum':
-        from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
-        return InvertedDoublePendulumEnv
-    else:
-        raise Exception('Unrecognized rllab environment.')
+from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 
 def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, seed, policy, max_offline_iters, aggregate, adaptive_batch, njobs=1):
-    
+
     # Create the environment
     env_rllab_class = rllab_env_from_name(env)
     def make_env():
@@ -66,7 +26,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
     elif policy == 'nn':
         hid_layers = [100, 50, 25]
 
-    
+
     if aggregate=='none':
         learner = pbpois
         PolicyClass = PeMlpPolicy
@@ -77,7 +37,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
         print("Unknown aggregation method, defaulting to none")
         learner = pbpois
         PolicyClass = PeMlpPolicy
-        
+
     make_policy = lambda name, observation_space, action_space: PolicyClass(name,
                       observation_space,
                       action_space,
@@ -97,10 +57,10 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
     set_global_seeds(seed)
 
     gym.logger.setLevel(logging.WARN)
-    
-    
+
+
     learner.learn(
-          make_env, 
+          make_env,
           make_policy,
           sampler,
           gamma=gamma,
@@ -160,5 +120,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
-    
