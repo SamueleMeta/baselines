@@ -154,4 +154,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
