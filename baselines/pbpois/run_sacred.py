@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-# noinspection PyUnresolvedReferences
 '''
     This script runs rllab or gym environments. To run RLLAB, use the format
     rllab.<env_name> as env name, otherwise gym will be used.
-
-    export SACRED_RUNS_DIRECTORY to log sacred to a directory
-    export SACRED_SLACK_CONFIG to use a slack plugin
 '''
 # Common imports
 import sys, re, os, time, logging
@@ -14,6 +10,7 @@ from collections import defaultdict
 # Framework imports
 import gym
 import tensorflow as tf
+import numpy as np
 
 # Self imports: utils
 from baselines.common import set_global_seeds
@@ -22,10 +19,10 @@ import baselines.common.tf_util as U
 from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # Self imports: algorithm
-from baselines.policy.mlp_policy import MlpPolicy
-from baselines.policy.cnn_policy import CnnPolicy
-from baselines.pois import pois
-from baselines.pois.parallel_sampler import ParallelSampler
+from baselines.policy.neuron_hyperpolicy import MultiPeMlpPolicy
+from baselines.policy.weight_hyperpolicy import PeMlpPolicy
+from baselines.pbpois import pbpois, nbpois
+from baselines.pbpois.parallel_sampler import ParallelSampler
 
 # Sacred
 from sacred import Experiment
@@ -55,14 +52,13 @@ def custom_config():
     logdir = '.'
     bound = 'max-d2'
     delta = 0.99
+    aggregate = 'none'
+    adaptive_batch = 0
     njobs = -1
     policy = 'nn'
     max_offline_iters = 10
     gamma = 1.0
     center = False
-    clipping = False
-    entropy = 'none'
-    positive_return = False
     # ENTROPY can be of 4 schemes:
     #    - 'none'
     #    - 'step:<height>:<duration>': step function which is <height> tall for <duration> iterations
@@ -89,7 +85,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
+def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, seed, policy, max_offline_iters, aggregate, adaptive_batch, njobs=1):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -108,38 +104,41 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
         assert env_type is not None, "Env not recognized."
         # Define the correct env maker
         if env_type == 'atari':
-            # Atari, custom env creation
-            def make_env():
-                _env = make_atari(env)
-                return wrap_deepmind(_env)
+            # Atari is not tested here
+            raise Exception('Not tested on atari.')
         else:
             # Not atari, standard env creation
             def make_env():
                 env_rllab = gym.make(env)
                 return env_rllab
 
+    # Create the policy
     if policy == 'linear':
-        hid_size = num_hid_layers = 0
+        hid_layers = []
     elif policy == 'nn':
-        hid_size = [100, 50, 25]
-        num_hid_layers = 3
-
-    if policy == 'linear' or policy == 'nn':
-        def make_policy(name, ob_space, ac_space):
-            return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                             hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                             output_W_init=tf.contrib.layers.xavier_initializer())
+        hid_layers = [100, 50, 25]
     elif policy == 'cnn':
-        def make_policy(name, ob_space, ac_space):
-            return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                         gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                         output_W_init=tf.contrib.layers.xavier_initializer())
-    else:
-        raise Exception('Unrecognized policy type.')
+        raise Exception('CNN policy not tested.')
 
-    sampler = ParallelSampler(make_policy, make_env, n_episodes, horizon, True, n_workers=njobs, seed=seed)
+    if aggregate=='none':
+        learner = pbpois
+        PolicyClass = PeMlpPolicy
+    elif aggregate=='neuron':
+        learner = nbpois
+        PolicyClass = MultiPeMlpPolicy
+    else:
+        print("Unknown aggregation method, defaulting to none")
+        learner = pbpois
+        PolicyClass = PeMlpPolicy
+
+    make_policy = lambda name, observation_space, action_space: PolicyClass(name,
+                      observation_space,
+                      action_space,
+                      hid_layers,
+                      use_bias=True,
+                      seed=seed)
+
+    sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -152,33 +151,46 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
 
     gym.logger.setLevel(logging.WARN)
 
-    pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
-                sampler=sampler, **alg_args)
+
+    learner.learn(
+          make_env,
+          make_policy,
+          sampler,
+          gamma=gamma,
+          n_episodes=num_episodes,
+          horizon=horizon,
+          max_iters=max_iters,
+          verbose=1,
+          feature_fun=np.ravel,
+          iw_norm=iw_norm,
+          bound = bound,
+          max_offline_iters=max_offline_iters,
+          delta=delta,
+          center_return=False,
+          line_search_type='parabola',
+          adaptive_batch=adaptive_batch)
 
     sampler.close()
 
 @ex.automain
 def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_name, logdir, bound, delta,
-            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, max_iters, positive_return, _run):
+            njobs, policy, max_offline_iters, gamma, center, max_iters, aggregate, adaptive_batch, _run):
 
     logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
     train(env=env,
-          policy=policy,
-          n_episodes=num_episodes,
-          horizon=horizon,
-          seed=seed,
-          njobs=njobs,
           max_iters=max_iters,
-          iw_method=iw_method,
+          num_episodes=num_episodes,
+          horizon=horizon,
           iw_norm=iw_norm,
-          use_natural_gradient=natural,
           bound=bound,
           delta=delta,
           gamma=gamma,
+          seed=seed,
+          policy=policy,
           max_offline_iters=max_offline_iters,
-          center_return=center,
-          clipping=clipping,
-          entropy=entropy)
+          njobs=njobs,
+          aggregate=aggregate,
+          adaptive_batch=adaptive_batch)
 
 if __name__ == '__main__':
     main()

@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-# noinspection PyUnresolvedReferences
 '''
     This script runs rllab or gym environments. To run RLLAB, use the format
     rllab.<env_name> as env name, otherwise gym will be used.
-
-    export SACRED_RUNS_DIRECTORY to log sacred to a directory
-    export SACRED_SLACK_CONFIG to use a slack plugin
 '''
 # Common imports
 import sys, re, os, time, logging
@@ -21,11 +17,12 @@ from baselines import logger
 import baselines.common.tf_util as U
 from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
+from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
+from baselines.common.vec_env.vec_frame_stack import VecFrameStack
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
-from baselines.pois import pois
-from baselines.pois.parallel_sampler import ParallelSampler
+from baselines.pois2 import pois2
 
 # Sacred
 from sacred import Experiment
@@ -89,17 +86,20 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
+def train(env, policy, seed, njobs=1, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
         env_name = re.match('rllab.(\w+)', env).group(1)
         env_rllab_class = rllab_env_from_name(env_name)
         # Define env maker
-        def make_env():
-            env_rllab = env_rllab_class()
-            _env = Rllab2GymWrapper(env_rllab)
-            return _env
+        def make_env(seed=0):
+            def _thunk():
+                env_rllab = Rllab2GymWrapper(env_rllab_class())
+                env_rllab.seed(seed)
+                return env_rllab
+            return _thunk
+        parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
         # Used later
         env_type = 'rllab'
     else:
@@ -109,15 +109,24 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
         # Define the correct env maker
         if env_type == 'atari':
             # Atari, custom env creation
-            def make_env():
-                _env = make_atari(env)
-                return wrap_deepmind(_env)
+            def make_env(seed=0):
+                def _thunk():
+                    _env = make_atari(env)
+                    _env.seed(seed)
+                    return wrap_deepmind(_env)
+                return _thunk
+            parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)]), 4)
         else:
             # Not atari, standard env creation
-            def make_env():
-                env_rllab = gym.make(env)
-                return env_rllab
+            def make_env(seed=0):
+                def _thunk():
+                    _env = gym.make(env)
+                    _env.seed(seed)
+                    return _env
+                return _thunk
+            parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
 
+    # Create the policy
     if policy == 'linear':
         hid_size = num_hid_layers = 0
     elif policy == 'nn':
@@ -139,8 +148,6 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
     else:
         raise Exception('Unrecognized policy type.')
 
-    sampler = ParallelSampler(make_policy, make_env, n_episodes, horizon, True, n_workers=njobs, seed=seed)
-
     try:
         affinity = len(os.sched_getaffinity(0))
     except:
@@ -152,10 +159,7 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
 
     gym.logger.setLevel(logging.WARN)
 
-    pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
-                sampler=sampler, **alg_args)
-
-    sampler.close()
+    pois2.learn(parallel_env, make_policy, **alg_args)
 
 @ex.automain
 def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_name, logdir, bound, delta,
