@@ -65,7 +65,8 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
             policy_time += time.time() - _pi_s
 
             # Filter the current indexes
-            ci_ob, ci_memory, ct = filter_indexes(current_indexes, current_timesteps)[:n_episodes] # Restrict if njobs > n_episodes
+            ci_ob, ci_memory, ct = filter_indexes(current_indexes, current_timesteps)
+            ci_ob, ci_memory, ct = ci_ob[:n_episodes], ci_memory[:n_episodes], ct[:n_episodes] # Restrict if njobs > n_episodes
 
             # Save the current properties
             obs[ci_memory, ct,:] = ob[ci_ob]
