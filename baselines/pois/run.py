@@ -6,6 +6,7 @@
 '''
 # Common imports
 import sys, re, os, time, logging
+from collections import defaultdict
 
 # Framework imports
 import gym
