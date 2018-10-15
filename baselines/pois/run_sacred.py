@@ -158,23 +158,23 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_nam
             njobs, policy, max_offline_iters, gamma, center, clipping, entropy, max_iters, positive_return, _run):
 
     logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
-    train(env=args.env,
-          policy=args.policy,
-          n_episodes=args.num_episodes,
-          horizon=args.horizon,
-          seed=args.seed,
-          njobs=args.njobs,
-          max_iters=args.max_iters,
-          iw_method=args.iw_method,
-          iw_norm=args.iw_norm,
-          use_natural_gradient=args.natural,
-          bound=args.bound,
-          delta=args.delta,
-          gamma=args.gamma,
-          max_offline_iters=args.max_offline_iters,
-          center_return=args.center,
-          clipping=args.clipping,
-          entropy=args.entropy)
+    train(env=env,
+          policy=policy,
+          n_episodes=num_episodes,
+          horizon=horizon,
+          seed=seed,
+          njobs=njobs,
+          max_iters=max_iters,
+          iw_method=iw_method,
+          iw_norm=iw_norm,
+          use_natural_gradient=natural,
+          bound=bound,
+          delta=delta,
+          gamma=gamma,
+          max_offline_iters=max_offline_iters,
+          center_return=center,
+          clipping=clipping,
+          entropy=entropy)
 
 if __name__ == '__main__':
     main()
