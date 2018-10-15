@@ -39,7 +39,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
+def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -89,7 +89,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
     else:
         raise Exception('Unrecognized policy type.')
 
-    sampler = ParallelSampler(make_policy, make_env, num_episodes, horizon, True, n_workers=njobs, seed=seed)
+    sampler = ParallelSampler(make_policy, make_env, n_episodes, horizon, True, n_workers=njobs, seed=seed)
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -102,10 +102,8 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
 
     gym.logger.setLevel(logging.WARN)
 
-    pois.learn(make_env, make_policy, n_episodes=num_episodes, max_iters=max_iters,
-               horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
-               iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True, sampler=sampler,
-               center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
+    pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
+                sampler=sampler, render_after=None, **alg_args)
 
     sampler.close()
 
@@ -127,6 +125,9 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--center', action='store_true')
+    parser.add_argument('--clipping', action='store_true')
+    parser.add_argument('--entropy', type=str, default='none')
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
@@ -134,19 +135,23 @@ def main():
         file_name = args.file_name
     logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     train(env=args.env,
-          max_iters=args.max_iters,
-          num_episodes=args.num_episodes,
+          policy=args.policy,
+          n_episodes=args.num_episodes,
           horizon=args.horizon,
+          seed=args.seed,
+          njobs=args.njobs,
+          max_iters=args.max_iters,
           iw_method=args.iw_method,
           iw_norm=args.iw_norm,
           natural=args.natural,
           bound=args.bound,
           delta=args.delta,
           gamma=args.gamma,
-          seed=args.seed,
-          policy=args.policy,
           max_offline_iters=args.max_offline_iters,
-          njobs=args.njobs)
+          center=args.center,
+          clipping=args.clipping,
+          entropy=args.entropy)
 
 if __name__ == '__main__':
     main()
+def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
