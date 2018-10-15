@@ -125,8 +125,8 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
-    parser.add_argument('--center', action='store_true')
-    parser.add_argument('--clipping', action='store_true')
+    parser.add_argument('--center', type=bool, default=False)
+    parser.add_argument('--clipping', type=bool, default=False)
     parser.add_argument('--entropy', type=str, default='none')
     args = parser.parse_args()
     if args.file_name == 'progress':
@@ -148,7 +148,7 @@ def main():
           delta=args.delta,
           gamma=args.gamma,
           max_offline_iters=args.max_offline_iters,
-          center=args.center,
+          center_return=args.center,
           clipping=args.clipping,
           entropy=args.entropy)
 
