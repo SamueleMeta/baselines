@@ -48,7 +48,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
         # Define env maker
         def make_env(seed=0):
             def _thunk():
-                env_rllab = Rllab2GymWrapper(rllab_env_class())
+                env_rllab = Rllab2GymWrapper(env_rllab_class())
                 env_rllab.seed(seed)
                 return env_rllab
             return _thunk
