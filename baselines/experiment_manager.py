@@ -33,6 +33,7 @@ parser.add_argument('--dir', help='Directory from which to load the experiment (
 parser.add_argument('--condaenv', help='Conda environment to activate.', type=str, default=None)
 parser.add_argument('--pythonv', help='Python version to use', type=str, default='python3')
 parser.add_argument('--pythonpath', help='Pythonpath to use for script.', type=str, default=None)
+parser.add_argument('--cuda_devices', help='CUDA visible devices.', type=str, default='')
 # Sacred
 parser.add_argument('--sacred', action='store_true', default=False, help='Enable sacred.')
 parser.add_argument('--sacred_dir', help='Dir used by sacred to log.', type=str, default=None)
@@ -55,6 +56,8 @@ if args.command == 'launch':
         cmd_base += 'export SACRED_SLACK_CONFIG=' + args.sacred_slack + ' && '
     if args.pythonpath:
         cmd_base += "export PYTHONPATH='PYTHONPATH:" + args.pythonpath + "' && "
+    if args.cuda_devices:
+        cmd_base += 'export CUDA_VISIBLE_DEVICES=' + args.cuda_devices + ' && '
     if args.condaenv:
         cmd_base += 'source activate ' + args.condaenv + ' && '
     # Parse the CSV
