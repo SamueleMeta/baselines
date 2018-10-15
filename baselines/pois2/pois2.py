@@ -55,7 +55,7 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
         current_indexes = np.arange(0, env.num_envs)
         current_timesteps = np.zeros((env.num_envs), dtype=np.int32)
         # Set to -1 indexes if njobs > num_episodes
-        current_indexes[num_episodes:] = -1
+        current_indexes[n_episodes:] = -1
 
         while not has_ended(current_indexes):
 
