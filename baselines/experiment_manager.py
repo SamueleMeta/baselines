@@ -61,6 +61,7 @@ if args.command == 'launch':
     param_cols = list(experiment)
     param_cols.remove('script')
     # Build the commands
+    cmd_base += args.pythonv + ' '
     cmds = []
     for index, row in experiment.iterrows():
         # Get the script, check if we need to use sacred (just append _sacred to script name)
