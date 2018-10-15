@@ -50,14 +50,13 @@ if args.command == 'launch':
     # Start build base command
     cmd_base = ''
     # Set env variables
+    cmd_base += 'export CUDA_VISIBLE_DEVICES=' + args.cuda_devices + ' && '
     if args.sacred_dir and args.sacred:
         cmd_base += 'export SACRED_RUNS_DIRECTORY=' + args.sacred_dir + ' && '
     if args.sacred_slack and args.sacred:
         cmd_base += 'export SACRED_SLACK_CONFIG=' + args.sacred_slack + ' && '
     if args.pythonpath:
         cmd_base += "export PYTHONPATH='PYTHONPATH:" + args.pythonpath + "' && "
-    if args.cuda_devices:
-        cmd_base += 'export CUDA_VISIBLE_DEVICES=' + args.cuda_devices + ' && '
     if args.condaenv:
         cmd_base += 'source activate ' + args.condaenv + ' && '
     # Parse the CSV
@@ -99,6 +98,7 @@ elif args.command == 'stop':
     # Get all screens
     for s in list_screens():
         if rule.match(s.name):
+            print("Stopping", s.name)
             s.kill()
 
 else:
