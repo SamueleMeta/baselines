@@ -143,7 +143,7 @@ def main():
           max_iters=args.max_iters,
           iw_method=args.iw_method,
           iw_norm=args.iw_norm,
-          natural=args.natural,
+          use_natural_gradient=args.natural,
           bound=args.bound,
           delta=args.delta,
           gamma=args.gamma,
