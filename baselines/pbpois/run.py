@@ -135,6 +135,7 @@ def main():
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_norm', type=str, default='sn')
     parser.add_argument('--file_name', type=str, default='progress')
+    parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--bound', type=str, default='max-d2')
     parser.add_argument('--aggregate', type=str, default='none')
     parser.add_argument('--adaptive_batch', type=int, default=0)
@@ -149,7 +150,7 @@ def main():
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
     else:
         file_name = args.file_name
-    logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
+    logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     train(env=args.env,
           max_iters=args.max_iters,
           num_episodes=args.num_episodes,

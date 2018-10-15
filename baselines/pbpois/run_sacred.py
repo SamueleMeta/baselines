@@ -49,7 +49,7 @@ def custom_config():
     iw_norm = 'none'
     natural = False
     file_name = 'progress'
-    logdir = '.'
+    logdir = 'logs'
     bound = 'max-d2'
     delta = 0.99
     aggregate = 'none'
@@ -176,7 +176,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
 def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_name, logdir, bound, delta,
             njobs, policy, max_offline_iters, gamma, center, max_iters, aggregate, adaptive_batch, _run):
 
-    logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
+    logger.configure(dir=logdir, format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
     train(env=env,
           max_iters=max_iters,
           num_episodes=num_episodes,
