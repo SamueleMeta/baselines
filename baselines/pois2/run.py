@@ -39,7 +39,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bound, delta, gamma, seed, policy, max_offline_iters, njobs=1):
+def train(env, policy, seed, njobs=1, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -112,10 +112,7 @@ def train(env, max_iters, num_episodes, horizon, iw_method, iw_norm, natural, bo
 
     gym.logger.setLevel(logging.WARN)
 
-    pois2.learn(parallel_env, make_policy, n_episodes=num_episodes, max_iters=max_iters,
-               horizon=horizon, gamma=gamma, delta=delta, use_natural_gradient=natural,
-               iw_method=iw_method, iw_norm=iw_norm, bound=bound, save_weights=True,
-               center_return=True, render_after=None, max_offline_iters=max_offline_iters,)
+    pois2.learn(parallel_env, make_policy, **alg_args)
 
 def main():
     import argparse
@@ -130,35 +127,37 @@ def main():
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--bound', type=str, default='max-d2')
     parser.add_argument('--delta', type=float, default=0.99)
-    parser.add_argument('--njobs', type=int, default=2)
+    parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--center', type=bool, default=False)
+    parser.add_argument('--clipping', type=bool, default=False)
+    parser.add_argument('--entropy', type=str, default='none')
     args = parser.parse_args()
-    assert args.njobs > 1, "Njobs must be more than 1, use POIS1 otherwise."
-    # Configure logging
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
     else:
         file_name = args.file_name
-    logger.configure(dir='logs', format_strs=['stdout', 'csv'], file_name=file_name)
-    # Start training
+    logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     train(env=args.env,
-          max_iters=args.max_iters,
-          num_episodes=args.num_episodes,
+          policy=args.policy,
+          n_episodes=args.num_episodes,
           horizon=args.horizon,
+          seed=args.seed,
+          njobs=args.njobs,
+          max_iters=args.max_iters,
           iw_method=args.iw_method,
           iw_norm=args.iw_norm,
-          natural=args.natural,
+          use_natural_gradient=args.natural,
           bound=args.bound,
           delta=args.delta,
           gamma=args.gamma,
-          seed=args.seed,
-          policy=args.policy,
           max_offline_iters=args.max_offline_iters,
-          njobs=args.njobs)
-
+          center_return=args.center,
+          clipping=args.clipping,
+          entropy=args.entropy)
 
 if __name__ == '__main__':
     main()
