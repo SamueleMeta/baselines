@@ -54,6 +54,8 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
         # Initialize indexes and timesteps
         current_indexes = np.arange(0, env.num_envs)
         current_timesteps = np.zeros((env.num_envs), dtype=np.int32)
+        # Set to -1 indexes if njobs > num_episodes
+        current_indexes[num_episodes:] = -1
 
         while not has_ended(current_indexes):
 
@@ -66,7 +68,6 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
 
             # Filter the current indexes
             ci_ob, ci_memory, ct = filter_indexes(current_indexes, current_timesteps)
-            ci_ob, ci_memory, ct = ci_ob[:n_episodes], ci_memory[:n_episodes], ct[:n_episodes] # Restrict if njobs > n_episodes
 
             # Save the current properties
             obs[ci_memory, ct,:] = ob[ci_ob]
