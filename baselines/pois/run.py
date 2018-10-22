@@ -129,6 +129,7 @@ def main():
     parser.add_argument('--center', type=bool, default=False)
     parser.add_argument('--clipping', type=bool, default=False)
     parser.add_argument('--entropy', type=str, default='none')
+    parser.add_argument('--reward_clustering', type=str, default='none')
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
@@ -151,7 +152,8 @@ def main():
           max_offline_iters=args.max_offline_iters,
           center_return=args.center,
           clipping=args.clipping,
-          entropy=args.entropy)
+          entropy=args.entropy,
+          reward_clustering=args.reward_clustering)
 
 if __name__ == '__main__':
     main()

@@ -62,12 +62,19 @@ def custom_config():
     center = False
     clipping = False
     entropy = 'none'
+    reward_clustering = 'none'
     positive_return = False
     # ENTROPY can be of 4 schemes:
-    #    - 'none'
+    #    - 'none': no entropy bonus
     #    - 'step:<height>:<duration>': step function which is <height> tall for <duration> iterations
     #    - 'lin:<max>:<min>': linearly decreasing function from <max> to <min> over all iterations, clipped to 0 for negatives
     #    - 'exp:<height>:<scale>': exponentially decreasing curve <height> tall, use <scale> to make it "spread" more
+    # REWARD_CLUSTERING can be of 4 schemes:
+    #    - 'none': do nothing
+    #    - 'manual:<N>:<min>:<max>': N classes between min and max
+    #    - 'global:<N>': N classes over global min and max (as seen so far)
+    #    - 'batch:<N>': N classes over batch min and max (as seen so far)
+    # TODO: quantiles discretization?
     # Create the filename
     if file_name == 'progress':
         file_name = '%s_iw=%s_bound=%s_delta=%s_gamma=%s_center=%s_entropy=%s_seed=%s_%s' % (env.upper(), iw_method, bound, delta, gamma, center, entropy, seed, time.time())
@@ -158,8 +165,10 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
     sampler.close()
 
 @ex.automain
-def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_name, logdir, bound, delta,
-            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, max_iters, positive_return, _run):
+def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural,
+            file_name, logdir, bound, delta, njobs, policy, max_offline_iters,
+            gamma, center, clipping, entropy, max_iters, positive_return,
+            reward_clustering, _run):
 
     logger.configure(dir=logdir, format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
     train(env=env,
@@ -178,7 +187,8 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_nam
           max_offline_iters=max_offline_iters,
           center_return=center,
           clipping=clipping,
-          entropy=entropy)
+          entropy=entropy,
+          reward_clustering=reward_clustering)
 
 if __name__ == '__main__':
     main()
