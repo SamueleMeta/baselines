@@ -465,6 +465,25 @@ def learn(make_env, make_policy, *,
                                  (ess_classic, 'ESSClassic'),
                                  (ess_renyi, 'ESSRenyi')])
     elif iw_method == 'rbis':
+        # Check if we need to cluster rewards
+        rew_clustering_options = reward_clustering.split(':')
+        if reward_clustering == 'none':
+            pass # Do nothing
+        elif rew_clustering_options[0] == 'global':
+            N = int(rew_clustering_options[1])
+            print("rew", N)
+            raise Exception('WIP.')
+        elif rew_clustering_options[0] == 'batch':
+            N = int(rew_clustering_options[1])
+            print("rew", N)
+            raise Exception('WIP.')
+        elif rew_clustering_options[0] == 'manual':
+            N, rew_min, rew_max = map(int, rew_clustering_options[1:])
+            print("rew", N, rew_min, rew_max)
+            raise Exception('WIP.')
+        else:
+            raise Exception('Unrecognized reward clustering scheme.')
+
         # Get pdfs for episodes
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
