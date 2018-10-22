@@ -470,16 +470,17 @@ def learn(make_env, make_policy, *,
         if reward_clustering == 'none':
             pass # Do nothing
         elif rew_clustering_options[0] == 'global':
+            assert len(rew_clustering_options) == 2, "Reward clustering: Provide the correct number of parameters"
             N = int(rew_clustering_options[1])
-            print("rew", N)
             raise Exception('WIP.')
         elif rew_clustering_options[0] == 'batch':
+            assert len(rew_clustering_options) == 2, "Reward clustering: Provide the correct number of parameters"
             N = int(rew_clustering_options[1])
-            print("rew", N)
             raise Exception('WIP.')
         elif rew_clustering_options[0] == 'manual':
+            assert len(rew_clustering_options) == 4, "Reward clustering: Provide the correct number of parameters"
             N, rew_min, rew_max = map(int, rew_clustering_options[1:])
-            print("rew", N, rew_min, rew_max)
+            tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return', summarize=20))
             raise Exception('WIP.')
         else:
             raise Exception('Unrecognized reward clustering scheme.')
