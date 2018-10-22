@@ -108,7 +108,12 @@ class CnnPolicy(object):
                stochastic: use noise
                ob: current state
         """
+        threeD = len(ob.shape) == 3
+        if threeD:
+            ob = ob[None]
         ac1, vpred1 =  self._act(stochastic, ob)
+        if threeD:
+            ac1, vpred1 = ac1[0], vpred1[0]
         return ac1, vpred1
 
 

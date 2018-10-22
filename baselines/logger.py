@@ -156,7 +156,7 @@ class TensorBoardOutputFormat(KVWriter):
         def summary_val(k, v):
             kwargs = {'tag': k, 'simple_value': float(v)}
             return self.tf.Summary.Value(**kwargs)
-        summary = self.tf.Summary(value=[summary_val(k, v) for k, v in kvs.items() if not isinstance(v, str)]) # Avoid string
+        summary = self.tf.Summary(value=[summary_val(k, v) for k, v in kvs.items() if not isinstance(v, str)]) # Avoid string values
         event = self.event_pb2.Event(wall_time=time.time(), summary=summary)
         event.step = self.step # is there any reason why you'd want to specify the step?
         self.writer.WriteEvent(event)
@@ -168,7 +168,18 @@ class TensorBoardOutputFormat(KVWriter):
             self.writer.Close()
             self.writer = None
 
-def make_output_format(format, ev_dir, file_name=None):
+class SacredOutputFormat(KVWriter):
+    def __init__(self, run):
+        self.run = run
+
+    def writekvs(self, kvs):
+        for k,v in kvs.items():
+            self.run.log_scalar(k, v)
+
+    def close(self):
+        pass
+
+def make_output_format(format, ev_dir, file_name=None, run=None):
     from mpi4py import MPI
     os.makedirs(ev_dir, exist_ok=True)
     rank = MPI.COMM_WORLD.Get_rank()
@@ -186,6 +197,10 @@ def make_output_format(format, ev_dir, file_name=None):
     elif format == 'tensorboard':
         assert rank==0
         return TensorBoardOutputFormat(osp.join(ev_dir, 'tb', 'run' if file_name is None else file_name))
+    elif format == 'sacred':
+        assert rank==0
+        assert run is not None
+        return SacredOutputFormat(run)
     else:
         raise ValueError('Unknown format specified: %s' % (format,))
 
@@ -307,7 +322,7 @@ class Logger(object):
 
 Logger.DEFAULT = Logger.CURRENT = Logger(dir=None, output_formats=[HumanOutputFormat(sys.stdout)])
 
-def configure(dir=None, format_strs=None, file_name=None):
+def configure(dir=None, format_strs=None, file_name=None, run=None):
     if dir is None:
         dir = os.getenv('OPENAI_LOGDIR')
     if dir is None:
@@ -319,7 +334,7 @@ def configure(dir=None, format_strs=None, file_name=None):
     if format_strs is None:
         strs = os.getenv('OPENAI_LOG_FORMAT')
         format_strs = strs.split(',') if strs else LOG_OUTPUT_FORMATS
-    output_formats = [make_output_format(f, dir, file_name) for f in format_strs]
+    output_formats = [make_output_format(f, dir, file_name, run) for f in format_strs]
 
     Logger.CURRENT = Logger(dir=dir, output_formats=output_formats)
     log('Logging to %s'%dir)

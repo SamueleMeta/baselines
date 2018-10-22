@@ -1,72 +1,79 @@
 #!/usr/bin/env python3
-from baselines import logger
-import time, os, gym, logging
+'''
+    This script runs rllab or gym environments. To run RLLAB, use the format
+    rllab.<env_name> as env name, otherwise gym will be used.
+'''
+# Common imports
+import sys, re, os, time, logging
+from collections import defaultdict
+
+# Framework imports
+import gym
+import tensorflow as tf
 import numpy as np
 
-import baselines.common.tf_util as U
+# Self imports: utils
 from baselines.common import set_global_seeds
+from baselines import logger
+import baselines.common.tf_util as U
+from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
+from baselines.common.atari_wrappers import make_atari, wrap_deepmind
+# Self imports: algorithm
 from baselines.policy.neuron_hyperpolicy import MultiPeMlpPolicy
 from baselines.policy.weight_hyperpolicy import PeMlpPolicy
 from baselines.pbpois import pbpois, nbpois
 from baselines.pbpois.parallel_sampler import ParallelSampler
-from baselines.envs.rllab_wrappers import Rllab2GymWrapper
 
-def rllab_env_from_name(env):
-    if env == 'swimmer':
-        from rllab.envs.mujoco.swimmer_env import SwimmerEnv
-        return SwimmerEnv
-    elif env == 'ant':
-        from rllab.envs.mujoco.ant_env import AntEnv
-        return AntEnv
-    elif env == 'half-cheetah':
-        from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
-        return HalfCheetahEnv
-    elif env == 'hopper':
-        from rllab.envs.mujoco.hopper_env import HopperEnv
-        return HopperEnv
-    elif env == 'simple-humanoid':
-        from rllab.envs.mujoco.simple_humanoid_env import SimpleHumanoidEnv
-        return SimpleHumanoidEnv
-    elif env == 'full-humanoid':
-        from rllab.envs.mujoco.humanoid_env import HumanoidEnv
-        return HumanoidEnv
-    elif env == 'walker':
-        from rllab.envs.mujoco.walker2d_env import Walker2DEnv
-        return Walker2DEnv
-    elif env == 'cartpole':
-        from rllab.envs.box2d.cartpole_env import CartpoleEnv
-        return CartpoleEnv
-    elif env == 'mountain-car':
-        from rllab.envs.box2d.mountain_car_env import MountainCarEnv
-        return MountainCarEnv
-    elif env == 'inverted-pendulum':
-        from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
-        return InvertedPendulumEnv
-    elif env == 'acrobot':
-        from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
-        return AcrobotEnv
-    elif env == 'inverted-double-pendulum':
-        from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
-        return InvertedDoublePendulumEnv
-    else:
-        raise Exception('Unrecognized rllab environment.')
+def get_env_type(env_id):
+    #First load all envs
+    _game_envs = defaultdict(set)
+    for env in gym.envs.registry.all():
+        # TODO: solve this with regexes
+        env_type = env._entry_point.split(':')[0].split('.')[-1]
+        _game_envs[env_type].add(env.id)
+    # Get env type
+    env_type = None
+    for g, e in _game_envs.items():
+        if env_id in e:
+            env_type = g
+            break
+    return env_type
 
 def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, seed, policy, max_offline_iters, aggregate, adaptive_batch, njobs=1):
-    
-    # Create the environment
-    env_rllab_class = rllab_env_from_name(env)
-    def make_env():
-        env_rllab = env_rllab_class()
-        _env = Rllab2GymWrapper(env_rllab)
-        return _env
+
+    if env.startswith('rllab.'):
+        # Get env name and class
+        env_name = re.match('rllab.(\w+)', env).group(1)
+        env_rllab_class = rllab_env_from_name(env_name)
+        # Define env maker
+        def make_env():
+            env_rllab = env_rllab_class()
+            _env = Rllab2GymWrapper(env_rllab)
+            return _env
+        # Used later
+        env_type = 'rllab'
+    else:
+        # Normal gym, get if Atari or not.
+        env_type = get_env_type(env)
+        assert env_type is not None, "Env not recognized."
+        # Define the correct env maker
+        if env_type == 'atari':
+            # Atari is not tested here
+            raise Exception('Not tested on atari.')
+        else:
+            # Not atari, standard env creation
+            def make_env():
+                env_rllab = gym.make(env)
+                return env_rllab
 
     # Create the policy
     if policy == 'linear':
         hid_layers = []
     elif policy == 'nn':
         hid_layers = [100, 50, 25]
+    elif policy == 'cnn':
+        raise Exception('CNN policy not tested.')
 
-    
     if aggregate=='none':
         learner = pbpois
         PolicyClass = PeMlpPolicy
@@ -77,7 +84,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
         print("Unknown aggregation method, defaulting to none")
         learner = pbpois
         PolicyClass = PeMlpPolicy
-        
+
     make_policy = lambda name, observation_space, action_space: PolicyClass(name,
                       observation_space,
                       action_space,
@@ -97,10 +104,10 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
     set_global_seeds(seed)
 
     gym.logger.setLevel(logging.WARN)
-    
-    
+
+
     learner.learn(
-          make_env, 
+          make_env,
           make_policy,
           sampler,
           gamma=gamma,
@@ -128,6 +135,7 @@ def main():
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_norm', type=str, default='sn')
     parser.add_argument('--file_name', type=str, default='progress')
+    parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--bound', type=str, default='max-d2')
     parser.add_argument('--aggregate', type=str, default='none')
     parser.add_argument('--adaptive_batch', type=int, default=0)
@@ -142,7 +150,7 @@ def main():
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
     else:
         file_name = args.file_name
-    logger.configure(dir='logs', format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
+    logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     train(env=args.env,
           max_iters=args.max_iters,
           num_episodes=args.num_episodes,
@@ -160,5 +168,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
-    
