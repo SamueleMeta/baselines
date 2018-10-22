@@ -12,9 +12,19 @@ We provide 3 different flavours of the POIS algorithm:
 - **POIS2**: control-based POIS (gpu optimized, used in complex environments or complex policies)
 - **PBPOIS**: parameter-based POIS
 
-This repository also contains a version of the algorithm controlled using [sacred](https://sacred.readthedocs.io/en/latest/). The POIS algorithms can be run using a single script, both from gym and rllab. To use rllab environments, use the prefix "*rllab.*".
+This repository also contains a version of the algorithm controlled using [sacred](https://sacred.readthedocs.io/en/latest/). The POIS algorithms can be run using a single script, both from gym and rllab. To use rllab environments, use the prefix "*rllab.*". You should always set the *SACRED_RUNS_DIRECTORY* env variable to tell sacred where to log the run. For example:
 
-We also provide an [*experiment_manager*](baselines/experiment_manager.py) script, which can be used to launch multiple runs of the algorithm in different screen and to manage them, using a CSV file to specify the parameters of each run. An example CSV is contained in the [experiments](experiments) directory.
+```bash
+export SACRED_RUNS_DIRECTORY=sacred_runs
+python baselines/pois/run_sacred.py with env=rllab.swimmer
+```
+will run the POIS algorithm over the RLLAB swimmer environment logging into the *sacred_runs* directory.
+
+We also provide an [*experiment_manager*](baselines/experiment_manager.py) script, which can be used to launch multiple runs of the algorithm in different screen and to manage them, using a CSV file to specify the parameters of each run. An example CSV is contained in the [experiments](experiments) directory. To run the sample:
+
+```bash
+python baselines/experiment_manager.py --command=launch --dir=experiments --name=sample_experiment --sacred --sacred_dir=sacred_runs
+```
 
 ## Installation
 You can install it by typing:
