@@ -82,7 +82,7 @@ elif args.command == 'clean':
                 pass
         elif args.filter is not None:
             # Check if the filter applies
-            if recursive_json_selector(value, filter_key) == filter_value:
+            if str(recursive_json_selector(value, filter_key)) == filter_value:
                 # Remove run with key
                 shutil.rmtree(base_directory + str(key) + '/')
                 print("Removed run:", key)
