@@ -183,6 +183,3 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_nam
           center_return=center,
           clipping=clipping,
           entropy=entropy)
-
-if __name__ == '__main__':
-    main()

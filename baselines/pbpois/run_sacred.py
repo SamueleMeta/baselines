@@ -191,6 +191,3 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_nam
           njobs=njobs,
           aggregate=aggregate,
           adaptive_batch=adaptive_batch)
-
-if __name__ == '__main__':
-    main()

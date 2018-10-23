@@ -189,6 +189,3 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural,
           clipping=clipping,
           entropy=entropy,
           reward_clustering=reward_clustering)
-
-if __name__ == '__main__':
-    main()
