@@ -26,10 +26,13 @@ def load_runs(base_directory):
     return runs
 
 def recursive_json_selector(obj, selector):
-    if selector is not None:
-        for qk in selector.split('.'):
-            obj = obj[qk]
-    return obj
+    try:
+        if selector is not None:
+            for qk in selector.split('.'):
+                obj = obj[qk]
+        return obj
+    except:
+        return None
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--dir', help='Directory of the sacred runs.', default='sacred_runs')
@@ -82,7 +85,8 @@ elif args.command == 'clean':
                 pass
         elif args.filter is not None:
             # Check if the filter applies
-            if str(recursive_json_selector(value, filter_key)) == filter_value:
+            selected_value = recursive_json_selector(value, filter_key)
+            if selected_value is not None and str(selected_value) == filter_value:
                 # Remove run with key
                 shutil.rmtree(base_directory + str(key) + '/')
                 print("Removed run:", key)
