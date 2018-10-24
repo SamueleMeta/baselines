@@ -37,7 +37,7 @@ parser.add_argument('--command', help='Different commands of the manager.', defa
 parser.add_argument('--groupby', help='Count groups by a specified config parameter (stats mode only).', default=None)
 parser.add_argument('--uncompleted', default=False, action='store_true')
 parser.add_argument('--cout', default=False, action='store_true')
-parser.add_argument('--filter', help='Remove the runs filtered as specified [key:value]', default=None)
+parser.add_argument('--filter', help='Remove the runs filtered as specified [key|value]', default=None)
 args = parser.parse_args()
 
 my_runs = load_runs(args.dir)
@@ -65,7 +65,7 @@ elif args.command == 'clean':
     removed_runs = 0
     # Parse the filter argument
     if args.filter is not None:
-        filter_key, filter_value = args.filter.split(':')
+        filter_key, filter_value = args.filter.split('|')
 
     for key, value in my_runs.items():
         if value['run']['status'] != 'COMPLETED' and args.uncompleted:
