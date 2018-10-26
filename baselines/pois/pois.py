@@ -514,6 +514,7 @@ def learn(make_env, make_policy, *,
         reward_unique, reward_indexes = tf.unique(ep_return)
         episode_clustering_matrix = tf.cast(tf.one_hot(reward_indexes, n_episodes), tf.float64)
         max_index = tf.reduce_max(reward_indexes) + 1
+        trajectories_per_cluster = tf.reduce_sum(episode_clustering_matrix)[:max_index]
         tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
         # Get the clustered pdfs
         clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
@@ -522,8 +523,10 @@ def learn(make_env, make_policy, *,
         tf.add_to_collection('asserts', tf.assert_positive(clustered_behavioral_pdf, name='clust_behavioral_pdf_positive'))
         # Compute the J
         ratio_clustered = clustered_target_pdf / clustered_behavioral_pdf
-        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique
-        w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)
+        #ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique                             # ---- No cluster cardinality
+        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique * trajectories_per_cluster   # ---- Cluster cardinality
+        #w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)                    # ---- No cluster cardinality
+        w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(n_episodes, tf.float32)                    # ---- Cluster cardinality
         # Divergences
         ess_classic = tf.linalg.norm(ratio_reward, 1) ** 2 / tf.linalg.norm(ratio_reward, 2) ** 2
         sqrt_ess_classic = tf.linalg.norm(ratio_reward, 1) / tf.linalg.norm(ratio_reward, 2)
