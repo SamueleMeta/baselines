@@ -515,7 +515,7 @@ def learn(make_env, make_policy, *,
         episode_clustering_matrix = tf.cast(tf.one_hot(reward_indexes, n_episodes), tf.float64)
         max_index = tf.reduce_max(reward_indexes) + 1
         print("S1:", episode_clustering_matrix.shape)
-        print("S2:". tf.reduce_sum(episode_clustering_matrix).shape)
+        print("S2:", tf.reduce_sum(episode_clustering_matrix).shape)
         trajectories_per_cluster = tf.reduce_sum(episode_clustering_matrix)[:max_index]
         tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
         # Get the clustered pdfs
