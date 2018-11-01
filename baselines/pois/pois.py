@@ -400,6 +400,39 @@ def learn(make_env, make_policy, *,
     negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
     return_step_maxmin = tf.abs(positive_step_return_max - negative_step_return_max)
 
+    # Reward clustering
+    rew_clustering_options = reward_clustering.split(':')
+    if reward_clustering == 'none':
+        pass # Do nothing
+    elif rew_clustering_options[0] == 'global':
+        assert len(rew_clustering_options) == 2, "Reward clustering: Provide the correct number of parameters"
+        N = int(rew_clustering_options[1])
+        tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return', summarize=20))
+        global_rew_min = tf.Variable(float('+inf'), trainable=False)
+        global_rew_max = tf.Variable(float('-inf'), trainable=False)
+        rew_min = tf.reduce_min(ep_return)
+        rew_max = tf.reduce_max(ep_return)
+        global_rew_min = tf.assign(global_rew_min, tf.minimum(global_rew_min, rew_min))
+        global_rew_max = tf.assign(global_rew_max, tf.maximum(global_rew_max, rew_max))
+        interval_size = (global_rew_max - global_rew_min) / N
+        ep_return = tf.floordiv(ep_return, interval_size) * interval_size
+    elif rew_clustering_options[0] == 'batch':
+        assert len(rew_clustering_options) == 2, "Reward clustering: Provide the correct number of parameters"
+        N = int(rew_clustering_options[1])
+        rew_min = tf.reduce_min(ep_return)
+        rew_max = tf.reduce_max(ep_return)
+        interval_size = (rew_max - rew_min) / N
+        ep_return = tf.floordiv(ep_return, interval_size) * interval_size
+    elif rew_clustering_options[0] == 'manual':
+        assert len(rew_clustering_options) == 4, "Reward clustering: Provide the correct number of parameters"
+        N, rew_min, rew_max = map(int, rew_clustering_options[1:])
+        interval_size = (rew_max - rew_min) / N
+        # Clip to avoid overflow and cluster
+        ep_return = tf.clip_by_value(ep_return, rew_min, rew_max)
+        ep_return = tf.floordiv(ep_return, interval_size) * interval_size
+    else:
+        raise Exception('Unrecognized reward clustering scheme.')
+
     losses_with_name.extend([(return_mean, 'InitialReturnMean'),
                              (return_max, 'InitialReturnMax'),
                              (return_min, 'InitialReturnMin'),
@@ -465,39 +498,6 @@ def learn(make_env, make_policy, *,
                                  (ess_classic, 'ESSClassic'),
                                  (ess_renyi, 'ESSRenyi')])
     elif iw_method == 'rbis':
-        # Check if we need to cluster rewards
-        rew_clustering_options = reward_clustering.split(':')
-        if reward_clustering == 'none':
-            pass # Do nothing
-        elif rew_clustering_options[0] == 'global':
-            assert len(rew_clustering_options) == 2, "Reward clustering: Provide the correct number of parameters"
-            N = int(rew_clustering_options[1])
-            tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return', summarize=20))
-            global_rew_min = tf.Variable(float('+inf'), trainable=False)
-            global_rew_max = tf.Variable(float('-inf'), trainable=False)
-            rew_min = tf.reduce_min(ep_return)
-            rew_max = tf.reduce_max(ep_return)
-            global_rew_min = tf.assign(global_rew_min, tf.minimum(global_rew_min, rew_min))
-            global_rew_max = tf.assign(global_rew_max, tf.maximum(global_rew_max, rew_max))
-            interval_size = (global_rew_max - global_rew_min) / N
-            ep_return = tf.floordiv(ep_return, interval_size) * interval_size
-        elif rew_clustering_options[0] == 'batch':
-            assert len(rew_clustering_options) == 2, "Reward clustering: Provide the correct number of parameters"
-            N = int(rew_clustering_options[1])
-            rew_min = tf.reduce_min(ep_return)
-            rew_max = tf.reduce_max(ep_return)
-            interval_size = (rew_max - rew_min) / N
-            ep_return = tf.floordiv(ep_return, interval_size) * interval_size
-        elif rew_clustering_options[0] == 'manual':
-            assert len(rew_clustering_options) == 4, "Reward clustering: Provide the correct number of parameters"
-            N, rew_min, rew_max = map(int, rew_clustering_options[1:])
-            interval_size = (rew_max - rew_min) / N
-            # Clip to avoid overflow and cluster
-            ep_return = tf.clip_by_value(ep_return, rew_min, rew_max)
-            ep_return = tf.floordiv(ep_return, interval_size) * interval_size
-        else:
-            raise Exception('Unrecognized reward clustering scheme.')
-
         # Get pdfs for episodes
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
