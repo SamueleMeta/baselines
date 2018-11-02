@@ -354,6 +354,7 @@ def learn(make_env, make_policy, *,
     mask_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='mask')
     rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
     disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='disc_rew')
+    clustered_rew_ = tf.placeholder(dtype=tf.float32, shape=(n_episodes))
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
     losses_with_name = []
@@ -364,8 +365,8 @@ def learn(make_env, make_policy, *,
     log_ratio = target_log_pdf - behavioral_log_pdf
 
     # Split operations
-    disc_rew_split = tf.stack(tf.split(tf.math.floor(disc_rew_) * mask_, n_episodes))
-    rew_split = tf.stack(tf.split(tf.math.floor(rew_) * mask_, n_episodes))
+    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes))
+    rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes))
     log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
     target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes))
     behavioral_log_pdf_split = tf.stack(tf.split(behavioral_log_pdf * mask_, n_episodes))
@@ -377,7 +378,7 @@ def learn(make_env, make_policy, *,
     empirical_d2 = tf.reduce_mean(tf.exp(emp_d2_cum_split))
 
     # Return
-    ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
+    ep_return = clustered_rew_ #tf.reduce_sum(mask_split * disc_rew_split, axis=1)
     if clipping:
         rew_split = tf.clip_by_value(rew_split, -1, 1)
 
@@ -389,9 +390,10 @@ def learn(make_env, make_policy, *,
     discounter_tf = tf.constant(discounter)
     disc_rew_split = rew_split * discounter_tf
 
-    tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return_not_clustered', summarize=20))
+    #tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return_not_clustered', summarize=20))
 
     # Reward clustering
+    '''
     rew_clustering_options = reward_clustering.split(':')
     if reward_clustering == 'none':
         pass # Do nothing
@@ -428,6 +430,7 @@ def learn(make_env, make_policy, *,
         tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return_clustered', summarize=20))
     else:
         raise Exception('Unrecognized reward clustering scheme.')
+    '''
 
     return_mean = tf.reduce_mean(ep_return)
     return_std = U.reduce_std(ep_return)
@@ -632,10 +635,10 @@ def learn(make_env, make_policy, *,
     assert_ops = tf.group(*tf.get_collection('asserts'))
     print_ops = tf.group(*tf.get_collection('prints'))
 
-    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], [bound_, assert_ops, print_ops])
-    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses)
+    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [bound_, assert_ops, print_ops])
+    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses)
     #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
 
     set_parameter = U.SetFromFlat(var_list)
@@ -686,7 +689,12 @@ def learn(make_env, make_policy, *,
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
 
-        args = ob, ac, rew, disc_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
+        # Get clustered reward
+        reward_matrix = np.reshape(seg['disc_rew'] * seg['mask'], (num_episodes, horizon))
+        ep_reward = np.sum(reward_matrix, axis=1)
+        #ep_reward = np.floor(ep_reward)
+
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], ep_reward, seg['mask'], iters_so_far
 
         assign_old_eq_new()
 
