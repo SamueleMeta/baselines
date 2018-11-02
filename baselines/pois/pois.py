@@ -358,17 +358,14 @@ def learn(make_env, make_policy, *,
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
     losses_with_name = []
 
-    # TESTING
-    rew_ = tf.math.floor(rew_)
-
     # Policy densities
     target_log_pdf = pi.pd.logp(ac_)
     behavioral_log_pdf = oldpi.pd.logp(ac_)
     log_ratio = target_log_pdf - behavioral_log_pdf
 
     # Split operations
-    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes))
-    rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes))
+    disc_rew_split = tf.stack(tf.split(tf.math.floor(disc_rew_) * mask_, n_episodes))
+    rew_split = tf.stack(tf.split(tf.math.floor(rew_) * mask_, n_episodes))
     log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
     target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes))
     behavioral_log_pdf_split = tf.stack(tf.split(behavioral_log_pdf * mask_, n_episodes))
