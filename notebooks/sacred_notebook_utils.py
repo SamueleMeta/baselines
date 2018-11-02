@@ -30,8 +30,11 @@ def load_runs(base_directory):
 def recursive_json_selector(obj, selector):
     try:
         if selector is not None:
-            for qk in selector.split('.'):
-                obj = obj[qk]
+            for i, qk in enumerate(selector.split('.')):
+                if isinstance(obj, dict):
+                    obj = obj[qk]
+                elif isinstance(obj, list):
+                    obj = [o[qk] for o in obj]
         return obj
     except:
         return None
@@ -54,6 +57,8 @@ def filter_runs(query, runs, avoid_missing=True):
             if obj is None and not avoid_missing:
                 _keys.append(run_key)
             elif obj is not None and obj == value:
+                _keys.append(run_key)
+            elif obj is not None and isinstance(obj, list) and value in obj:
                 _keys.append(run_key)
         keys = _keys
     # Now create a filtered object only with the selected runs

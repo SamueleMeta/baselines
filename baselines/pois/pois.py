@@ -389,17 +389,6 @@ def learn(make_env, make_policy, *,
     discounter_tf = tf.constant(discounter)
     disc_rew_split = rew_split * discounter_tf
 
-    return_mean = tf.reduce_mean(ep_return)
-    return_std = U.reduce_std(ep_return)
-    return_max = tf.reduce_max(ep_return)
-    return_min = tf.reduce_min(ep_return)
-    return_abs_max = tf.reduce_max(tf.abs(ep_return))
-    return_step_max = tf.reduce_max(tf.abs(rew_split)) # Max step reward
-    return_step_mean = tf.abs(tf.reduce_mean(rew_split))
-    positive_step_return_max = tf.maximum(0.0, tf.reduce_max(rew_split))
-    negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
-    return_step_maxmin = tf.abs(positive_step_return_max - negative_step_return_max)
-
     # Reward clustering
     rew_clustering_options = reward_clustering.split(':')
     if reward_clustering == 'none':
@@ -432,6 +421,17 @@ def learn(make_env, make_policy, *,
         ep_return = tf.floordiv(ep_return, interval_size) * interval_size
     else:
         raise Exception('Unrecognized reward clustering scheme.')
+
+    return_mean = tf.reduce_mean(ep_return)
+    return_std = U.reduce_std(ep_return)
+    return_max = tf.reduce_max(ep_return)
+    return_min = tf.reduce_min(ep_return)
+    return_abs_max = tf.reduce_max(tf.abs(ep_return))
+    return_step_max = tf.reduce_max(tf.abs(rew_split)) # Max step reward
+    return_step_mean = tf.abs(tf.reduce_mean(rew_split))
+    positive_step_return_max = tf.maximum(0.0, tf.reduce_max(rew_split))
+    negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
+    return_step_maxmin = tf.abs(positive_step_return_max - negative_step_return_max)
 
     losses_with_name.extend([(return_mean, 'InitialReturnMean'),
                              (return_max, 'InitialReturnMax'),
