@@ -389,6 +389,8 @@ def learn(make_env, make_policy, *,
     discounter_tf = tf.constant(discounter)
     disc_rew_split = rew_split * discounter_tf
 
+    tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return_not_clustered', summarize=20))
+
     # Reward clustering
     rew_clustering_options = reward_clustering.split(':')
     if reward_clustering == 'none':
@@ -415,10 +417,15 @@ def learn(make_env, make_policy, *,
     elif rew_clustering_options[0] == 'manual':
         assert len(rew_clustering_options) == 4, "Reward clustering: Provide the correct number of parameters"
         N, rew_min, rew_max = map(int, rew_clustering_options[1:])
+        print("N:", N)
+        print("Min reward:", rew_min)
+        print("Max reward:", rew_max)
         interval_size = (rew_max - rew_min) / N
+        print("Interval size:", interval_size)
         # Clip to avoid overflow and cluster
         ep_return = tf.clip_by_value(ep_return, rew_min, rew_max)
         ep_return = tf.floordiv(ep_return, interval_size) * interval_size
+        tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return_clustered', summarize=20))
     else:
         raise Exception('Unrecognized reward clustering scheme.')
 
