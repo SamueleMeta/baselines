@@ -358,6 +358,9 @@ def learn(make_env, make_policy, *,
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
     losses_with_name = []
 
+    # TESTING
+    rew_ = tf.math.floor(rew_)
+
     # Policy densities
     target_log_pdf = pi.pd.logp(ac_)
     behavioral_log_pdf = oldpi.pd.logp(ac_)
