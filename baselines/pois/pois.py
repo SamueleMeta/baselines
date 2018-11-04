@@ -698,6 +698,15 @@ def learn(make_env, make_policy, *,
             ep_reward = np.floor(ep_reward)
         elif reward_clustering == 'ceil':
             ep_reward = np.ceil(ep_reward)
+        elif reward_clustering == 'floor10':
+            ep_reward = np.floor(ep_reward * 10) / 10
+        elif reward_clustering == 'ceil10':
+            ep_reward = np.ceil(ep_reward * 10) / 10
+        elif reward_clustering == 'floor100':
+            ep_reward = np.floor(ep_reward * 100) / 100
+        elif reward_clustering == 'ceil100':
+            ep_reward = np.ceil(ep_reward * 100) / 100
+
 
         args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], ep_reward, seg['mask'], iters_so_far
 
