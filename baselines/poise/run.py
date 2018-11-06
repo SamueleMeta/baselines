@@ -88,8 +88,8 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
     else:
         raise Exception('Unrecognized policy type.')
 
-    #Prepare sampler to generate ONE trajectory at a time
-    sampler = ParallelSampler(make_policy, make_env, 1, horizon, True, n_workers=njobs, seed=seed)
+    #Prepare (sequential) sampler to generate ONE trajectory at a time
+    sampler = None
 
     #Initialize
     try:
