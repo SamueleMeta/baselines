@@ -107,7 +107,7 @@ def add_disc_rew(seg, gamma):
     rew = seg['rew']
     n_ep = len(seg['ep_rets'])
     n_samp = len(rew)
-    seg['ep_disc_ret'] = ep_disc_ret = np.empty(n_ep, 'float32')
+    seg['ep_disc_rets'] = ep_disc_ret = np.empty(n_ep, 'float32')
     seg['disc_rew'] = disc_rew = np.empty(n_samp, 'float32')
     discounter = 0
     ret = 0.
@@ -249,8 +249,8 @@ def learn(make_env, make_policy, *,
             
         #Retrieve data
         add_disc_rew(seg, gamma)
-        lens, rets = seg['ep_lens'], seg['ep_rets']
-        assert len(lens)==1 and len(rets)==1
+        lens, u_rets = seg['ep_lens'], seg['ep_rets']
+        assert len(lens)==1
         episodes_so_far += 1
         timesteps_so_far += lens[0]
         args = ob, ac, rew, disc_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
@@ -258,8 +258,7 @@ def learn(make_env, make_policy, *,
         #Info
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
-            logger.record_tabular("URet", rets[0])
-            logger.record_tabular("EpisodesSoFar", episodes_so_far)
+            logger.record_tabular("URet", u_rets[0])
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
 
@@ -277,7 +276,8 @@ def learn(make_env, make_policy, *,
 
         #Info
         with timed('summaries after'):
-            for (lossname, lossval) in zip(loss_names, losses):
+            meanlosses = np.array(compute_losses(*args))
+            for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
 
         #Print all info in a table
