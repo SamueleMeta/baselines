@@ -202,7 +202,9 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
     return theta_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
 
-def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
+def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss,
+                     evaluate_gradient, evaluate_natural_gradient=None,
+                     gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
     set_parameter(theta)

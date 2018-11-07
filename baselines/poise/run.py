@@ -72,7 +72,7 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
     elif policy == 'nn':
         hid_size = [100, 50, 25]
         num_hid_layers = 3
-        
+
     if policy == 'linear' or policy == 'nn':
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
@@ -106,14 +106,14 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
                 sampler=sampler, **alg_args)
 
     #Close sampler in the end
-    sampler.close()
+    # sampler.close()
 
 def main():
     #Command line arguments
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--env', type=str, default='cartpole')
+    parser.add_argument('--env', type=str, default='CartPole-v1')
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_norm', type=str, default='none')
     parser.add_argument('--file_name', type=str, default='progress')
@@ -124,16 +124,16 @@ def main():
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
     args = parser.parse_args()
-    
+
     #Log file name
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
     else:
         file_name = args.file_name
-    
+
     #Configure logger
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
-    
+
     #Learn
     train(env=args.env,
           policy=args.policy,
