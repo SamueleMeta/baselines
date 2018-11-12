@@ -66,7 +66,7 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
                 env_rllab = gym.make(env)
                 return env_rllab
 
-    #Prepare policy maker
+    # Prepare policy maker
     if policy == 'linear':
         hid_size = num_hid_layers = 0
     elif policy == 'nn':
@@ -75,16 +75,19 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
 
     if policy == 'linear' or policy == 'nn':
         def make_policy(name, ob_space, ac_space):
-            return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                             hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                             output_W_init=tf.contrib.layers.xavier_initializer())
+            return MlpPolicy(
+                name=name, ob_space=ob_space, ac_space=ac_space,
+                hid_size=hid_size, num_hid_layers=num_hid_layers,
+                gaussian_fixed_var=True, use_bias=False, use_critic=False,
+                hidden_W_init=tf.contrib.layers.xavier_initializer(),
+                output_W_init=tf.contrib.layers.xavier_initializer())
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
-            return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                         gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                         output_W_init=tf.contrib.layers.xavier_initializer())
+            return CnnPolicy(
+                name=name, ob_space=ob_space, ac_space=ac_space,
+                gaussian_fixed_var=True, use_bias=False, use_critic=False,
+                hidden_W_init=tf.contrib.layers.xavier_initializer(),
+                output_W_init=tf.contrib.layers.xavier_initializer())
     else:
         raise Exception('Unrecognized policy type.')
 

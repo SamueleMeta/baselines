@@ -129,10 +129,9 @@ def add_disc_rew(seg, gamma):
             discounter += 1
 
 
-def optimize_offline(max_offline_ite=100):
-    for i in range(max_offline_ite):
+def optimize_offline(sampler, max_offline_ite=100):
 
-        return
+    return
 
 
 def render(env, pi, horizon):
@@ -186,6 +185,7 @@ def learn(make_env, make_policy, *,
 
     # Build the policy
     pi = make_policy('pi', ob_space, ac_space)
+    # oldpis = make_policy('oldpi')
 
     # Get all learnable parameters
     all_var_list = pi.get_trainable_variables()
@@ -206,11 +206,17 @@ def learn(make_env, make_policy, *,
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
     losses_with_name = []
 
+    # Policy densities
+    target_log_pdf = pi.pd.logp(ac_)
+
+    # Split operations
+    # ...
+
     # Episodic return
     ep_return = tf.reduce_sum(mask_ * disc_rew_)
 
     # Other Tf definitions
-    # ...
+    # iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
 
     # Info
     losses_with_name.extend([(ep_return, 'Return')])

@@ -489,7 +489,7 @@ def learn(make_env, make_policy, *,
             rew_min = tf.reduce_min(ep_return)
             rew_max = tf.reduce_max(ep_return)
             interval_size = (rew_max - rew_min) / N
-            ep_return = tf.floordiv(ep_return, interval_size) * interval_size
+            ep_return = tf.floordiv(ep_return, interval_size) * interval_size   
         elif rew_clustering_options[0] == 'manual':
             assert len(rew_clustering_options) == 4, "Reward clustering: Provide the correct number of parameters"
             N, rew_min, rew_max = map(int, rew_clustering_options[1:])
