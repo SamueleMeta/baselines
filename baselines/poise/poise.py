@@ -10,7 +10,6 @@ from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
 
-
 @contextmanager
 def timed(msg):
     print(colorize(msg, color='magenta'))
@@ -129,7 +128,13 @@ def add_disc_rew(seg, gamma):
             discounter += 1
 
 
-def optimize_offline(sampler, max_offline_ite=100):
+def optimize_offline(old_thetas_list, evaluate_behav, max_offline_ite=100):
+
+    denominator_mise = 0
+    for i in range(len(old_thetas_list)):
+        denominator_mise += evaluate_behav([old_thetas_list[i]])
+    print('Denominator:', denominator_mise)
+    print('Old_thetas_shape:', len(old_thetas_list))
 
     return
 
@@ -185,7 +190,11 @@ def learn(make_env, make_policy, *,
 
     # Build the policy
     pi = make_policy('pi', ob_space, ac_space)
-    # oldpis = make_policy('oldpi')
+    oldpi = make_policy('oldpi', ob_space, ac_space)
+
+    # Initialize the array of params of each behavioral
+    # old_thetas_arr = np.array([], dtype=np.float32)
+    old_thetas_list = []
 
     # Get all learnable parameters
     all_var_list = pi.get_trainable_variables()
@@ -193,8 +202,10 @@ def learn(make_env, make_policy, *,
                 if v.name.split('/')[1].startswith('pol')]
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
     n_parameters = sum(shapes)
-
+    print('n_parameters=', n_parameters)
     # Placeholders
+    old_thetas_ = tf.placeholder(shape=[None, n_parameters],
+                                 dtype=tf.float32, name='old_thetas')
     ob_ = ob = U.get_placeholder_cached(name='ob')
     ac_ = pi.pdtype.sample_placeholder([max_samples], name='ac')
     mask_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='mask')
@@ -204,19 +215,36 @@ def learn(make_env, make_policy, *,
     gradient_ = tf.placeholder(dtype=tf.float32,
                                shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
+    denominator_mise_ = 
     losses_with_name = []
 
     # Policy densities
     target_log_pdf = pi.pd.logp(ac_)
+    behav_log_pdf = oldpi.pd.logp(ac_)
 
-    # Split operations
+    # Mask operations
+    disc_rew_masked = disc_rew_ * mask_
+    rew_masked = rew_ * mask_
+    target_log_masked = target_log_pdf * mask_
+    behav_log_masked = behav_log_pdf * mask_
+
+    # Multiple importance weights computation
+    behav_log_sum = tf.reduce_sum(behav_log_masked, axis=0)
+    miw = target_log_masked
+
+    # Renyi divergence
     # ...
 
-    # Episodic return
-    ep_return = tf.reduce_sum(mask_ * disc_rew_)
+    # Return
+    ep_return = tf.reduce_sum(disc_rew_masked)
 
-    # Other Tf definitions
-    # iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
+    # Bound definitions
+    # ...
+
+    # Baselines' functions
+    compute_behav = U.function([ob_, ac_, mask_, old_thetas_],
+                               behav_log_sum,
+                               updates=None, givens=None)
 
     # Info
     losses_with_name.extend([(ep_return, 'Return')])
@@ -266,11 +294,15 @@ def learn(make_env, make_policy, *,
 
         # Learning iteration
         logger.log('********** Iteration %i ************' % iters_so_far)
+        # Store the list of arrays representing pi's parameters
 
         # Generate trajectories
         theta = get_parameter()
         with timed('sampling'):
             seg = sampler.collect(theta)
+
+        # Store the list of arrays representing behaviorals' parameters
+        old_thetas_list.append(theta)
 
         # Retrieve data
         add_disc_rew(seg, gamma)
@@ -295,10 +327,14 @@ def learn(make_env, make_policy, *,
             file = open('checkpoint.pkl', 'wb')
             pickle.dump(theta, file)
 
+        def evaluate_behav(behav_thetas):
+            args_behav = ob, ac, mask, behav_thetas
+            return compute_behav(*args_behav)
+
         # Perform optimization
         with timed("Optimization"):
-            pass
-            # ...
+            optimize_offline(old_thetas_list,
+                             evaluate_behav, max_offline_ite=100)
 
         # Info
         with timed('summaries after'):

@@ -239,7 +239,8 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss,
 
     fmtstr = '%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g'
     titlestr = '%6s %10s %10s %18s %18s %18s %18s'
-    print(titlestr % ('iter', 'epsilon', 'step size', 'num line search', 'gradient norm', 'delta bound ite', 'delta bound tot'))
+    print(titlestr % ('iter', 'epsilon', 'step size', 'num line search',
+                      'gradient norm', 'delta bound ite', 'delta bound tot'))
 
     for i in range(max_offline_ite):
         bound = evaluate_loss()
@@ -366,6 +367,7 @@ def learn(make_env, make_policy, *,
     log_ratio = target_log_pdf - behavioral_log_pdf
 
     # Split operations
+
     disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes))
     rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes))
     log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
@@ -489,7 +491,7 @@ def learn(make_env, make_policy, *,
             rew_min = tf.reduce_min(ep_return)
             rew_max = tf.reduce_max(ep_return)
             interval_size = (rew_max - rew_min) / N
-            ep_return = tf.floordiv(ep_return, interval_size) * interval_size   
+            ep_return = tf.floordiv(ep_return, interval_size) * interval_size
         elif rew_clustering_options[0] == 'manual':
             assert len(rew_clustering_options) == 4, "Reward clustering: Provide the correct number of parameters"
             N, rew_min, rew_max = map(int, rew_clustering_options[1:])
@@ -635,6 +637,7 @@ def learn(make_env, make_policy, *,
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
+    print('get_parameter', get_parameter)
 
     if sampler is None:
         seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True)
@@ -682,7 +685,13 @@ def learn(make_env, make_policy, *,
         timesteps_so_far += sum(lens)
 
         args = ob, ac, rew, disc_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
-
+        print('YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO')
+        # print('pi variables=', pi.get_trainable_variables())
+        print('theta', theta)
+        print('oldpi variables=', oldpi.get_trainable_variables())
+        print(len(args))
+        print(ob.shape)
+        print(ob[0])
         assign_old_eq_new()
 
         def evaluate_loss():
