@@ -637,7 +637,6 @@ def learn(make_env, make_policy, *,
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
-    print('get_parameter', get_parameter)
 
     if sampler is None:
         seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True)

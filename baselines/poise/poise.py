@@ -128,13 +128,63 @@ def add_disc_rew(seg, gamma):
             discounter += 1
 
 
-def optimize_offline(old_thetas_list, evaluate_behav, max_offline_ite=100):
+def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
+    if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
+        return epsilon_old * max_increase
+    else:
+        return epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
 
-    denominator_mise = 0
+
+def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter,
+                         evaluate_bound, delta_bound_tol=1e-4,
+                         max_line_search_ite=30):
+    epsilon = 1.
+    epsilon_old = 0.
+    delta_bound_old = -np.inf
+    bound_init = evaluate_bound()
+    theta_old = theta_init
+
+    for i in range(max_line_search_ite):
+
+        theta = theta_init + epsilon * alpha * natural_gradient
+        set_parameter(theta)
+
+        bound = evaluate_bound()
+
+        if np.isnan(bound):
+            warnings.warn('Got NaN bound value: rolling back!')
+            return theta_old, epsilon_old, delta_bound_old, i + 1
+
+        delta_bound = bound - bound_init
+
+        epsilon_old = epsilon
+        epsilon = update_epsilon(delta_bound, epsilon_old)
+        if delta_bound <= delta_bound_old + delta_bound_tol:
+            if delta_bound_old < 0.:
+                return theta_init, 0., 0., i+1
+            else:
+                return theta_old, epsilon_old, delta_bound_old, i+1
+
+        delta_bound_old = delta_bound
+        theta_old = theta
+
+    return theta_old, epsilon_old, delta_bound_old, i+1
+
+
+def optimize_offline(theta, old_thetas_list, set_parameter,
+                     evaluate_behav, evaluate_miw, max_offline_ite=1):
+
+    # Compute MISE's denominator
+    den_mise = 0
     for i in range(len(old_thetas_list)):
-        denominator_mise += evaluate_behav([old_thetas_list[i]])
-    print('Denominator:', denominator_mise)
-    print('Old_thetas_shape:', len(old_thetas_list))
+        den_mise += np.exp(
+            evaluate_behav([old_thetas_list[i]])).astype(np.float32)
+
+    for i in range(max_offline_ite):
+        miw = evaluate_miw(den_mise)
+        # parameters update
+        # ...theta = ...
+        set_parameter(theta)
 
     return
 
@@ -192,9 +242,9 @@ def learn(make_env, make_policy, *,
     pi = make_policy('pi', ob_space, ac_space)
     oldpi = make_policy('oldpi', ob_space, ac_space)
 
-    # Initialize the array of params of each behavioral
-    # old_thetas_arr = np.array([], dtype=np.float32)
+    # Store behaviorals' params and their trajectories
     old_thetas_list = []
+    old_traj_list = []
 
     # Get all learnable parameters
     all_var_list = pi.get_trainable_variables()
@@ -202,7 +252,7 @@ def learn(make_env, make_policy, *,
                 if v.name.split('/')[1].startswith('pol')]
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
     n_parameters = sum(shapes)
-    print('n_parameters=', n_parameters)
+
     # Placeholders
     old_thetas_ = tf.placeholder(shape=[None, n_parameters],
                                  dtype=tf.float32, name='old_thetas')
@@ -215,7 +265,7 @@ def learn(make_env, make_policy, *,
     gradient_ = tf.placeholder(dtype=tf.float32,
                                shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
-    denominator_mise_ = 
+    den_mise_ = tf.placeholder(dtype=tf.float32, name='den_mise')
     losses_with_name = []
 
     # Policy densities
@@ -229,8 +279,10 @@ def learn(make_env, make_policy, *,
     behav_log_masked = behav_log_pdf * mask_
 
     # Multiple importance weights computation
-    behav_log_sum = tf.reduce_sum(behav_log_masked, axis=0)
-    miw = target_log_masked
+    target_sum_log = tf.reduce_sum(target_log_masked)
+    behav_sum_log = tf.reduce_sum(behav_log_masked, axis=0)
+    log_ratio = target_sum_log - den_mise_
+    miw = tf.exp(log_ratio)
 
     # Renyi divergence
     # ...
@@ -243,8 +295,12 @@ def learn(make_env, make_policy, *,
 
     # Baselines' functions
     compute_behav = U.function([ob_, ac_, mask_, old_thetas_],
-                               behav_log_sum,
+                               behav_sum_log,
                                updates=None, givens=None)
+    compute_miw = U.function([ob_, ac_, mask_, den_mise_], miw,
+                             updates=None, givens=None)
+    # compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_],
+    #                            [bound_, assert_ops, print_ops])
 
     # Info
     losses_with_name.extend([(ep_return, 'Return')])
@@ -310,8 +366,9 @@ def learn(make_env, make_policy, *,
         assert len(lens) == 1
         episodes_so_far += 1
         timesteps_so_far += lens[0]
-        args = ob, ac, rew, disc_rew, mask, iter_number = \
+        ob, ac, rew, disc_rew, mask, iter_number = \
             seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
+        print('ARGSSSS:', ob.shape)
 
         # Info
         with timed('summaries before'):
@@ -321,20 +378,27 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("TimeElapsed", time.time() - tstart)
 
         # Save policy parameters to disk
-        if save_weights:
-            logger.record_tabular('Weights', str(get_parameter()))
-            import pickle
-            file = open('checkpoint.pkl', 'wb')
-            pickle.dump(theta, file)
+        # if save_weights:
+        #     logger.record_tabular('Weights', str(get_parameter()))
+        #     import pickle
+        #     file = open('checkpoint.pkl', 'wb')
+        #     pickle.dump(theta, file)
 
         def evaluate_behav(behav_thetas):
             args_behav = ob, ac, mask, behav_thetas
             return compute_behav(*args_behav)
 
+        def evaluate_miw(den_mise):
+            args_miw = ob, ac, mask, den_mise
+            return compute_miw(*args_miw)
+
         # Perform optimization
         with timed("Optimization"):
-            optimize_offline(old_thetas_list,
-                             evaluate_behav, max_offline_ite=100)
+            optimize_offline(theta, old_thetas_list, set_parameter,
+                             evaluate_behav, evaluate_miw,
+                             max_offline_ite=100)
+
+        # set_parameter(theta)
 
         # Info
         with timed('summaries after'):
