@@ -468,12 +468,7 @@ def learn(make_env, make_policy, *,
         assert len(lens) == 1
         episodes_so_far += 1
         timesteps_so_far += lens[0]
-        a_shape = seg['ac'].shape
-        print("seg[ac]:", seg['ac'])
-        print("seg[ac].shape:", a_shape)
-        # if len(a_shape) > 1:  # reshape arrays to be one-dimensional
-        #     seg['ac'] = seg['ac'].reshape(max(a_shape[0], a_shape[1]),)
-        # print("seg[ac].shape:", seg['ac'].shape)
+
         args = ()
         for key in all_seg.keys():
             all_seg[key][iters_so_far-1:iters_so_far-1+horizon] = seg[key]

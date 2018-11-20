@@ -119,7 +119,7 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--env', type=str, default='LQG1D-v0')
-    parser.add_argument('--horizon', type=int, default=5)
+    parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_norm', type=str, default='none')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
@@ -127,7 +127,7 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
-    parser.add_argument('--max_iters', type=int, default=2)
+    parser.add_argument('--max_iters', type=int, default=1000)
     parser.add_argument('--gamma', type=float, default=1.0)
     args = parser.parse_args()
 
