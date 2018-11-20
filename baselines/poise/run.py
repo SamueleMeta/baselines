@@ -122,6 +122,7 @@ def main():
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--delta', type=float, default=0.99)
+    parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=2)

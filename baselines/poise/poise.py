@@ -135,13 +135,13 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
         return epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
 
 
-def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter,
-                         evaluate_bound, delta_bound_tol=1e-4,
+def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
+                         set_parameter, evaluate_bound, delta_bound_tol=1e-4,
                          max_line_search_ite=30):
     epsilon = 1.
     epsilon_old = 0.
     delta_bound_old = -np.inf
-    bound_init = evaluate_bound()
+    bound_init = evaluate_bound(den_mise)
     theta_old = theta_init
 
     for i in range(max_line_search_ite):
@@ -149,7 +149,7 @@ def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter,
         theta = theta_init + epsilon * alpha * natural_gradient
         set_parameter(theta)
 
-        bound = evaluate_bound()
+        bound = evaluate_bound(den_mise)
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -171,10 +171,10 @@ def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def optimize_offline(theta_init, old_thetas_list, set_parameter, line_search,
+def optimize_offline(theta, old_thetas_list, set_parameter, line_search,
                      evaluate_behav, evaluate_bound, evaluate_gradient,
                      evaluate_natural_gradient=None, gradient_tol=1e-4,
-                     bound_tol=1e-4, max_offline_ite=100):
+                     bound_tol=1e-4, max_offline_ite=10):
 
     # Compute MISE's denominator
     den_mise = 0
@@ -182,6 +182,7 @@ def optimize_offline(theta_init, old_thetas_list, set_parameter, line_search,
     for i in range(len(old_thetas_list)):
         den_mise += np.exp(
             evaluate_behav([old_thetas_list[i]])).astype(np.float32)
+    den_mise_log = np.log(den_mise)
 
     # Print infos about optimization loop
     fmtstr = '%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g'
@@ -195,40 +196,31 @@ def optimize_offline(theta_init, old_thetas_list, set_parameter, line_search,
     set_parameter(theta)
 
     for i in range(max_offline_ite):
-        bound = evaluate_bound(den_mise)
-        gradient = evaluate_gradient(den_mise)
+        bound = evaluate_bound(den_mise_log)
+        gradient = evaluate_gradient(den_mise_log)
 
         if np.any(np.isnan(gradient)):
             warnings.warn('Got NaN gradient! Stopping!')
             set_parameter(theta_old)
-            return theta_old, improvement, den_mise
+            return theta_old, improvement, den_mise_log
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound! Stopping!')
             set_parameter(theta_old)
-            return theta_old, improvement_old, den_mise
+            return theta_old, improvement_old, den_mise_log
 
-        if evaluate_natural_gradient is not None:
-            natural_gradient = evaluate_natural_gradient(gradient)
-        else:
-            natural_gradient = gradient
-
-        if np.dot(gradient, natural_gradient) < 0:
-            warnings.warn('NatGrad dot Grad < 0! Using vanilla gradient')
-            natural_gradient = gradient
-
-        gradient_norm = np.sqrt(np.dot(gradient, natural_gradient))
+        gradient_norm = np.sqrt(np.dot(gradient, gradient))
 
         if gradient_norm < gradient_tol:
             print('stopping - gradient norm < gradient_tol')
-            return theta, improvement, den_mise
+            return theta, improvement, den_mise_log
 
         alpha = 1. / gradient_norm ** 2
 
         theta_old = theta
         improvement_old = improvement
         theta, epsilon, delta_bound, num_line_search = \
-            line_search(theta, alpha, natural_gradient,
+            line_search(den_mise_log, theta, alpha, gradient,
                         set_parameter, evaluate_bound)
         set_parameter(theta)
 
@@ -236,6 +228,7 @@ def optimize_offline(theta_init, old_thetas_list, set_parameter, line_search,
         print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search,
                         gradient_norm, delta_bound, improvement))
 
+    return theta, improvement, den_mise_log
 
 def render(env, pi, horizon):
     """
@@ -285,8 +278,8 @@ def learn(make_env, make_policy, *,
     env = make_env()
     ob_space = env.observation_space
     ac_space = env.action_space
-    print('ENVVVV:', list(ob_space.shape))
-    print('ENVVVV:', list(ac_space.shape))
+    print('ob_space.shape:', list(ob_space.shape))
+    print('ac_space.shape:', list(ac_space.shape))
     max_samples = horizon * max_iters
 
     # Build the policy
@@ -303,7 +296,7 @@ def learn(make_env, make_policy, *,
     # My Placeholders
     old_thetas_ = tf.placeholder(shape=[None, n_params],
                                  dtype=tf.float32, name='old_thetas')
-    den_mise_ = tf.placeholder(dtype=tf.float32, name='den_mise')
+    den_mise_log_ = tf.placeholder(dtype=tf.float32, name='den_mise')
 
     ob_ = ob = U.get_placeholder_cached(name='ob')  # shape=[None, ac_shape]
     ac_ = pi.pdtype.sample_placeholder([max_samples], name='ac')
@@ -337,9 +330,11 @@ def learn(make_env, make_policy, *,
     print('target_log_pdf_split', target_log_pdf_split.get_shape().as_list())
     target_sum_log = tf.reduce_sum(target_log_pdf_split, axis=1)
     behavioral_sum_log = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
+    behavioral_sum_log_mean = tf.reduce_sum(behavioral_sum_log)/iter_number_
+    behavioral_sum_log_centered = behavioral_sum_log - behavioral_sum_log_mean
     print('target_sum_log', target_sum_log.get_shape().as_list())
     print('behavioral_sum_log', behavioral_sum_log.get_shape().as_list())
-    log_ratio_split = target_sum_log - den_mise_
+    log_ratio_split = target_sum_log - (behavioral_sum_log_mean + den_mise_log_)
     miw = tf.exp(log_ratio_split)
 
     losses_with_name.extend([(tf.reduce_max(miw), 'MaxIWNorm'),
@@ -397,20 +392,20 @@ def learn(make_env, make_policy, *,
     get_parameter = U.GetFlat(var_list)
 
     compute_behav = U.function(
-        [ob_, ac_, mask_, old_thetas_],
-        behavioral_sum_log,
+        [ob_, ac_, mask_, old_thetas_, iter_number_],
+        behavioral_sum_log_centered,
         updates=None, givens=None)
     compute_miw = U.function(
-        [ob_, ac_, mask_, den_mise_],
+        [ob_, ac_, mask_, den_mise_log_],
         miw, updates=None, givens=None)
     compute_bound = U.function(
-        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise],
+        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise_log_],
         [bound_, assert_ops, print_ops])
     compute_grad = U.function(
-        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_],
+        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise_log_],
         [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_losses = U.function(
-        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise_],
+        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise_log_],
         losses)
 
     # Set sampler (default: sequential)
@@ -476,8 +471,8 @@ def learn(make_env, make_policy, *,
         args = ()
         for key in all_seg.keys():
             all_seg[key][iters_so_far-1:iters_so_far-1+horizon] = seg[key]
-            args += (all_seg[key],)
-        args += (iters_so_fa,)
+        args = all_seg['ob'], all_seg['ac'],  all_seg['rew'], \
+            all_seg['disc_rew'], all_seg['mask'], iters_so_far
         # Info
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
@@ -493,32 +488,33 @@ def learn(make_env, make_policy, *,
         #     pickle.dump(theta, file)
 
         def evaluate_behav(thetas):
-            args_behav = all_seg['ob'], all_seg['ac'], all_seg['mask'], thetas
+            args_behav = all_seg['ob'], all_seg['ac'], \
+                all_seg['mask'], thetas, iters_so_far
             return compute_behav(*args_behav)
 
-        def evaluate_miw(den_mise):
-            args_miw = all_seg['ob'], all_seg['ac'], all_seg['mask'], den_mise
+        def evaluate_miw(den_mise_log):
+            args_miw = all_seg['ob'], all_seg['ac'], \
+                all_seg['mask'], den_mise_log
             return compute_miw(*args_miw)
 
-        def evaluate_bound(den_mise):
-            args_bound = args + (den_mise,)
+        def evaluate_bound(den_mise_log):
+            args_bound = args + (den_mise_log,)
             return compute_bound(*args_bound)[0]
 
-        def evaluate_gradient(den_mise):
-            args_gradient = args + (den_mise,)
+        def evaluate_gradient(den_mise_log):
+            args_gradient = args + (den_mise_log,)
             return compute_bound(*args_gradient)[0]
 
         # Perform optimization
+        line_search = line_search_parabola
         with timed("Optimization"):
-            den_mise = optimize_offline(theta, old_thetas_list, set_parameter,
-                                        evaluate_behav, evaluate_miw,
-                                        max_offline_ite=3)
-optimize_offline(theta_init, old_thetas_list, set_parameter, line_search,
-                     evaluate_behav, evaluate_bound, evaluate_gradient,
-                     evaluate_natural_gradient=None, gradient_tol=1e-4,
-                     bound_tol=1e-4, max_offline_ite=100):
-        args += (den_mise,)
-        # set_parameter(theta)
+            theta, improvement, den_mise_log = \
+                optimize_offline(theta, old_thetas_list,
+                                 set_parameter, line_search,
+                                 evaluate_behav, evaluate_bound,
+                                 evaluate_gradient)
+        args += (den_mise_log,)
+        set_parameter(theta)
 
         # Info
         with timed('summaries after'):
