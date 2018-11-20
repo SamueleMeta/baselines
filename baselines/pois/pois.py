@@ -687,13 +687,8 @@ def learn(make_env, make_policy, *,
         timesteps_so_far += sum(lens)
 
         args = ob, ac, rew, disc_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
-        print('YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO')
-        # print('pi variables=', pi.get_trainable_variables())
-        print('theta', theta)
-        print('oldpi variables=', oldpi.get_trainable_variables())
-        print(len(args))
-        print(ob.shape)
-        print(ob[0])
+        print('YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO', seg['ac'])
+        print(seg['ac'].shape)
         assign_old_eq_new()
 
         def evaluate_loss():

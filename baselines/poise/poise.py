@@ -428,8 +428,9 @@ def learn(make_env, make_policy, *,
     old_thetas_list = []
     all_seg = {}
     all_seg['ob'] = np.zeros((max_samples, ob_space.shape[0]))
+    all_seg['ac'] = np.zeros(shape=ac_.get_shape().as_list())
 
-    for i in ["ac", "rew", "disc_rew", "mask"]:
+    for i in ["rew", "disc_rew", "mask"]:
         all_seg[i] = np.zeros(max_samples)
 
     while True:
@@ -467,10 +468,16 @@ def learn(make_env, make_policy, *,
         assert len(lens) == 1
         episodes_so_far += 1
         timesteps_so_far += lens[0]
+        a_shape = seg['ac'].shape
         print("seg[ac]:", seg['ac'])
+        print("seg[ac].shape:", a_shape)
+        # if len(a_shape) > 1:  # reshape arrays to be one-dimensional
+        #     seg['ac'] = seg['ac'].reshape(max(a_shape[0], a_shape[1]),)
+        # print("seg[ac].shape:", seg['ac'].shape)
         args = ()
         for key in all_seg.keys():
             all_seg[key][iters_so_far-1:iters_so_far-1+horizon] = seg[key]
+
         args = all_seg['ob'], all_seg['ac'],  all_seg['rew'], \
             all_seg['disc_rew'], all_seg['mask'], iters_so_far
         # Info
