@@ -21,6 +21,8 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.poise import poise
 from baselines.pois.parallel_sampler import ParallelSampler
+# Import custom envs
+import baselines.envs.lqg1d #registered at import as gym env
 
 def get_env_type(env_id):
     #First load all envs
