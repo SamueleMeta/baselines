@@ -382,6 +382,7 @@ def learn(make_env, make_policy, *,
 
     # Return
     ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
+
     if clipping:
         rew_split = tf.clip_by_value(rew_split, -1, 1)
 
@@ -440,6 +441,8 @@ def learn(make_env, make_policy, *,
 
     elif iw_method == 'is':
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
+        print("SHAPE IW=", iw.get_shape().as_list())
+        print("SHAPE log_ratio_split=", log_ratio_split.get_shape().as_list())
         if iw_norm == 'none':
             iwn = iw / n_episodes
             w_return_mean = tf.reduce_sum(iwn * ep_return)

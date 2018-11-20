@@ -171,22 +171,70 @@ def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def optimize_offline(theta, old_thetas_list, set_parameter,
-                     evaluate_behav, evaluate_miw, max_offline_ite=1):
+def optimize_offline(theta_init, old_thetas_list, set_parameter, line_search,
+                     evaluate_behav, evaluate_bound, evaluate_gradient,
+                     evaluate_natural_gradient=None, gradient_tol=1e-4,
+                     bound_tol=1e-4, max_offline_ite=100):
 
     # Compute MISE's denominator
     den_mise = 0
+    print('OLD_THETAS_LIST=', len(old_thetas_list))
     for i in range(len(old_thetas_list)):
         den_mise += np.exp(
             evaluate_behav([old_thetas_list[i]])).astype(np.float32)
 
+    # Print infos about optimization loop
+    fmtstr = '%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g'
+    titlestr = '%6s %10s %10s %18s %18s %18s %18s'
+    print(titlestr % ('iter', 'epsilon', 'step size', 'num line search',
+                      'gradient norm', 'delta bound ite', 'delta bound tot'))
+
+    # Optimization loop
+    theta_old = theta
+    improvement = improvement_old = 0.
+    set_parameter(theta)
+
     for i in range(max_offline_ite):
-        miw = evaluate_miw(den_mise)
-        # parameters update
-        # ...theta = ...
+        bound = evaluate_bound(den_mise)
+        gradient = evaluate_gradient(den_mise)
+
+        if np.any(np.isnan(gradient)):
+            warnings.warn('Got NaN gradient! Stopping!')
+            set_parameter(theta_old)
+            return theta_old, improvement, den_mise
+
+        if np.isnan(bound):
+            warnings.warn('Got NaN bound! Stopping!')
+            set_parameter(theta_old)
+            return theta_old, improvement_old, den_mise
+
+        if evaluate_natural_gradient is not None:
+            natural_gradient = evaluate_natural_gradient(gradient)
+        else:
+            natural_gradient = gradient
+
+        if np.dot(gradient, natural_gradient) < 0:
+            warnings.warn('NatGrad dot Grad < 0! Using vanilla gradient')
+            natural_gradient = gradient
+
+        gradient_norm = np.sqrt(np.dot(gradient, natural_gradient))
+
+        if gradient_norm < gradient_tol:
+            print('stopping - gradient norm < gradient_tol')
+            return theta, improvement, den_mise
+
+        alpha = 1. / gradient_norm ** 2
+
+        theta_old = theta
+        improvement_old = improvement
+        theta, epsilon, delta_bound, num_line_search = \
+            line_search(theta, alpha, natural_gradient,
+                        set_parameter, evaluate_bound)
         set_parameter(theta)
 
-    return
+        improvement += delta_bound
+        print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search,
+                        gradient_norm, delta_bound, improvement))
 
 
 def render(env, pi, horizon):
@@ -210,12 +258,13 @@ def render(env, pi, horizon):
 
 
 def learn(make_env, make_policy, *,
+          max_iters,
           horizon,
           delta,
           gamma,
-          max_iters,
           sampler=None,
           iw_norm='none',
+          bound='J',
           save_weights=False,
           render_after=None,
           callback=None):
@@ -236,83 +285,133 @@ def learn(make_env, make_policy, *,
     env = make_env()
     ob_space = env.observation_space
     ac_space = env.action_space
-    max_samples = horizon
+    print('ENVVVV:', list(ob_space.shape))
+    print('ENVVVV:', list(ac_space.shape))
+    max_samples = horizon * max_iters
 
     # Build the policy
     pi = make_policy('pi', ob_space, ac_space)
     oldpi = make_policy('oldpi', ob_space, ac_space)
 
-    # Store behaviorals' params and their trajectories
-    old_thetas_list = []
-    old_traj_list = []
-
     # Get all learnable parameters
     all_var_list = pi.get_trainable_variables()
-    var_list = [v for v in all_var_list
-                if v.name.split('/')[1].startswith('pol')]
+    var_list = \
+        [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
-    n_parameters = sum(shapes)
+    n_params = sum(shapes)
 
-    # Placeholders
-    old_thetas_ = tf.placeholder(shape=[None, n_parameters],
+    # My Placeholders
+    old_thetas_ = tf.placeholder(shape=[None, n_params],
                                  dtype=tf.float32, name='old_thetas')
-    ob_ = ob = U.get_placeholder_cached(name='ob')
+    den_mise_ = tf.placeholder(dtype=tf.float32, name='den_mise')
+
+    ob_ = ob = U.get_placeholder_cached(name='ob')  # shape=[None, ac_shape]
     ac_ = pi.pdtype.sample_placeholder([max_samples], name='ac')
     mask_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='mask')
     rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
     disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples),
                                name='disc_rew')
     gradient_ = tf.placeholder(dtype=tf.float32,
-                               shape=(n_parameters, 1), name='gradient')
-    iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
-    den_mise_ = tf.placeholder(dtype=tf.float32, name='den_mise')
+                               shape=(n_params, 1), name='gradient')
+    iter_number_ = tf.placeholder(dtype=tf.float32, name='iter_number')
     losses_with_name = []
 
     # Policy densities
     target_log_pdf = pi.pd.logp(ac_)
-    behav_log_pdf = oldpi.pd.logp(ac_)
+    behavioral_log_pdf = oldpi.pd.logp(ac_)
 
-    # Mask operations
-    disc_rew_masked = disc_rew_ * mask_
-    rew_masked = rew_ * mask_
-    target_log_masked = target_log_pdf * mask_
-    behav_log_masked = behav_log_pdf * mask_
+    # Split operations
+    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, max_iters))
+    rew_split = tf.stack(tf.split(rew_ * mask_, max_iters))
+    target_log_pdf_split = tf.stack(
+        tf.split(target_log_pdf * mask_, max_iters))
+    behavioral_log_pdf_split = tf.stack(
+        tf.split(behavioral_log_pdf * mask_, max_iters))
+    mask_split = tf.stack(tf.split(mask_, max_iters))
+    # disc_rew_masked = disc_rew_ * mask_
+    # rew_masked = rew_ * mask_
+    # target_log_masked = target_log_pdf * mask_
+    # behavioral_log_masked = behavioral_log_pdf * mask_
 
     # Multiple importance weights computation
-    target_sum_log = tf.reduce_sum(target_log_masked)
-    behav_sum_log = tf.reduce_sum(behav_log_masked, axis=0)
-    log_ratio = target_sum_log - den_mise_
-    miw = tf.exp(log_ratio)
+    print('target_log_pdf_split', target_log_pdf_split.get_shape().as_list())
+    target_sum_log = tf.reduce_sum(target_log_pdf_split, axis=1)
+    behavioral_sum_log = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
+    print('target_sum_log', target_sum_log.get_shape().as_list())
+    print('behavioral_sum_log', behavioral_sum_log.get_shape().as_list())
+    log_ratio_split = target_sum_log - den_mise_
+    miw = tf.exp(log_ratio_split)
 
-    # Renyi divergence
-    # ...
+    losses_with_name.extend([(tf.reduce_max(miw), 'MaxIWNorm'),
+                             (tf.reduce_min(miw), 'MinIWNorm'),
+                             (tf.reduce_mean(miw), 'MeanIWNorm'),
+                             (U.reduce_std(miw), 'StdIWNorm'),
+                             (tf.reduce_max(miw), 'MaxIW'),
+                             (tf.reduce_min(miw), 'MinIW'),
+                             (tf.reduce_mean(miw), 'MeanIW'),
+                             (U.reduce_std(miw), 'StdIW')])
 
     # Return
-    ep_return = tf.reduce_sum(disc_rew_masked)
+    ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
+    return_mean = tf.reduce_mean(ep_return)
+    return_std = U.reduce_std(ep_return)
+    return_max = tf.reduce_max(ep_return)
+    return_min = tf.reduce_min(ep_return)
+    return_abs_max = tf.reduce_max(tf.abs(ep_return))
+    return_step_max = tf.reduce_max(tf.abs(rew_split))  # Max step reward
+    return_step_mean = tf.abs(tf.reduce_mean(rew_split))
+    positive_step_return_max = tf.maximum(0.0, tf.reduce_max(rew_split))
+    negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
+    return_step_maxmin = tf.abs(
+        positive_step_return_max - negative_step_return_max)
 
-    # Bound definitions
-    # ...
+    losses_with_name.extend([(return_mean, 'InitialReturnMean'),
+                             (return_max, 'InitialReturnMax'),
+                             (return_min, 'InitialReturnMin'),
+                             (return_std, 'InitialReturnStd'),
+                             (return_step_max, 'ReturnStepMax'),
+                             (return_step_maxmin, 'ReturnStepMaxmin')])
 
-    # Baselines' functions
-    compute_behav = U.function([ob_, ac_, mask_, old_thetas_],
-                               behav_sum_log,
-                               updates=None, givens=None)
-    compute_miw = U.function([ob_, ac_, mask_, den_mise_], miw,
-                             updates=None, givens=None)
-    # compute_bound = U.function([ob_, ac_, rew_, disc_rew_, mask_, iter_number_],
-    #                            [bound_, assert_ops, print_ops])
+    # MISE
+    mise = tf.reduce_sum(miw * ep_return)
+    losses_with_name.append((mise, 'MISE'))
 
-    # Info
-    losses_with_name.extend([(ep_return, 'Return')])
-    losses, loss_names = map(list, zip(*losses_with_name))
-    compute_losses = U.function(
-        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_], losses)
+    # Renyi divergence
+    if bound == 'J':
+        bound_ = mise
+    elif bound == 'max-ess':
+        sqrt_ess_classic = tf.linalg.norm(miw, 1) / tf.linalg.norm(miw, 2)
+        mise_variance = \
+            tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
+        bound_ = mise + mise_variance
+        losses_with_name.append((sqrt_ess_classic, 'SqrtESSClassic'))
+    losses_with_name.append((bound_, 'Bound'))
 
-    # Tf utils
+    # Infos
     assert_ops = tf.group(*tf.get_collection('asserts'))
     print_ops = tf.group(*tf.get_collection('prints'))
+    losses, loss_names = map(list, zip(*losses_with_name))
+
+    # TF functions
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
+
+    compute_behav = U.function(
+        [ob_, ac_, mask_, old_thetas_],
+        behavioral_sum_log,
+        updates=None, givens=None)
+    compute_miw = U.function(
+        [ob_, ac_, mask_, den_mise_],
+        miw, updates=None, givens=None)
+    compute_bound = U.function(
+        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise],
+        [bound_, assert_ops, print_ops])
+    compute_grad = U.function(
+        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_],
+        [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_losses = U.function(
+        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise_],
+        losses)
 
     # Set sampler (default: sequential)
     if sampler is None:
@@ -330,6 +429,13 @@ def learn(make_env, make_policy, *,
     timesteps_so_far = 0
     iters_so_far = 0
     tstart = time.time()
+    # Store behaviorals' params and their trajectories
+    old_thetas_list = []
+    all_seg = {}
+    all_seg['ob'] = np.zeros((max_samples, ob_space.shape[0]))
+
+    for i in ["ac", "rew", "disc_rew", "mask"]:
+        all_seg[i] = np.zeros(max_samples)
 
     while True:
         iters_so_far += 1
@@ -366,10 +472,12 @@ def learn(make_env, make_policy, *,
         assert len(lens) == 1
         episodes_so_far += 1
         timesteps_so_far += lens[0]
-        ob, ac, rew, disc_rew, mask, iter_number = \
-            seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
-        print('ARGSSSS:', ob.shape)
-
+        print("seg[ac]:", seg['ac'])
+        args = ()
+        for key in all_seg.keys():
+            all_seg[key][iters_so_far-1:iters_so_far-1+horizon] = seg[key]
+            args += (all_seg[key],)
+        args += (iters_so_fa,)
         # Info
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
@@ -384,20 +492,32 @@ def learn(make_env, make_policy, *,
         #     file = open('checkpoint.pkl', 'wb')
         #     pickle.dump(theta, file)
 
-        def evaluate_behav(behav_thetas):
-            args_behav = ob, ac, mask, behav_thetas
+        def evaluate_behav(thetas):
+            args_behav = all_seg['ob'], all_seg['ac'], all_seg['mask'], thetas
             return compute_behav(*args_behav)
 
         def evaluate_miw(den_mise):
-            args_miw = ob, ac, mask, den_mise
+            args_miw = all_seg['ob'], all_seg['ac'], all_seg['mask'], den_mise
             return compute_miw(*args_miw)
+
+        def evaluate_bound(den_mise):
+            args_bound = args + (den_mise,)
+            return compute_bound(*args_bound)[0]
+
+        def evaluate_gradient(den_mise):
+            args_gradient = args + (den_mise,)
+            return compute_bound(*args_gradient)[0]
 
         # Perform optimization
         with timed("Optimization"):
-            optimize_offline(theta, old_thetas_list, set_parameter,
-                             evaluate_behav, evaluate_miw,
-                             max_offline_ite=100)
-
+            den_mise = optimize_offline(theta, old_thetas_list, set_parameter,
+                                        evaluate_behav, evaluate_miw,
+                                        max_offline_ite=3)
+optimize_offline(theta_init, old_thetas_list, set_parameter, line_search,
+                     evaluate_behav, evaluate_bound, evaluate_gradient,
+                     evaluate_natural_gradient=None, gradient_tol=1e-4,
+                     bound_tol=1e-4, max_offline_ite=100):
+        args += (den_mise,)
         # set_parameter(theta)
 
         # Info
