@@ -171,17 +171,16 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def optimize_offline(theta, old_thetas_list, set_parameter, line_search,
-                     evaluate_behav, evaluate_bound, evaluate_gradient,
-                     evaluate_natural_gradient=None, gradient_tol=1e-4,
-                     bound_tol=1e-4, max_offline_ite=10):
+def optimize_offline(theta, old_thetas_list, set_parameter, set_parameter_old,
+                     line_search, evaluate_behav, evaluate_bound,
+                     evaluate_gradient, evaluate_natural_gradient=None,
+                     gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=10):
 
     # Compute MISE's denominator
     den_mise = 0
-    print('OLD_THETAS_LIST=', len(old_thetas_list))
     for i in range(len(old_thetas_list)):
-        den_mise += np.exp(
-            evaluate_behav([old_thetas_list[i]])).astype(np.float32)
+        set_parameter_old(old_thetas_list[i])
+        den_mise += np.exp(evaluate_behav()).astype(np.float32)
     den_mise_log = np.log(den_mise)
 
     # Print infos about optimization loop
@@ -286,12 +285,17 @@ def learn(make_env, make_policy, *,
     pi = make_policy('pi', ob_space, ac_space)
     oldpi = make_policy('oldpi', ob_space, ac_space)
 
-    # Get all learnable parameters
+    # Get all pi's learnable parameters
     all_var_list = pi.get_trainable_variables()
     var_list = \
         [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
     n_params = sum(shapes)
+
+    # Get all oldpi's learnable parameters
+    all_var_list_old = oldpi.get_trainable_variables()
+    var_list_old = \
+        [v for v in all_var_list_old if v.name.split('/')[1].startswith('pol')]
 
     # My Placeholders
     old_thetas_ = tf.placeholder(shape=[None, n_params],
@@ -321,23 +325,23 @@ def learn(make_env, make_policy, *,
     behavioral_log_pdf_split = tf.stack(
         tf.split(behavioral_log_pdf * mask_, max_iters))
     mask_split = tf.stack(tf.split(mask_, max_iters))
-    # disc_rew_masked = disc_rew_ * mask_
-    # rew_masked = rew_ * mask_
-    # target_log_masked = target_log_pdf * mask_
-    # behavioral_log_masked = behavioral_log_pdf * mask_
 
     # Multiple importance weights computation
     print('target_log_pdf_split', target_log_pdf_split.get_shape().as_list())
     target_sum_log = tf.reduce_sum(target_log_pdf_split, axis=1)
     behavioral_sum_log = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
+    behavioral_sum_log_sum = tf.reduce_sum(behavioral_sum_log, axis=0)
     behavioral_sum_log_mean = tf.reduce_sum(behavioral_sum_log)/iter_number_
     behavioral_sum_log_centered = behavioral_sum_log - behavioral_sum_log_mean
     print('target_sum_log', target_sum_log.get_shape().as_list())
     print('behavioral_sum_log', behavioral_sum_log.get_shape().as_list())
-    log_ratio_split = target_sum_log - (behavioral_sum_log_mean + den_mise_log_)
+    # log_ratio_split = target_sum_log - (behavioral_sum_log_mean + den_mise_log_)
+    log_ratio_split = target_sum_log - den_mise_log_
     miw = tf.exp(log_ratio_split)
 
-    losses_with_name.extend([(tf.reduce_max(miw), 'MaxIWNorm'),
+    losses_with_name.extend([(behavioral_sum_log_sum, 'behavioral_sum_log_sum'),
+                             (behavioral_sum_log_mean, 'behavioral_sum_log_mean'),
+                             (tf.reduce_max(miw), 'MaxIWNorm'),
                              (tf.reduce_min(miw), 'MinIWNorm'),
                              (tf.reduce_mean(miw), 'MeanIWNorm'),
                              (U.reduce_std(miw), 'StdIWNorm'),
@@ -390,10 +394,12 @@ def learn(make_env, make_policy, *,
     # TF functions
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
+    set_parameter_old = U.SetFromFlat(var_list_old)
+    get_parameter_old = U.GetFlat(var_list_old)
 
     compute_behav = U.function(
-        [ob_, ac_, mask_, old_thetas_, iter_number_],
-        behavioral_sum_log_centered,
+        [ob_, ac_, mask_, iter_number_],
+        behavioral_sum_log,
         updates=None, givens=None)
     compute_miw = U.function(
         [ob_, ac_, mask_, den_mise_log_],
@@ -471,8 +477,9 @@ def learn(make_env, make_policy, *,
 
         args = ()
         for key in all_seg.keys():
-            all_seg[key][iters_so_far-1:iters_so_far-1+horizon] = seg[key]
-
+            start = (iters_so_far-1)*horizon
+            all_seg[key][start:start + horizon] = seg[key]
+        print('all_seg[mask] non-zeros', all_seg['mask'])
         args = all_seg['ob'], all_seg['ac'],  all_seg['rew'], \
             all_seg['disc_rew'], all_seg['mask'], iters_so_far
         # Info
@@ -489,9 +496,9 @@ def learn(make_env, make_policy, *,
         #     file = open('checkpoint.pkl', 'wb')
         #     pickle.dump(theta, file)
 
-        def evaluate_behav(thetas):
+        def evaluate_behav():
             args_behav = all_seg['ob'], all_seg['ac'], \
-                all_seg['mask'], thetas, iters_so_far
+                all_seg['mask'], iters_so_far
             return compute_behav(*args_behav)
 
         def evaluate_miw(den_mise_log):
@@ -512,7 +519,8 @@ def learn(make_env, make_policy, *,
         with timed("Optimization"):
             theta, improvement, den_mise_log = \
                 optimize_offline(theta, old_thetas_list,
-                                 set_parameter, line_search,
+                                 set_parameter, set_parameter_old,
+                                 line_search,
                                  evaluate_behav, evaluate_bound,
                                  evaluate_gradient)
         args += (den_mise_log,)
