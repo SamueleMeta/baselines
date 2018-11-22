@@ -27,6 +27,7 @@ ob = np.array([0.2])[None]
 a, _ = pi.act(True, ob)
 print("------------------------")
 print(a)
+print(pi.max_std)
 
 print(pi.eval_mean(ob))
 print(pi.eval_std())

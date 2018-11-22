@@ -19,7 +19,7 @@ class MlpPolicy(object):
             self._prepare_getsetters()
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers, 
-              max_mu=None, min_mu=None, max_std=None, min_std=None,
+              max_mean=None, min_mean=None, max_std=None, min_std=None,
               gaussian_fixed_var=True, use_bias=True, use_critic=True,
               seed=None, hidden_W_init=U.normc_initializer(1.0), hidden_b_init=tf.zeros_initializer(),
                  output_W_init=U.normc_initializer(0.01), std_init = 1):
@@ -32,10 +32,10 @@ class MlpPolicy(object):
             use_bias: whether to include bias in neurons
             use_critic: whether to learn a value predictor
             seed: random seed
-            max_mu: maximum policy mean
+            max_mean: maximum policy mean
             max_std: maximum policy standard deviation
-            min_mu: minimum policy mean (-max_mu by default)
-            min_std: minimum policy standard deviation (0 by default)
+            min_mean: minimum policy mean
+            min_std: minimum policy standard deviation
         """
         assert isinstance(ob_space, gym.spaces.Box)
 
@@ -49,21 +49,26 @@ class MlpPolicy(object):
             
         #Boundaries
         #Default values
-        if max_mu == None: max_mu = ob_space.high
-        if min_mu == None: min_mu = ob_space.low
-        diam = np.linalg.norm(ac_space.high - ac_space.low)
-        if min_std == None: min_std = 1./diam 
-        if max_std == None: max_std = np.linalg.norm(ac_space.high - ac_space.low)
+        if max_mean == None: max_mean = ob_space.high
+        if min_mean == None: min_mean = ob_space.low
+        if min_std == None: min_std = std_init/np.sqrt(2)
+        if max_std == None: max_std = np.sqrt(2) * std_init
         
         #Illegal values
-        if(max_mu <= min_mu):
-            raise ValueError("max_mu should be greater than min_mu!")
+        if(max_mean <= min_mean):
+            raise ValueError("max_mean should be greater than min_mean!")
         if(min_std <= 0):
             raise ValueError("min_std should be greater than 0!")
         if(max_std <= min_std):
             raise ValueError("max_std should be greater than min_std!")
         if(std_init > max_std or std_init < min_std):
             raise ValueError("Initial std out of range!")
+            
+        self.max_mean = max_mean
+        self.min_mean = min_mean
+        self.max_std = max_std
+        self.min_std = min_std
+        self.std_init = std_init
         
 
         self.pdtype = pdtype = make_pdtype(ac_space)
@@ -93,13 +98,13 @@ class MlpPolicy(object):
                                                           use_bias=use_bias))
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
                 #Bounded mean
-                mu_range = max_mu - min_mu
+                mu_range = max_mean - min_mean
                 mean = mean = tf.nn.tanh(tf.layers.dense(last_out, 
                                                      pdtype.param_shape()[0]//2,
                                                      kernel_initializer=hidden_W_init, 
                                                      use_bias=use_bias))
                 mean = mean * mu_range/2.
-                self.mean = mean = tf.add(mean, - mu_range/2 + max_mu, name='final')
+                self.mean = mean = tf.add(mean, - mu_range/2 + max_mean, name='final')
                 
                 #Bounded std
                 logstd_range = np.log(max_std) - np.log(min_std)
