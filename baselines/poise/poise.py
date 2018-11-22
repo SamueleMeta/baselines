@@ -171,7 +171,8 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def optimize_offline(theta, old_thetas_list, set_parameter, set_parameter_old,
+def optimize_offline(theta, old_thetas_list, mask_iters,
+                     set_parameter, set_parameter_old,
                      line_search, evaluate_behav, evaluate_bound,
                      evaluate_gradient, evaluate_natural_gradient=None,
                      gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=10):
@@ -180,8 +181,14 @@ def optimize_offline(theta, old_thetas_list, set_parameter, set_parameter_old,
     den_mise = 0
     for i in range(len(old_thetas_list)):
         set_parameter_old(old_thetas_list[i])
-        den_mise += np.exp(evaluate_behav()).astype(np.float32)
-    den_mise_log = np.log(den_mise)
+        behav = evaluate_behav()
+        # print(behav)
+        den_mise += np.exp(behav).astype(np.float32)
+
+    # Compute log of MISE's denominator
+    den_mise_log = np.log(den_mise) * mask_iters
+    # print('den_mise=', den_mise_log)
+    # print('len den_mise=', len(den_mise))
 
     # Print infos about optimization loop
     fmtstr = '%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g'
@@ -301,10 +308,11 @@ def learn(make_env, make_policy, *,
     old_thetas_ = tf.placeholder(shape=[None, n_params],
                                  dtype=tf.float32, name='old_thetas')
     den_mise_log_ = tf.placeholder(dtype=tf.float32, name='den_mise')
-
     ob_ = ob = U.get_placeholder_cached(name='ob')  # shape=[None, ac_shape]
     ac_ = pi.pdtype.sample_placeholder([max_samples], name='ac')
     mask_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='mask')
+    mask_iters_ = tf.placeholder(dtype=tf.float32, shape=(max_iters),
+                                 name='mask_iters')
     rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
     disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples),
                                name='disc_rew')
@@ -327,19 +335,22 @@ def learn(make_env, make_policy, *,
     mask_split = tf.stack(tf.split(mask_, max_iters))
 
     # Multiple importance weights computation
+    # nb: the sum behaviorals' logs is centered for avoiding numerical problems
     print('target_log_pdf_split', target_log_pdf_split.get_shape().as_list())
     target_sum_log = tf.reduce_sum(target_log_pdf_split, axis=1)
+    target_nonzero = tf.count_nonzero(target_sum_log)
     behavioral_sum_log = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
-    behavioral_sum_log_sum = tf.reduce_sum(behavioral_sum_log, axis=0)
     behavioral_sum_log_mean = tf.reduce_sum(behavioral_sum_log)/iter_number_
-    behavioral_sum_log_centered = behavioral_sum_log - behavioral_sum_log_mean
+    behavioral_sum_log_centered = \
+        (behavioral_sum_log - behavioral_sum_log_mean) * mask_iters_
+    behavioral_nonzero = tf.count_nonzero(behavioral_sum_log_centered)
     print('target_sum_log', target_sum_log.get_shape().as_list())
     print('behavioral_sum_log', behavioral_sum_log.get_shape().as_list())
-    # log_ratio_split = target_sum_log - (behavioral_sum_log_mean + den_mise_log_)
-    log_ratio_split = target_sum_log - den_mise_log_
-    miw = tf.exp(log_ratio_split)
+    log_ratio_split = target_sum_log - behavioral_sum_log_mean - den_mise_log_
+    log_ratio_split = log_ratio_split * mask_iters_
+    miw = tf.exp(log_ratio_split) * mask_iters_
 
-    losses_with_name.extend([(behavioral_sum_log_sum, 'behavioral_sum_log_sum'),
+    losses_with_name.extend([(behavioral_nonzero, 'behavioral_nonzero'),
                              (behavioral_sum_log_mean, 'behavioral_sum_log_mean'),
                              (tf.reduce_max(miw), 'MaxIWNorm'),
                              (tf.reduce_min(miw), 'MinIWNorm'),
@@ -398,21 +409,21 @@ def learn(make_env, make_policy, *,
     get_parameter_old = U.GetFlat(var_list_old)
 
     compute_behav = U.function(
-        [ob_, ac_, mask_, iter_number_],
-        behavioral_sum_log,
+        [ob_, ac_, mask_, iter_number_, mask_iters_],
+        behavioral_sum_log_centered,
         updates=None, givens=None)
     compute_miw = U.function(
         [ob_, ac_, mask_, den_mise_log_],
         miw, updates=None, givens=None)
     compute_bound = U.function(
-        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise_log_],
-        [bound_, assert_ops, print_ops])
+        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_,
+         mask_iters_, den_mise_log_], [bound_, assert_ops, print_ops])
     compute_grad = U.function(
-        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise_log_],
-        [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, mask_iters_,
+         den_mise_log_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_losses = U.function(
-        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, den_mise_log_],
-        losses)
+        [ob_, ac_, rew_, disc_rew_, mask_, iter_number_,
+         mask_iters_, den_mise_log_], losses)
 
     # Set sampler (default: sequential)
     if sampler is None:
@@ -475,13 +486,18 @@ def learn(make_env, make_policy, *,
         episodes_so_far += 1
         timesteps_so_far += lens[0]
 
+        # Set arguments
         args = ()
+        mask_iters = np.zeros(max_iters)
+        mask_iters[:iters_so_far] = 1
+
         for key in all_seg.keys():
             start = (iters_so_far-1)*horizon
             all_seg[key][start:start + horizon] = seg[key]
-        print('all_seg[mask] non-zeros', all_seg['mask'])
+
         args = all_seg['ob'], all_seg['ac'],  all_seg['rew'], \
-            all_seg['disc_rew'], all_seg['mask'], iters_so_far
+            all_seg['disc_rew'], all_seg['mask'], iters_so_far, mask_iters
+
         # Info
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
@@ -498,13 +514,8 @@ def learn(make_env, make_policy, *,
 
         def evaluate_behav():
             args_behav = all_seg['ob'], all_seg['ac'], \
-                all_seg['mask'], iters_so_far
+                all_seg['mask'], iters_so_far, mask_iters
             return compute_behav(*args_behav)
-
-        def evaluate_miw(den_mise_log):
-            args_miw = all_seg['ob'], all_seg['ac'], \
-                all_seg['mask'], den_mise_log
-            return compute_miw(*args_miw)
 
         def evaluate_bound(den_mise_log):
             args_bound = args + (den_mise_log,)
@@ -512,13 +523,13 @@ def learn(make_env, make_policy, *,
 
         def evaluate_gradient(den_mise_log):
             args_gradient = args + (den_mise_log,)
-            return compute_bound(*args_gradient)[0]
+            return compute_grad(*args_gradient)[0]
 
         # Perform optimization
         line_search = line_search_parabola
         with timed("Optimization"):
             theta, improvement, den_mise_log = \
-                optimize_offline(theta, old_thetas_list,
+                optimize_offline(theta, old_thetas_list, mask_iters,
                                  set_parameter, set_parameter_old,
                                  line_search,
                                  evaluate_behav, evaluate_bound,
