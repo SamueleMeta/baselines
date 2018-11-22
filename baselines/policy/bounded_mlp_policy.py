@@ -21,8 +21,8 @@ class MlpPolicy(object):
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers, 
               max_mean=None, min_mean=None, max_std=None, min_std=None,
               gaussian_fixed_var=True, use_bias=True, use_critic=True,
-              seed=None, hidden_W_init=U.normc_initializer(1.0), hidden_b_init=tf.zeros_initializer(),
-                 output_W_init=U.normc_initializer(0.01), std_init = 1):
+              seed=None, hidden_W_init=U.normc_initializer(1.0),
+              std_init = 1):
         """Params:
             ob_space: task observation space
             ac_space : task action space

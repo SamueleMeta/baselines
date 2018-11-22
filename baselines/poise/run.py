@@ -81,8 +81,7 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
                 name=name, ob_space=ob_space, ac_space=ac_space,
                 hid_size=hid_size, num_hid_layers=num_hid_layers,
                 gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                output_W_init=tf.contrib.layers.xavier_initializer(),
+                hidden_W_init=tf.constant_initializer(-0.1),
                 max_mean = None,
                 min_mean = None,
                 max_std = None,
@@ -125,16 +124,16 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--env', type=str, default='LQG1D-v0')
-    parser.add_argument('--horizon', type=int, default=500)
+    parser.add_argument('--horizon', type=int, default=20)
     parser.add_argument('--iw_norm', type=str, default='none')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
-    parser.add_argument('--delta', type=float, default=0.99)
+    parser.add_argument('--delta', type=float, default=0.3)#delta piccolo -> grande bonus
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=1000)
-    parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--gamma', type=float, default=0.99)
     args = parser.parse_args()
 
     #Log file name
@@ -155,7 +154,8 @@ def main():
           njobs=args.njobs,
           iw_norm=args.iw_norm,
           delta=args.delta,
-          gamma=args.gamma)
+          gamma=args.gamma,
+          max_offline_iters=args.max_offline_iters)
 
 
 if __name__ == '__main__':

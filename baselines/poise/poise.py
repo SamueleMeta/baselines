@@ -153,7 +153,7 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
-            return theta_old, epsilon_old, delta_bound_old, i + 1
+            return theta_old, epsilon_old, 0, i + 1
 
         delta_bound = bound - bound_init
 
@@ -207,7 +207,7 @@ def optimize_offline(evaluate_roba, theta, old_thetas_list, mask_iters,
         # print('miw*ep_return', np.sum(miw*ep_return))
 
         bound = evaluate_bound(den_mise_log)
-        # print('bound', bound)
+        print('bound', bound)
         gradient = evaluate_gradient(den_mise_log)
 
         if np.any(np.isnan(gradient)):
@@ -270,6 +270,7 @@ def learn(make_env, make_policy, *,
           sampler=None,
           iw_norm='none',
           bound='max-ess',
+          max_offline_iters=10,
           save_weights=False,
           render_after=None,
           callback=None):
@@ -513,11 +514,19 @@ def learn(make_env, make_policy, *,
             all_seg['disc_rew'], all_seg['mask'], iters_so_far, mask_iters
 
         # Info
+        #"""LQG ONLY
+        x1, x2 = np.tanh(pi.eval_param())
+        mu = np.tanh(x1)
+        sigma = np.exp(np.tanh(x2))
+        #print('params: ', np.tanh(x1), np.exp(np.tanh(x2)))
+        #"""
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
             logger.record_tabular("URet", u_rets[0])
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
+            logger.record_tabular("mu", mu)
+            logger.record_tabular("sigma", sigma)
 
         # Save policy parameters to disk
         # if save_weights:
@@ -525,6 +534,8 @@ def learn(make_env, make_policy, *,
         #     import pickle
         #     file = open('checkpoint.pkl', 'wb')
         #     pickle.dump(theta, file)
+        
+
 
         def evaluate_behav():
             args_behav = all_seg['ob'], all_seg['ac'], \
@@ -551,7 +562,8 @@ def learn(make_env, make_policy, *,
                                  mask_iters, set_parameter,
                                  set_parameter_old, line_search,
                                  evaluate_behav, evaluate_bound,
-                                 evaluate_gradient)
+                                 evaluate_gradient,
+                                 max_offline_ite=max_offline_iters)
         args += (den_mise_log,)
         set_parameter(theta)
 

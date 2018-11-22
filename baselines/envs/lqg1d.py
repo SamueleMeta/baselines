@@ -331,3 +331,9 @@ class LQG1D(gym.Env):
         #
         #     P = self.to_mat(vecP)
         #     return P
+
+if __name__ == '__main__':
+    env = LQG1D()
+    K = env.computeOptimalK()
+    J = env.computeJ(K, 1)
+    print(K, J)
