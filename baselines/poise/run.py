@@ -17,7 +17,7 @@ import baselines.common.tf_util as U
 from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # Self imports: algorithm
-from baselines.policy.mlp_policy import MlpPolicy
+from baselines.policy.bounded_mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.poise import poise
 from baselines.pois.parallel_sampler import ParallelSampler
@@ -82,7 +82,13 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
                 hid_size=hid_size, num_hid_layers=num_hid_layers,
                 gaussian_fixed_var=True, use_bias=False, use_critic=False,
                 hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                output_W_init=tf.contrib.layers.xavier_initializer())
+                output_W_init=tf.contrib.layers.xavier_initializer(),
+                max_mean = None,
+                min_mean = None,
+                max_std = None,
+                min_std = None,
+                std_init = 1)
+            
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
             return CnnPolicy(
