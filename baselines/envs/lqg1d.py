@@ -104,7 +104,7 @@ class LQG1D(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def _render(self, mode='human', close=False):
+    def render(self, mode='human', close=False):
         if close:
             if self.viewer is not None:
                 self.viewer.close()
