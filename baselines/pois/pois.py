@@ -688,7 +688,7 @@ def learn(make_env, make_policy, *,
 
         args = ob, ac, rew, disc_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
         print('YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO', seg['ac'])
-        print(seg['ac'].shape)
+        print(seg['mask'].shape)
         assign_old_eq_new()
 
         def evaluate_loss():

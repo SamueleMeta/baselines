@@ -87,7 +87,7 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
                 max_std = None,
                 min_std = None,
                 std_init = 1)
-            
+
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
             return CnnPolicy(
@@ -118,7 +118,7 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
     #Close sampler in the end
     # sampler.close()
 
-def main():
+def main(args):
     #Command line arguments
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -134,7 +134,7 @@ def main():
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=1000)
     parser.add_argument('--gamma', type=float, default=0.99)
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     #Log file name
     if args.file_name == 'progress':
@@ -159,4 +159,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])

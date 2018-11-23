@@ -23,6 +23,8 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.pois import pois
 from baselines.pois.parallel_sampler import ParallelSampler
+# Import custom envs
+import baselines.envs.lqg1d #registered at import as gym env
 
 def get_env_type(env_id):
     #First load all envs
@@ -111,7 +113,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--env', type=str, default='CartPole-v1')
+    parser.add_argument('--env', type=str, default='LQG1D-v0')
     parser.add_argument('--num_episodes', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_method', type=str, default='is')

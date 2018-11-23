@@ -380,19 +380,13 @@ def learn(make_env, make_policy, *,
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
     return_step_max = tf.reduce_max(tf.abs(rew_split))  # Max step reward
-    return_step_mean = tf.abs(tf.reduce_mean(rew_split))
-    positive_step_return_max = tf.maximum(0.0, tf.reduce_max(rew_split))
-    negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
-    return_step_maxmin = tf.abs(
-        positive_step_return_max - negative_step_return_max)
 
-    losses_with_name.extend([(return_mean, 'InitialReturnMean'),
-                             (return_max, 'InitialReturnMax'),
-                             (return_min, 'InitialReturnMin'),
-                             (return_last, 'return_last'),
-                             (return_abs_max, 'return_abs_max'),
-                             (return_step_max, 'ReturnStepMax'),
-                             (return_step_maxmin, 'ReturnStepMaxmin')])
+    losses_with_name.extend([(return_mean, 'ReturnMean'),
+                             (return_max, 'ReturnMax'),
+                             (return_min, 'ReturnMin'),
+                             (return_last, 'ReturnLastEpisode'),
+                             (return_abs_max, 'ReturnAbsMax'),
+                             (return_step_max, 'ReturnStepMax')])
 
     # MISE
     mise = tf.reduce_sum(miw * ep_return * mask_iters_)
@@ -514,12 +508,12 @@ def learn(make_env, make_policy, *,
             all_seg['disc_rew'], all_seg['mask'], iters_so_far, mask_iters
 
         # Info
-        #"""LQG ONLY
+        # """LQG ONLY
         x1, x2 = np.tanh(pi.eval_param())
         mu = np.tanh(x1)
         sigma = np.exp(np.tanh(x2))
-        #print('params: ', np.tanh(x1), np.exp(np.tanh(x2)))
-        #"""
+        # print('params: ', np.tanh(x1), np.exp(np.tanh(x2)))
+        # """
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
             logger.record_tabular("URet", u_rets[0])
@@ -534,8 +528,6 @@ def learn(make_env, make_policy, *,
         #     import pickle
         #     file = open('checkpoint.pkl', 'wb')
         #     pickle.dump(theta, file)
-        
-
 
         def evaluate_behav():
             args_behav = all_seg['ob'], all_seg['ac'], \
