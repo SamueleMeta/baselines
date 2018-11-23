@@ -509,9 +509,8 @@ def learn(make_env, make_policy, *,
 
         # Info
         # """LQG ONLY
-        x1, x2 = np.tanh(pi.eval_param())
-        mu = np.tanh(x1)
-        sigma = np.exp(np.tanh(x2))
+        mu = pi.eval_mean([[1]])
+        sigma = pi.eval_std()
         # print('params: ', np.tanh(x1), np.exp(np.tanh(x2)))
         # """
         with timed('summaries before'):

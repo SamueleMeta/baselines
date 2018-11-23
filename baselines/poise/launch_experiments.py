@@ -20,7 +20,7 @@ def frange(start, stop, step):
 args = []
 for i in frange(0.1, 0.9, 0.1):
     for j in range(3):
-        args.append([str(i), j])
+        args.append([str(i), str(j)])
 
 n_jobs = len(args)
 Parallel(n_jobs=n_jobs)(delayed(run.main)(
