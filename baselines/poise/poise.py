@@ -326,6 +326,8 @@ def learn(make_env, make_policy, *,
     gradient_ = tf.placeholder(dtype=tf.float32,
                                shape=(n_params, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.float32, name='iter_number')
+
+    iter_number_int = tf.cast(iter_number_, dtype=tf.int32)
     losses_with_name = []
 
     # Policy densities
@@ -344,8 +346,6 @@ def learn(make_env, make_policy, *,
     # Multiple importance weights computation
     # nb: the sum behaviorals' logs is centered for avoiding numerical problems
     target_sum_log = tf.reduce_sum(target_log_pdf_split, axis=1)
-    target_sum_log_sum = tf.reduce_sum(target_sum_log)
-    target_nonzero = tf.count_nonzero(target_sum_log)
     behavioral_sum_log = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
     behavioral_sum_log_mean = tf.reduce_sum(behavioral_sum_log)/iter_number_
     behavioral_sum_log_centered = \
@@ -355,23 +355,17 @@ def learn(make_env, make_policy, *,
     log_ratio_split = log_ratio_split * mask_iters_
     miw = tf.exp(log_ratio_split) * mask_iters_
 
-    losses_with_name.extend([(target_sum_log_sum, 'target_sum_log_sum'),
-                             (behavioral_sum_log_mean, 'behavioral_sum_log_mean'),
+    losses_with_name.extend([(behavioral_sum_log_mean, 'behavioral_sum_log_mean'),
                              (miw[0], 'miw[0]'),
-                             (tf.reduce_max(miw), 'MaxIWNorm'),
-                             (tf.reduce_min(miw), 'MinIWNorm'),
-                             (tf.reduce_mean(miw), 'MeanIWNorm'),
-                             (U.reduce_std(miw), 'StdIWNorm'),
-                             (tf.reduce_max(miw), 'MaxIW'),
-                             (tf.reduce_min(miw), 'MinIW'),
-                             (tf.reduce_mean(miw), 'MeanIW'),
-                             (U.reduce_std(miw), 'StdIW')])
+                             (miw[iter_number_int-1], 'LastMIW'),
+                             (tf.reduce_sum(miw)/iter_number_, 'IWmean'),
+                             (tf.reduce_max(miw), 'IWmax'),
+                             (tf.reduce_min(miw), 'IWmin')])
 
     # ToDo: eliminate useless ones
     # Return
     ep_return = tf.reduce_sum(disc_rew_split * mask_split, axis=1)
     return_mean = tf.reduce_sum(ep_return)/iter_number_
-    iter_number_int = tf.cast(iter_number_, dtype=tf.int32)
     return_last = ep_return[iter_number_int - 1]
     return_max = tf.reduce_max(ep_return)
     return_min = tf.reduce_min(ep_return)
@@ -503,18 +497,18 @@ def learn(make_env, make_policy, *,
         args = all_seg['ob'], all_seg['ac'],  all_seg['rew'], \
             all_seg['disc_rew'], all_seg['mask'], iters_so_far, mask_iters
 
-        # Info
-        # """LQG ONLY
-        mu = pi.eval_mean([[1]])
-        sigma = pi.eval_std()
-        # """
+        if env.spec.id == 'LQG1D-v0':
+            mu = pi.eval_mean([[1]])
+            sigma = pi.eval_std()
+
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
             logger.record_tabular("URet", u_rets[0])
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
-            logger.record_tabular("mu", mu)
-            logger.record_tabular("sigma", sigma)
+            if env.spec.id == 'LQG1D-v0':
+                logger.record_tabular("LQGmu", mu)
+                logger.record_tabular("LQGsigma", sigma)
 
         # Save policy parameters to disk
         # if save_weights:
@@ -543,7 +537,7 @@ def learn(make_env, make_policy, *,
         # Perform optimization
         line_search = line_search_parabola
         with timed("Optimization"):
-            theta_new, improvement, den_mise_log = \
+            theta, improvement, den_mise_log = \
                 optimize_offline(evaluate_roba, theta, old_thetas_list,
                                  mask_iters, set_parameter,
                                  set_parameter_old, line_search,
