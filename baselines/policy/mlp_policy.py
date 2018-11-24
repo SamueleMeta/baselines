@@ -95,6 +95,8 @@ class MlpPolicy(object):
         self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
                                        shape=[sequence_length]+[1])
         self.logprobs = self.pd.logp(self.ac_in) #  [\log\pi(a|s)]
+        self._get_mean = U.function([ob], [self.mean])
+        self._get_std = U.function([], [tf.exp(self.logstd)])
 
         #Fisher
         with tf.variable_scope('pol') as vs:
@@ -124,6 +126,13 @@ class MlpPolicy(object):
         if oneD:
             ac1, vpred1 = ac1[0], vpred1[0]
         return ac1, vpred1
+
+    #Distribution parameters
+    def eval_mean(self, ob):
+        return self._get_mean(ob)[0]
+
+    def eval_std(self):
+        return self._get_std()[0]
 
 
     #Divergence

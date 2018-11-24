@@ -17,7 +17,8 @@ import baselines.common.tf_util as U
 from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # Self imports: algorithm
-from baselines.policy.bounded_mlp_policy import MlpPolicy
+from baselines.policy.mlp_policy import MlpPolicy
+from baselines.policy.bounded_mlp_policy import MlpPolicyBounded
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.poise import poise
 from baselines.pois.parallel_sampler import ParallelSampler
@@ -38,7 +39,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, policy, horizon, seed, njobs=1, **alg_args):
+def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
 
     #Prepare environment maker
     if env.startswith('rllab.'):
@@ -76,17 +77,25 @@ def train(env, policy, horizon, seed, njobs=1, **alg_args):
         num_hid_layers = 3
 
     if policy == 'linear' or policy == 'nn':
-        def make_policy(name, ob_space, ac_space):
-            return MlpPolicy(
-                name=name, ob_space=ob_space, ac_space=ac_space,
-                hid_size=hid_size, num_hid_layers=num_hid_layers,
-                gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                hidden_W_init=tf.constant_initializer(-0.1),
-                max_mean = None,
-                min_mean = None,
-                max_std = None,
-                min_std = None,
-                std_init = 1)
+        if bounded_policy == 'True':
+            def make_policy(name, ob_space, ac_space):
+                return MlpPolicyBounded(
+                    name=name, ob_space=ob_space, ac_space=ac_space,
+                    hid_size=hid_size, num_hid_layers=num_hid_layers,
+                    gaussian_fixed_var=True, use_bias=False, use_critic=False,
+                    hidden_W_init=tf.constant_initializer(-0.1),
+                    max_mean=None,
+                    min_mean=None,
+                    max_std=None,
+                    min_std=None,
+                    std_init=1)
+        else:
+            def make_policy(name, ob_space, ac_space):
+                return MlpPolicy(
+                    name=name, ob_space=ob_space, ac_space=ac_space,
+                    hid_size=hid_size, num_hid_layers=num_hid_layers,
+                    gaussian_fixed_var=True, use_bias=False, use_critic=False,
+                    hidden_W_init=tf.constant_initializer(-0.1))
 
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
@@ -129,18 +138,20 @@ def main(args):
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--delta', type=float, default=0.3)#delta piccolo -> grande bonus
-    parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=1000)
+    parser.add_argument('--max_offline_iters', type=int, default=10)
+    parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
+    parser.add_argument('--bounded_policy', type=bool, default='True')
     args = parser.parse_args(args)
 
     #Log file name
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
     else:
-        file_name = args.file_name
+        file_name = args.file_name + '_%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
 
     #Configure logger
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
@@ -148,14 +159,16 @@ def main(args):
     #Learn
     train(env=args.env,
           policy=args.policy,
-          max_iters=args.max_iters,
           horizon=args.horizon,
           seed=args.seed,
+          bounded_policy=args.bounded_policy,
           njobs=args.njobs,
           iw_norm=args.iw_norm,
           delta=args.delta,
           gamma=args.gamma,
-          max_offline_iters=args.max_offline_iters)
+          max_offline_iters=args.max_offline_iters,
+          max_iters=args.max_iters,
+          render_after=args.render_after)
 
 
 if __name__ == '__main__':

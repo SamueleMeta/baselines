@@ -7,7 +7,7 @@ import numpy as np
 import scipy.stats as sts
 #import time
 
-class MlpPolicy(object):
+class MlpPolicyBounded(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""
     recurrent = False
     def __init__(self, name, *args, **kwargs):
@@ -18,7 +18,7 @@ class MlpPolicy(object):
             self.scope = tf.get_variable_scope().name
             self._prepare_getsetters()
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, 
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
               max_mean=None, min_mean=None, max_std=None, min_std=None,
               gaussian_fixed_var=True, use_bias=True, use_critic=True,
               seed=None, hidden_W_init=U.normc_initializer(1.0),
@@ -46,14 +46,14 @@ class MlpPolicy(object):
 
         if seed is not None:
             tf.set_random_seed(seed)
-            
+
         #Boundaries
         #Default values
         if max_mean == None: max_mean = ob_space.high
         if min_mean == None: min_mean = ob_space.low
         if min_std == None: min_std = std_init/np.sqrt(2)
         if max_std == None: max_std = np.sqrt(2) * std_init
-        
+
         #Illegal values
         if(max_mean <= min_mean):
             raise ValueError("max_mean should be greater than min_mean!")
@@ -63,13 +63,13 @@ class MlpPolicy(object):
             raise ValueError("max_std should be greater than min_std!")
         if(std_init > max_std or std_init < min_std):
             raise ValueError("Initial std out of range!")
-            
+
         self.max_mean = max_mean
         self.min_mean = min_mean
         self.max_std = max_std
         self.min_std = min_std
         self.std_init = std_init
-        
+
 
         self.pdtype = pdtype = make_pdtype(ac_space)
         sequence_length = None
@@ -91,7 +91,7 @@ class MlpPolicy(object):
         with tf.variable_scope('pol'):
             last_out = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
             for i in range(num_hid_layers):
-                last_out = tf.nn.tanh(tf.layers.dense(last_out, 
+                last_out = tf.nn.tanh(tf.layers.dense(last_out,
                                                           hid_size[i],
                                                           name='fc%i'%(i+1),
                                                           kernel_initializer=hidden_W_init,
@@ -99,26 +99,26 @@ class MlpPolicy(object):
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
                 #Bounded mean
                 mu_range = max_mean - min_mean
-                mean = mean = tf.nn.tanh(tf.layers.dense(last_out, 
+                mean = mean = tf.nn.tanh(tf.layers.dense(last_out,
                                                      pdtype.param_shape()[0]//2,
-                                                     kernel_initializer=hidden_W_init, 
+                                                     kernel_initializer=hidden_W_init,
                                                      use_bias=use_bias))
                 mean = mean * mu_range/2.
                 self.mean = mean = tf.add(mean, - mu_range/2 + max_mean, name='final')
-                
+
                 #Bounded std
                 logstd_range = np.log(max_std) - np.log(min_std)
                 std_param_initializer = tf.constant_initializer(np.arctanh(2./logstd_range*
-                                                                           (np.log(std_init) + 
-                                                                            logstd_range/2. - 
+                                                                           (np.log(std_init) +
+                                                                            logstd_range/2. -
                                                                             np.log(max_std))))
-                std_param = tf.get_variable(name="std_param", shape=[1, pdtype.param_shape()[0]//2], 
+                std_param = tf.get_variable(name="std_param", shape=[1, pdtype.param_shape()[0]//2],
                                                                      initializer=std_param_initializer)
                 logstd = tf.nn.tanh(std_param)
                 logstd = logstd * logstd_range/2.
                 logstd = self.logstd = tf.add(logstd, - logstd_range/2 + np.log(max_std), name="pol_logstd")
                 self.logstd = logstd
-                
+
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
                 raise NotImplementedError
@@ -180,14 +180,14 @@ class MlpPolicy(object):
         if oneD:
             ac1, vpred1 = ac1[0], vpred1[0]
         return ac1, vpred1
-    
+
     #Distribution parameters
     def eval_mean(self, ob):
         return self._get_mean(ob)[0]
-    
+
     def eval_std(self):
         return self._get_std()[0]
-        
+
 
 
     #Divergence

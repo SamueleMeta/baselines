@@ -201,13 +201,13 @@ def optimize_offline(evaluate_roba, theta, old_thetas_list, mask_iters,
     set_parameter(theta)
 
     for i in range(max_offline_ite):
-        miw, ep_return = evaluate_roba(den_mise_log)
+        # miw, ep_return = evaluate_roba(den_mise_log)
         # print('ep_return =', ep_return)
         # print('miw =', miw)
         # print('miw*ep_return', np.sum(miw*ep_return))
 
         bound = evaluate_bound(den_mise_log)
-        print('bound', bound)
+        # print('bound', bound)
         gradient = evaluate_gradient(den_mise_log)
 
         if np.any(np.isnan(gradient)):
@@ -343,7 +343,6 @@ def learn(make_env, make_policy, *,
 
     # Multiple importance weights computation
     # nb: the sum behaviorals' logs is centered for avoiding numerical problems
-    print('target_log_pdf_split', target_log_pdf_split.get_shape().as_list())
     target_sum_log = tf.reduce_sum(target_log_pdf_split, axis=1)
     target_sum_log_sum = tf.reduce_sum(target_sum_log)
     target_nonzero = tf.count_nonzero(target_sum_log)
@@ -352,8 +351,6 @@ def learn(make_env, make_policy, *,
     behavioral_sum_log_centered = \
         (behavioral_sum_log - behavioral_sum_log_mean) * mask_iters_
     behavioral_nonzero = tf.count_nonzero(behavioral_sum_log_centered)
-    print('target_sum_log', target_sum_log.get_shape().as_list())
-    print('behavioral_sum_log', behavioral_sum_log.get_shape().as_list())
     log_ratio_split = target_sum_log - behavioral_sum_log_mean - den_mise_log_
     log_ratio_split = log_ratio_split * mask_iters_
     miw = tf.exp(log_ratio_split) * mask_iters_
@@ -478,7 +475,6 @@ def learn(make_env, make_policy, *,
 
         # Learning iteration
         logger.log('********** Iteration %i ************' % iters_so_far)
-        # Store the list of arrays representing pi's parameters
 
         # Generate trajectories
         theta = get_parameter()
@@ -511,7 +507,6 @@ def learn(make_env, make_policy, *,
         # """LQG ONLY
         mu = pi.eval_mean([[1]])
         sigma = pi.eval_std()
-        # print('params: ', np.tanh(x1), np.exp(np.tanh(x2)))
         # """
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
@@ -548,7 +543,7 @@ def learn(make_env, make_policy, *,
         # Perform optimization
         line_search = line_search_parabola
         with timed("Optimization"):
-            theta, improvement, den_mise_log = \
+            theta_new, improvement, den_mise_log = \
                 optimize_offline(evaluate_roba, theta, old_thetas_list,
                                  mask_iters, set_parameter,
                                  set_parameter_old, line_search,
