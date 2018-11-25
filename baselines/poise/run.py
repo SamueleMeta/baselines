@@ -21,10 +21,6 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.bounded_mlp_policy import MlpPolicyBounded
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.poise import poise
-from baselines.pois.parallel_sampler import ParallelSampler
-# Import custom envs
-import baselines.envs.lqg1d #registered at import as gym env
-from joblib import Parallel, delayed
 
 
 def get_env_type(env_id):
@@ -83,8 +79,6 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
 
     if policy == 'linear' or policy == 'nn':
         if bounded_policy:
-            print('Bounded mlp-policy')
-
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicyBounded(
                     name=name, ob_space=ob_space, ac_space=ac_space,
@@ -97,8 +91,6 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
                     min_std=None,
                     std_init=1)
         else:
-            print('Non-bounded mlp-policy')
-
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicy(
                     name=name, ob_space=ob_space, ac_space=ac_space,
@@ -137,6 +129,67 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
     # sampler.close()
 
 
+def single_run(args, delta=None, seed=None):
+
+    # Import custom envs
+    import baselines.envs.lqg1d  # registered at import as gym env
+
+    # Manage call from multiple runs
+    if delta:
+        args.delta = delta
+    if seed:
+        args.seed = seed
+
+    # Log file name
+    if args.file_name == 'progress':
+        file_name = '%s_delta=%s_seed=%s_%s' % (
+            args.env.upper(), args.delta, args.seed, time.time())
+    else:
+        file_name = args.file_name + '_%s_delta=%s_seed=%s_%s' % (
+            args.env.upper(), args.delta, args.seed, time.time())
+
+    # Configure logger
+    logger.configure(dir=args.logdir,
+                     format_strs=['stdout', 'csv', 'tensorboard'],
+                     file_name=file_name)
+
+    # Learn
+    train(env=args.env,
+          policy=args.policy,
+          horizon=args.horizon,
+          seed=args.seed,
+          bounded_policy=args.bounded_policy,
+          njobs=args.njobs,
+          iw_norm=args.iw_norm,
+          delta=args.delta,
+          gamma=args.gamma,
+          max_offline_iters=args.max_offline_iters,
+          max_iters=args.max_iters,
+          render_after=args.render_after)
+
+
+def multiple_runs(args):
+
+    # Import tools for parallelizing runs
+    from joblib import Parallel, delayed
+
+    # Define range() for floats
+    delta = []
+    seed = []
+    for i in [n/10 for n in range(1, 3)]:
+        for j in range(1):
+            delta.append(i)
+            seed.append(j)
+
+    # Parallelize single runs
+    n_jobs = len(delta)
+    Parallel(n_jobs=n_jobs)(delayed(single_run)(
+        args,
+        delta[i],
+        seed[i]
+        ) for i in range(n_jobs))
+
+
 def main(args):
 
     import argparse
@@ -168,32 +221,10 @@ def main(args):
     add_bool_arg(parser, 'experiment', default=False)
     args = parser.parse_args(args)
 
-    # Log file name
-    if args.file_name == 'progress':
-        file_name = '%s_delta=%s_seed=%s_%s' % (
-            args.env.upper(), args.delta, args.seed, time.time())
+    if args.experiment:
+        multiple_runs(args)
     else:
-        file_name = args.file_name + '_%s_delta=%s_seed=%s_%s' % (
-            args.env.upper(), args.delta, args.seed, time.time())
-
-    # Configure logger
-    logger.configure(dir=args.logdir,
-                     format_strs=['stdout', 'csv', 'tensorboard'],
-                     file_name=file_name)
-
-    # Learn
-    train(env=args.env,
-          policy=args.policy,
-          horizon=args.horizon,
-          seed=args.seed,
-          bounded_policy=args.bounded_policy,
-          njobs=args.njobs,
-          iw_norm=args.iw_norm,
-          delta=args.delta,
-          gamma=args.gamma,
-          max_offline_iters=args.max_offline_iters,
-          max_iters=args.max_iters,
-          render_after=args.render_after)
+        single_run(args)
 
 
 if __name__ == '__main__':
