@@ -171,7 +171,8 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def optimize_offline(evaluate_roba, theta, old_thetas_list, mask_iters,
+def optimize_offline(evaluate_roba, theta, old_thetas_list, iters_so_far,
+                     mask_iters,
                      set_parameter, set_parameter_old,
                      line_search, evaluate_behav, evaluate_bound,
                      evaluate_gradient, evaluate_natural_gradient=None,
@@ -185,6 +186,7 @@ def optimize_offline(evaluate_roba, theta, old_thetas_list, mask_iters,
         den_mise += np.exp(behav).astype(np.float32)
 
     # Compute log of MISE's denominator
+    den_mise = den_mise / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
     # print('den_mise_log=', den_mise_log)
     # print('len den_mise=', len(den_mise))
@@ -350,17 +352,21 @@ def learn(make_env, make_policy, *,
     behavioral_sum_log_mean = tf.reduce_sum(behavioral_sum_log)/iter_number_
     behavioral_sum_log_centered = \
         (behavioral_sum_log - behavioral_sum_log_mean) * mask_iters_
-    behavioral_nonzero = tf.count_nonzero(behavioral_sum_log_centered)
     log_ratio_split = target_sum_log - behavioral_sum_log_mean - den_mise_log_
     log_ratio_split = log_ratio_split * mask_iters_
     miw = tf.exp(log_ratio_split) * mask_iters_
 
-    losses_with_name.extend([(behavioral_sum_log_mean, 'behavioral_sum_log_mean'),
-                             (miw[0], 'miw[0]'),
-                             (miw[iter_number_int-1], 'LastMIW'),
-                             (tf.reduce_sum(miw)/iter_number_, 'IWmean'),
-                             (tf.reduce_max(miw), 'IWmax'),
-                             (tf.reduce_min(miw), 'IWmin')])
+    den_mise_log_mean = tf.reduce_sum(den_mise_log_)/iter_number_
+    den_mise_log_last = den_mise_log_[iter_number_int-1]
+    losses_with_name.extend([(behavioral_sum_log_mean, 'BehavSumLogMean'),
+                             (den_mise_log_mean, 'DenMISEMeanLog'),
+                             (den_mise_log_[0], 'DenMISELogFirst'),
+                             (den_mise_log_last, 'DenMISELogLast'),
+                             (miw[0], 'IWFirstEpisode'),
+                             (miw[iter_number_int-1], 'IWLastEpisode'),
+                             (tf.reduce_sum(miw)/iter_number_, 'IWMean'),
+                             (tf.reduce_max(miw), 'IWMax'),
+                             (tf.reduce_min(miw), 'IWMin')])
 
     # ToDo: eliminate useless ones
     # Return
@@ -380,18 +386,23 @@ def learn(make_env, make_policy, *,
                              (return_step_max, 'ReturnStepMax')])
 
     # MISE
-    mise = tf.reduce_sum(miw * ep_return * mask_iters_)
+    mise = tf.reduce_sum(miw * ep_return * mask_iters_)/iter_number_
     losses_with_name.append((mise, 'MISE'))
 
     # Renyi divergence
     if bound == 'J':
         bound_ = mise
     elif bound == 'max-ess':
-        sqrt_ess_classic = tf.linalg.norm(miw, 1) / tf.linalg.norm(miw, 2)
+        miw_1 = tf.log(tf.linalg.norm(miw, 1))
+        miw_2 = tf.log(tf.linalg.norm(miw, 2))
+        sqrt_ess_classic = tf.exp(miw_1 - miw_2)
         mise_variance = \
             tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
         bound_ = mise + mise_variance
-        losses_with_name.append((sqrt_ess_classic, 'SqrtESSClassic'))
+        losses_with_name.extend([(sqrt_ess_classic, 'SqrtESSClassic'),
+                                 (miw_1, 'IWNorm1'),
+                                 (miw_2, 'IWNorm2')])
+
     losses_with_name.append((bound_, 'Bound'))
 
     # Infos
@@ -539,6 +550,7 @@ def learn(make_env, make_policy, *,
         with timed("Optimization"):
             theta, improvement, den_mise_log = \
                 optimize_offline(evaluate_roba, theta, old_thetas_list,
+                                 iters_so_far,
                                  mask_iters, set_parameter,
                                  set_parameter_old, line_search,
                                  evaluate_behav, evaluate_bound,

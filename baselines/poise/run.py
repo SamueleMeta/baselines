@@ -78,6 +78,7 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
 
     if policy == 'linear' or policy == 'nn':
         if bounded_policy == 'True':
+            print('Bounded mlp-policy')
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicyBounded(
                     name=name, ob_space=ob_space, ac_space=ac_space,
@@ -90,6 +91,7 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
                     min_std=None,
                     std_init=1)
         else:
+            print('Non-bounded mlp-policy')
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicy(
                     name=name, ob_space=ob_space, ac_space=ac_space,
@@ -144,7 +146,7 @@ def main(args):
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--bounded_policy', type=bool, default='True')
+    parser.add_argument('--bounded_policy', type=str, default='True')
     args = parser.parse_args(args)
 
     #Log file name

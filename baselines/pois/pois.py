@@ -687,8 +687,6 @@ def learn(make_env, make_policy, *,
         timesteps_so_far += sum(lens)
 
         args = ob, ac, rew, disc_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask'], iters_so_far
-        print('YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO', seg['ac'])
-        print(seg['mask'].shape)
         assign_old_eq_new()
 
         def evaluate_loss():
@@ -708,6 +706,10 @@ def learn(make_env, make_policy, *,
         else:
             evaluate_natural_gradient = None
 
+        if env.spec.id == 'LQG1D-v0':
+            mu = pi.eval_mean([[1]])
+            sigma = pi.eval_std()
+
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
             logger.record_tabular("InitialBound", evaluate_loss())
@@ -717,6 +719,9 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("EpisodesSoFar", episodes_so_far)
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
+            if env.spec.id == 'LQG1D-v0':
+                logger.record_tabular("LQGmu", mu)
+                logger.record_tabular("LQGsigma", sigma)
 
         if save_weights:
             logger.record_tabular('Weights', str(get_parameter()))
