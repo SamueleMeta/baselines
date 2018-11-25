@@ -19,7 +19,7 @@ def frange(start, stop, step):
 
 if __name__ == '__main__':
     args = []
-    for i in frange(0.1, 0.2, 0.1):
+    for i in frange(0.2, 0.8, 0.2):
         for j in range(3):
             args.append([str(i), str(j)])
 
@@ -28,6 +28,6 @@ if __name__ == '__main__':
         ['--delta', args[i][0],
          '--seed', args[i][1],
          '--bounded_policy', 'True',
-         '--file_name', 'progress'
+         '--file_name', 'same_theta'
          ]
         ) for i in range(n_jobs))
