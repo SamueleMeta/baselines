@@ -24,9 +24,11 @@ from baselines.poise import poise
 from baselines.pois.parallel_sampler import ParallelSampler
 # Import custom envs
 import baselines.envs.lqg1d #registered at import as gym env
+from joblib import Parallel, delayed
+
 
 def get_env_type(env_id):
-    #First load all envs
+    # First load all envs
     _game_envs = defaultdict(set)
     for env in gym.envs.registry.all():
         env_type = env._entry_point.split(':')[0].split('.')[-1]
@@ -39,18 +41,21 @@ def get_env_type(env_id):
             break
     return env_type
 
+
 def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
 
-    #Prepare environment maker
+    # Prepare environment maker
     if env.startswith('rllab.'):
         # Get env name and class
         env_name = re.match('rllab.(\w+)', env).group(1)
         env_rllab_class = rllab_env_from_name(env_name)
+
         # Define env maker
         def make_env():
             env_rllab = env_rllab_class()
             _env = Rllab2GymWrapper(env_rllab)
             return _env
+
         # Used later
         env_type = 'rllab'
     else:
@@ -77,8 +82,9 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
         num_hid_layers = 3
 
     if policy == 'linear' or policy == 'nn':
-        if bounded_policy == 'True':
+        if bounded_policy:
             print('Bounded mlp-policy')
+
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicyBounded(
                     name=name, ob_space=ob_space, ac_space=ac_space,
@@ -92,6 +98,7 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
                     std_init=1)
         else:
             print('Non-bounded mlp-policy')
+
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicy(
                     name=name, ob_space=ob_space, ac_space=ac_space,
@@ -109,10 +116,10 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
     else:
         raise Exception('Unrecognized policy type.')
 
-    #Prepare (sequential) sampler to generate ONE trajectory at a time
+    # Prepare (sequential) sampler to generate ONE trajectory at a time
     sampler = None
 
-    #Initialize
+    # Initialize
     try:
         affinity = len(os.sched_getaffinity(0))
     except:
@@ -122,43 +129,59 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
     set_global_seeds(seed)
     gym.logger.setLevel(logging.WARN)
 
-    #Learn
+    # Learn
     poise.learn(make_env, make_policy, horizon=horizon,
                 sampler=sampler, **alg_args)
 
-    #Close sampler in the end
+    # Close sampler in the end
     # sampler.close()
 
+
 def main(args):
-    #Command line arguments
+
     import argparse
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    # Easily add a boolean argument to the parser with default value
+    def add_bool_arg(parser, name, default=False):
+        group = parser.add_mutually_exclusive_group(required=False)
+        group.add_argument('--' + name, dest=name, action='store_true')
+        group.add_argument('--no-' + name, dest=name, action='store_false')
+        parser.set_defaults(**{name: default})
+
+    # Command line arguments
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--env', type=str, default='LQG1D-v0')
     parser.add_argument('--horizon', type=int, default=20)
     parser.add_argument('--iw_norm', type=str, default='none')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
-    parser.add_argument('--delta', type=float, default=0.3)#delta piccolo -> grande bonus
+    parser.add_argument('--delta', type=float, default=0.3)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=1000)
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--bounded_policy', type=str, default='True')
+    add_bool_arg(parser, 'bounded_policy', default=True)
+    add_bool_arg(parser, 'experiment', default=False)
     args = parser.parse_args(args)
 
-    #Log file name
+    # Log file name
     if args.file_name == 'progress':
-        file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
+        file_name = '%s_delta=%s_seed=%s_%s' % (
+            args.env.upper(), args.delta, args.seed, time.time())
     else:
-        file_name = args.file_name + '_%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
+        file_name = args.file_name + '_%s_delta=%s_seed=%s_%s' % (
+            args.env.upper(), args.delta, args.seed, time.time())
 
-    #Configure logger
-    logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
+    # Configure logger
+    logger.configure(dir=args.logdir,
+                     format_strs=['stdout', 'csv', 'tensorboard'],
+                     file_name=file_name)
 
-    #Learn
+    # Learn
     train(env=args.env,
           policy=args.policy,
           horizon=args.horizon,

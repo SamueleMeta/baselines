@@ -548,7 +548,7 @@ def learn(make_env, make_policy, *,
         # Perform optimization
         line_search = line_search_parabola
         with timed("Optimization"):
-            theta_new, improvement, den_mise_log = \
+            theta, improvement, den_mise_log = \
                 optimize_offline(evaluate_roba, theta, old_thetas_list,
                                  iters_so_far,
                                  mask_iters, set_parameter,
