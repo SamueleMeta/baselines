@@ -45,6 +45,7 @@ class LQG1D(gym.Env):
         self.discrete_reward = discrete_reward
         self.max_pos = 4.0
         self.max_action = 4.0
+        self.start_state = [self.max_pos]  # always reset state to same value
         self.sigma_noise = 0.1
         self.A = np.array([1]).reshape((1, 1))
         self.B = np.array([1]).reshape((1, 1))
@@ -52,7 +53,7 @@ class LQG1D(gym.Env):
         self.R = np.array([0.9]).reshape((1, 1))
 
         self.max_cost = np.dot(self.max_pos,
-                      np.dot(self.Q, self.max_pos)) + \
+                               np.dot(self.Q, self.max_pos)) + \
             np.dot(self.max_action, np.dot(self.R, self.max_action))
 
         # gym attributes
@@ -62,7 +63,6 @@ class LQG1D(gym.Env):
                                        high=self.max_action,
                                        shape=(1,), dtype=np.float32)
         self.observation_space = spaces.Box(low=-high, high=high,dtype=np.float32)
-
 
         # initialize state
         # self.seed()
@@ -76,9 +76,9 @@ class LQG1D(gym.Env):
         cost = np.dot(self.state,
                       np.dot(self.Q, self.state)) + \
             np.dot(u, np.dot(self.R, u))
-        assert cost>=0
+        assert cost >= 0
 
-        #normalized_cost = cost / self.max_cost * 2 - 1
+        # normalized_cost = cost / self.max_cost * 2 - 1
         normalized_cost = cost
         self.state = np.array(xn.ravel())
         if self.discrete_reward:
@@ -88,12 +88,12 @@ class LQG1D(gym.Env):
 
         return self.get_state(), -np.asscalar(normalized_cost), False, {}
 
-    def reset(self, state=None):
-        if state is None:
-            self.state = np.array([np.random.uniform(low=-self.max_pos,
-                                                          high=self.max_pos)])
+    def reset(self, random_start=None):
+        if random_start is None:
+            self.state = np.array(self.start_state)
         else:
-            self.state = np.array(state)
+            self.state = np.array([np.random.uniform(low=-self.max_pos,
+                                                     high=self.max_pos)])
 
         return self.get_state()
 
@@ -133,9 +133,9 @@ class LQG1D(gym.Env):
             self.track.set_color(0.5, 0.5, 0.5)
             self.viewer.add_geom(self.track)
             zero_line = rendering.Line((screen_width / 2, 0),
+            self.viewer.add_geom(zero_line)
                                        (screen_width / 2, screen_height))
             zero_line.set_color(0.5, 0.5, 0.5)
-            self.viewer.add_geom(zero_line)
 
         x = self.state[0]
         ballx = x * scale + screen_width / 2.0
