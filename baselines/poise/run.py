@@ -176,8 +176,9 @@ def multiple_runs(args):
     # Define range() for floats
     delta = []
     seed = []
-    for i in [n/10 for n in range(1, 3)]:
-        for j in range(1):
+    # for i in [n/10 for n in range(1, 8)]:
+    for i in [0.1, 0.2, 0.3, 0.5, 0.8]:
+        for j in range(3):
             delta.append(i)
             seed.append(j)
 
