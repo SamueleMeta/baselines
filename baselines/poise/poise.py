@@ -461,6 +461,7 @@ def learn(make_env, make_policy, *,
     for i in ["rew", "disc_rew", "mask"]:
         all_seg[i] = np.zeros(max_samples)
 
+    theta = theta_start = get_parameter()
     while True:
         iters_so_far += 1
 
@@ -482,7 +483,6 @@ def learn(make_env, make_policy, *,
         logger.log('********** Iteration %i ************' % iters_so_far)
 
         # Generate trajectories
-        theta = get_parameter()
         with timed('sampling'):
             seg = sampler.collect(theta)
 
@@ -549,17 +549,17 @@ def learn(make_env, make_policy, *,
         line_search = line_search_parabola
         with timed("Optimization"):
             theta, improvement, den_mise_log = \
-                optimize_offline(evaluate_roba, theta, old_thetas_list,
+                optimize_offline(evaluate_roba, theta_start, old_thetas_list,
                                  iters_so_far,
                                  mask_iters, set_parameter,
                                  set_parameter_old, line_search,
                                  evaluate_behav, evaluate_bound,
                                  evaluate_gradient,
                                  max_offline_ite=max_offline_iters)
-        args += (den_mise_log,)
         set_parameter(theta)
 
         # Info
+        args += (den_mise_log,)
         with timed('summaries after'):
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
