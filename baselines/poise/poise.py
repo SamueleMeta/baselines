@@ -392,7 +392,7 @@ def learn(make_env, make_policy, *,
     lrs_is = tf.stack(tf.split(lr_is * mask_, max_iters))
     iw = tf.exp(tf.reduce_sum(lrs_is, axis=1))
     mis = tf.reduce_sum(iw * ep_return)/iter_number_
-    losses_with_name.append((mis, 'MIS'))
+    losses_with_name.append((mis, 'ISE'))
 
     # Renyi divergence
     if bound == 'J':
