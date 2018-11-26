@@ -368,7 +368,6 @@ def learn(make_env, make_policy, *,
                              (tf.reduce_max(miw), 'IWMax'),
                              (tf.reduce_min(miw), 'IWMin')])
 
-    # ToDo: eliminate useless ones
     # Return
     ep_return = tf.reduce_sum(disc_rew_split * mask_split, axis=1)
     return_mean = tf.reduce_sum(ep_return)/iter_number_
@@ -388,6 +387,12 @@ def learn(make_env, make_policy, *,
     # MISE
     mise = tf.reduce_sum(miw * ep_return * mask_iters_)/iter_number_
     losses_with_name.append((mise, 'MISE'))
+    # test MISE = ISE when sampling always from the same distribution
+    lr_is = target_log_pdf - behavioral_log_pdf
+    lrs_is = tf.stack(tf.split(lr_is * mask_, max_iters))
+    iw = tf.exp(tf.reduce_sum(lrs_is, axis=1))
+    mis = tf.reduce_sum(iw * ep_return)/iter_number_
+    losses_with_name.append((mis, 'MIS'))
 
     # Renyi divergence
     if bound == 'J':
@@ -484,10 +489,10 @@ def learn(make_env, make_policy, *,
 
         # Generate trajectories
         with timed('sampling'):
-            seg = sampler.collect(theta)
+            seg = sampler.collect(theta_start)
 
         # Store the list of arrays representing behaviorals' parameters
-        old_thetas_list.append(theta)
+        old_thetas_list.append(theta_start)
 
         # Retrieve data
         add_disc_rew(seg, gamma)

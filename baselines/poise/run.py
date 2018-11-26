@@ -85,10 +85,10 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
                     hid_size=hid_size, num_hid_layers=num_hid_layers,
                     gaussian_fixed_var=True, use_bias=False, use_critic=False,
                     hidden_W_init=tf.constant_initializer(-0.1),
-                    max_mean=None,
-                    min_mean=None,
+                    max_mean=0,
+                    min_mean=-1,
                     max_std=None,
-                    min_std=None,
+                    min_std=0.1,
                     std_init=1)
         else:
             def make_policy(name, ob_space, ac_space):

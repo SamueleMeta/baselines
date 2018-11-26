@@ -17,7 +17,7 @@ def read_data(path, iters=None, default_batchsize=100, scale='Eps'):
     if iters: df = df.loc[:iters, :]
     if not 'BatchSize' in df: df['BatchSize'] = default_batchsize
     if not 'AvgRet' in df: df['AvgRet'] = df['AverageReturn']
-    if not 'EpsThisIter' in df: df['EpsThisIter'] = df['BatchSize'] 
+    if not 'EpsThisIter' in df: df['EpsThisIter'] = df['BatchSize']
     df['EpsSoFar'] = np.cumsum(df['EpsThisIter'])
     if 'SamplesThisIter' in df: df['SamplesSoFar'] = np.cumsum(df['SamplesThisIter'])
     df['CumAvgRet'] = np.cumsum(df['AvgRet']*df[scale+'ThisIter'])/np.sum(df[scale+'ThisIter'])
@@ -87,7 +87,7 @@ def print_ci(dfs, conf=0.95, key='CumAvgRet'):
     std = std_df[key][len(mean_df)-1]
     interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
     print('%f \u00B1 %f\t[%f, %f]\t total horizon: %d' % (mean, std, interval[0], interval[1], int(total_horizon)))
-    
+
 def save_ci(dfs, conf=0.95, key='AvgRet', ylim=None, scale='Eps', horizon=500, filename='prova.csv'):
     n_runs = len(dfs)
     mean_df, std_df = moments(dfs)
