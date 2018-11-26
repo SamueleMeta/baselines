@@ -489,10 +489,10 @@ def learn(make_env, make_policy, *,
 
         # Generate trajectories
         with timed('sampling'):
-            seg = sampler.collect(theta_start)
+            seg = sampler.collect(theta)
 
         # Store the list of arrays representing behaviorals' parameters
-        old_thetas_list.append(theta_start)
+        old_thetas_list.append(theta)
 
         # Retrieve data
         add_disc_rew(seg, gamma)
