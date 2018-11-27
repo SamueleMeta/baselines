@@ -91,7 +91,7 @@ def train(env, policy, horizon, seed, bounded_policy,
                     min_mean=-1,
                     max_std=None,
                     min_std=0.1,
-                    std_init=1)
+                    std_init=0.1)
         else:
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicy(
