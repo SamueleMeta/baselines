@@ -20,7 +20,7 @@ class MlpPolicyBounded(object):
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
               max_mean=None, min_mean=None, max_std=None, min_std=None,
-              gaussian_fixed_var=True, use_bias=True, use_critic=True,
+              gaussian_fixed_var=True, trainable_var=True, use_bias=True, use_critic=True,
               seed=None, hidden_W_init=U.normc_initializer(1.0),
               std_init = 1):
         """Params:
@@ -113,7 +113,8 @@ class MlpPolicyBounded(object):
                                                                             logstd_range/2. -
                                                                             np.log(max_std))))
                 std_param = tf.get_variable(name="std_param", shape=[1, pdtype.param_shape()[0]//2],
-                                                                     initializer=std_param_initializer)
+                                                                     initializer=std_param_initializer,
+                                                                     trainable=trainable_var)
                 logstd = tf.nn.tanh(std_param)
                 logstd = logstd * logstd_range/2.
                 logstd = self.logstd = tf.add(logstd, - logstd_range/2 + np.log(max_std), name="pol_logstd")

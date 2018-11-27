@@ -38,7 +38,8 @@ def get_env_type(env_id):
     return env_type
 
 
-def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
+def train(env, policy, horizon, seed, bounded_policy,
+          trainable_var, njobs=1, **alg_args):
 
     # Prepare environment maker
     if env.startswith('rllab.'):
@@ -83,7 +84,8 @@ def train(env, policy, horizon, seed, bounded_policy, njobs=1, **alg_args):
                 return MlpPolicyBounded(
                     name=name, ob_space=ob_space, ac_space=ac_space,
                     hid_size=hid_size, num_hid_layers=num_hid_layers,
-                    gaussian_fixed_var=True, use_bias=False, use_critic=False,
+                    gaussian_fixed_var=True, trainable_var=trainable_var,
+                    use_bias=False, use_critic=False,
                     hidden_W_init=tf.constant_initializer(-0.1),
                     max_mean=0,
                     min_mean=-1,
@@ -159,6 +161,7 @@ def single_run(args, delta=None, seed=None):
           horizon=args.horizon,
           seed=args.seed,
           bounded_policy=args.bounded_policy,
+          trainable_var=args.trainable_var,
           njobs=args.njobs,
           iw_norm=args.iw_norm,
           delta=args.delta,
@@ -219,6 +222,7 @@ def main(args):
     parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
     add_bool_arg(parser, 'bounded_policy', default=True)
+    add_bool_arg(parser, 'trainable_var', default=True)
     add_bool_arg(parser, 'experiment', default=False)
     args = parser.parse_args(args)
 
