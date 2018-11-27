@@ -22,7 +22,7 @@ class MlpPolicyBounded(object):
               max_mean=None, min_mean=None, max_std=None, min_std=None,
               gaussian_fixed_var=True, trainable_var=True, use_bias=True, use_critic=True,
               seed=None, hidden_W_init=U.normc_initializer(1.0),
-              std_init = 1):
+              std_init = 1, gain_init=None):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -99,6 +99,12 @@ class MlpPolicyBounded(object):
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
                 #Bounded mean
                 mu_range = max_mean - min_mean
+                if gain_init is not None:
+                    std_param_initializer = tf.constant_initializer(np.arctanh(2./mu_range*
+                                                                           (gain_init +
+                                                                            mu_range/2. -
+                                                                            max_mean)))
+                
                 mean = mean = tf.nn.tanh(tf.layers.dense(last_out,
                                                      pdtype.param_shape()[0]//2,
                                                      kernel_initializer=hidden_W_init,

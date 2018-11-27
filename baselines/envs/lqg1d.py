@@ -51,6 +51,7 @@ class LQG1D(gym.Env):
         self.B = np.array([1]).reshape((1, 1))
         self.Q = np.array([0.9]).reshape((1, 1))
         self.R = np.array([0.9]).reshape((1, 1))
+        
 
         self.max_cost = np.dot(self.max_pos,
                                np.dot(self.Q, self.max_pos)) + \
@@ -78,15 +79,15 @@ class LQG1D(gym.Env):
             np.dot(u, np.dot(self.R, u))
         assert cost >= 0
 
-        # normalized_cost = cost / self.max_cost * 2 - 1
-        normalized_cost = cost
+        normalized_cost = cost / self.max_cost
+        #normalized_cost = cost
         self.state = np.array(xn.ravel())
         if self.discrete_reward:
             if abs(self.state[0]) <= 2 and abs(u) <= 2:
                 return self.get_state(), 0, False, {}
             return self.get_state(), -1, False, {}
 
-        return self.get_state(), -np.asscalar(normalized_cost), False, {}
+        return self.get_state(), 1 - np.asscalar(normalized_cost), False, {}
 
     def reset(self, random_start=None):
         if random_start is None:
