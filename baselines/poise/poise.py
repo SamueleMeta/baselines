@@ -293,8 +293,6 @@ def learn(make_env, make_policy, *,
     env = make_env()
     ob_space = env.observation_space
     ac_space = env.action_space
-    print('ob_space.shape:', list(ob_space.shape))
-    print('ac_space.shape:', list(ac_space.shape))
     max_samples = horizon * max_iters
 
     # Build the policy
