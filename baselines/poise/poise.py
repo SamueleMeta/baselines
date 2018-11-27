@@ -152,7 +152,7 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
         bound = evaluate_bound(den_mise)
 
         if np.isnan(bound):
-            warnings.warn('Got NaN bound value: rolling back!')
+            print('Got NaN bound value: rolling back!')
             return theta_old, epsilon_old, 0, i + 1
 
         delta_bound = bound - bound_init
@@ -171,7 +171,7 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def optimize_offline(evaluate_roba, theta, old_thetas_list, iters_so_far,
+def optimize_offline(evaluate_roba, theta_init, old_thetas_list, iters_so_far,
                      mask_iters,
                      set_parameter, set_parameter_old,
                      line_search, evaluate_behav, evaluate_bound,
@@ -198,7 +198,7 @@ def optimize_offline(evaluate_roba, theta, old_thetas_list, iters_so_far,
                       'gradient norm', 'delta bound ite', 'delta bound tot'))
 
     # Optimization loop
-    theta_old = theta
+    theta = theta_old = theta_init
     improvement = improvement_old = 0.
     set_parameter(theta)
 
@@ -213,12 +213,12 @@ def optimize_offline(evaluate_roba, theta, old_thetas_list, iters_so_far,
         gradient = evaluate_gradient(den_mise_log)
 
         if np.any(np.isnan(gradient)):
-            warnings.warn('Got NaN gradient! Stopping!')
+            print('Got NaN gradient! Stopping!')
             set_parameter(theta_old)
             return theta_old, improvement, den_mise_log
 
         if np.isnan(bound):
-            warnings.warn('Got NaN bound! Stopping!')
+            print('Got NaN bound! Stopping!')
             set_parameter(theta_old)
             return theta_old, improvement_old, den_mise_log
 
@@ -230,17 +230,20 @@ def optimize_offline(evaluate_roba, theta, old_thetas_list, iters_so_far,
 
         alpha = 1. / gradient_norm ** 2
 
+        # print('............before line search............')
         theta_old = theta
         improvement_old = improvement
         theta, epsilon, delta_bound, num_line_search = \
             line_search(den_mise_log, theta, alpha, gradient,
-                        set_parameter, evaluate_bound)
+                        set_parameter, evaluate_bound, bound_tol)
         set_parameter(theta)
+        # print('............after line search............')
 
         improvement += delta_bound
         print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search,
                         gradient_norm, delta_bound, improvement))
 
+    print('Max number of offline iterations reached.')
     return theta, improvement, den_mise_log
 
 
@@ -386,11 +389,11 @@ def learn(make_env, make_policy, *,
     mise = tf.reduce_sum(miw * ep_return * mask_iters_)/iter_number_
     losses_with_name.append((mise, 'MISE'))
     # test MISE = ISE when sampling always from the same distribution
-    lr_is = target_log_pdf - behavioral_log_pdf
-    lrs_is = tf.stack(tf.split(lr_is * mask_, max_iters))
-    iw = tf.exp(tf.reduce_sum(lrs_is, axis=1))
-    mis = tf.reduce_sum(iw * ep_return)/iter_number_
-    losses_with_name.append((mis, 'ISE'))
+    # lr_is = target_log_pdf - behavioral_log_pdf
+    # lrs_is = tf.stack(tf.split(lr_is * mask_, max_iters))
+    # iw = tf.exp(tf.reduce_sum(lrs_is, axis=1))
+    # mis = tf.reduce_sum(iw * ep_return)/iter_number_
+    # losses_with_name.append((mis, 'ISE'))
 
     # Renyi divergence
     if bound == 'J':

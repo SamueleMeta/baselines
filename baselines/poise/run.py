@@ -91,7 +91,7 @@ def train(env, policy, horizon, seed, bounded_policy,
                     min_mean=-1,
                     max_std=None,
                     min_std=0.1,
-                    std_init=0.1)
+                    std_init=0.11)  # added 0.01 to avoid warning
         else:
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicy(
@@ -163,7 +163,6 @@ def single_run(args, delta=None, seed=None):
           bounded_policy=args.bounded_policy,
           trainable_var=args.trainable_var,
           njobs=args.njobs,
-          iw_norm=args.iw_norm,
           delta=args.delta,
           gamma=args.gamma,
           max_offline_iters=args.max_offline_iters,
@@ -211,10 +210,10 @@ def main(args):
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--env', type=str, default='LQG1D-v0')
     parser.add_argument('--horizon', type=int, default=20)
-    parser.add_argument('--iw_norm', type=str, default='none')
+    parser.add_argument('--bound', type=str, default='max-ess')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
-    parser.add_argument('--delta', type=float, default=0.3)
+    parser.add_argument('--delta', type=float, default=0.2)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=1000)
