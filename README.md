@@ -1,5 +1,3 @@
-<img src="data/logo.jpg" width=25% align="right" />
-
 # Baselines with POIS
 
 This repository contains the implementation of the [POIS algorithm](https://arxiv.org/abs/1809.06098).
