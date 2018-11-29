@@ -20,7 +20,7 @@ class MlpPolicyBounded(object):
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
               max_mean=None, min_mean=None, max_std=None, min_std=None,
-              gaussian_fixed_var=True, trainable_var=True, use_bias=True, use_critic=True,
+              gaussian_fixed_var=True, trainable_std=True, use_bias=True, use_critic=True,
               seed=None, hidden_W_init=U.normc_initializer(1.0),
               std_init = 1, gain_init=None):
         """Params:
@@ -100,14 +100,14 @@ class MlpPolicyBounded(object):
                 #Bounded mean
                 mu_range = max_mean - min_mean
                 if gain_init is not None:
-                    std_param_initializer = tf.constant_initializer(np.arctanh(2./mu_range*
+                    mean_param_initializer = tf.constant_initializer(np.arctanh(2./mu_range*
                                                                            (gain_init +
                                                                             mu_range/2. -
                                                                             max_mean)))
-                
+
                 mean = mean = tf.nn.tanh(tf.layers.dense(last_out,
                                                      pdtype.param_shape()[0]//2,
-                                                     kernel_initializer=hidden_W_init,
+                                                     kernel_initializer=mean_param_initializer,
                                                      use_bias=use_bias))
                 mean = mean * mu_range/2.
                 self.mean = mean = tf.add(mean, - mu_range/2 + max_mean, name='final')
@@ -120,7 +120,7 @@ class MlpPolicyBounded(object):
                                                                             np.log(max_std))))
                 std_param = tf.get_variable(name="std_param", shape=[1, pdtype.param_shape()[0]//2],
                                                                      initializer=std_param_initializer,
-                                                                     trainable=trainable_var)
+                                                                     trainable=trainable_std)
                 logstd = tf.nn.tanh(std_param)
                 logstd = logstd * logstd_range/2.
                 logstd = self.logstd = tf.add(logstd, - logstd_range/2 + np.log(max_std), name="pol_logstd")

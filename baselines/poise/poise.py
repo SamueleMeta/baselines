@@ -1,4 +1,5 @@
 import numpy as np
+from copy import deepcopy
 import warnings
 import baselines.common.tf_util as U
 import tensorflow as tf
@@ -136,12 +137,13 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
 
 
 def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
-                         set_parameter, evaluate_bound, delta_bound_tol=1e-4,
+                         set_parameter, evaluate_bound, delta_theta,
+                         iters_so_far, delta_bound_tol=1e-4,
                          max_line_search_ite=30):
     epsilon = 1.
     epsilon_old = 0.
     delta_bound_old = -np.inf
-    bound_init = evaluate_bound(den_mise)
+    bound_init, _, _, _, _ = evaluate_bound(den_mise)
     theta_old = theta_init
 
     for i in range(max_line_search_ite):
@@ -149,7 +151,7 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
         theta = theta_init + epsilon * alpha * natural_gradient
         set_parameter(theta)
 
-        bound = evaluate_bound(den_mise)
+        bound, _, _, _, _ = evaluate_bound(den_mise)
 
         if np.isnan(bound):
             print('Got NaN bound value: rolling back!')
@@ -171,8 +173,8 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def optimize_offline(evaluate_roba, theta_init, old_thetas_list, iters_so_far,
-                     mask_iters,
+def optimize_offline(evaluate_roba, theta_init, delta_theta, old_thetas_list,
+                     iters_so_far, mask_iters,
                      set_parameter, set_parameter_old,
                      line_search, evaluate_behav, evaluate_bound,
                      evaluate_gradient, evaluate_natural_gradient=None,
@@ -183,6 +185,7 @@ def optimize_offline(evaluate_roba, theta_init, old_thetas_list, iters_so_far,
     for i in range(len(old_thetas_list)):
         set_parameter_old(old_thetas_list[i])
         behav = evaluate_behav()
+        # print('behavioral', behav[0:10])
         den_mise += np.exp(behav).astype(np.float32)
 
     # Compute log of MISE's denominator
@@ -192,35 +195,37 @@ def optimize_offline(evaluate_roba, theta_init, old_thetas_list, iters_so_far,
     # print('len den_mise=', len(den_mise))
 
     # Print infos about optimization loop
-    fmtstr = '%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g'
-    titlestr = '%6s %10s %10s %18s %18s %18s %18s'
-    print(titlestr % ('iter', 'epsilon', 'step size', 'num line search',
-                      'gradient norm', 'delta bound ite', 'delta bound tot'))
+    fmtstr = '%6i %10.3g %18.3g %18.3g %18.3g'
+    titlestr = '%6s %10s %18s %18s %18s'
+    print(titlestr % ('iter', 'step size', 'gradient norm',
+                      'delta bound ite', 'delta bound tot'))
 
     # Optimization loop
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
     set_parameter(theta)
+    bound, target_sum_log_mean, miw_1, miw, mise = evaluate_bound(den_mise_log)
+    bound_old = bound
+
 
     for i in range(max_offline_ite):
         # miw, ep_return = evaluate_roba(den_mise_log)
         # print('ep_return =', ep_return)
         # print('miw =', miw)
         # print('miw*ep_return', np.sum(miw*ep_return))
-
-        bound = evaluate_bound(den_mise_log)
-        # print('bound', bound)
         gradient = evaluate_gradient(den_mise_log)
+
+        # print('target_sum_log_mean', target_sum_log_mean)
+        # print('den_mise_log_mean', np.sum(den_mise)/iters_so_far)
+        # print('miw_1', miw_1)
+        # print('mise', mise)
+        # print('bound', bound)
+        # print('miw', miw)
 
         if np.any(np.isnan(gradient)):
             print('Got NaN gradient! Stopping!')
             set_parameter(theta_old)
             return theta_old, improvement, den_mise_log
-
-        if np.isnan(bound):
-            print('Got NaN bound! Stopping!')
-            set_parameter(theta_old)
-            return theta_old, improvement_old, den_mise_log
 
         gradient_norm = np.sqrt(np.dot(gradient, gradient))
 
@@ -228,20 +233,35 @@ def optimize_offline(evaluate_roba, theta_init, old_thetas_list, iters_so_far,
             print('stopping - gradient norm < gradient_tol')
             return theta, improvement, den_mise_log
 
-        alpha = 1. / gradient_norm ** 2
-
-        # print('............before line search............')
-        theta_old = theta
+        # Set step size
+        delta_theta = delta_theta
+        alpha = delta_theta / gradient_norm ** 2
+        # Save old values
+        theta_old = deepcopy(theta)
         improvement_old = improvement
-        theta, epsilon, delta_bound, num_line_search = \
-            line_search(den_mise_log, theta, alpha, gradient,
-                        set_parameter, evaluate_bound, bound_tol)
+        # Make an optimization step
+        print('theta_old', theta_old)
+        theta += alpha*gradient
+        print('theta', theta)
+        # theta, epsilon, delta_bound, num_line_search = \
+        #     line_search(den_mise_log, theta, alpha, gradient,
+        #                 set_parameter, evaluate_bound, iters_so_far, bound_tol)
         set_parameter(theta)
-        # print('............after line search............')
 
+        bound, target_sum_log_mean, miw_1, miw, mise = evaluate_bound(den_mise_log)
+
+        if np.isnan(bound):
+            print('Got NaN bound! Stopping!')
+            set_parameter(theta_old)
+            print('theta', theta)
+            print('theta_old', theta_old)
+            return theta_old, improvement_old, den_mise_log
+
+        delta_bound = bound - bound_old
         improvement += delta_bound
-        print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search,
-                        gradient_norm, delta_bound, improvement))
+        bound_old = bound
+
+        print(fmtstr % (i+1, alpha, gradient_norm, delta_bound, improvement))
 
     print('Max number of offline iterations reached.')
     return theta, improvement, den_mise_log
@@ -270,6 +290,7 @@ def render(env, pi, horizon):
 def learn(make_env, make_policy, *,
           max_iters,
           horizon,
+          delta_theta,
           delta,
           gamma,
           sampler=None,
@@ -349,6 +370,7 @@ def learn(make_env, make_policy, *,
     # Multiple importance weights computation
     # nb: the sum behaviorals' logs is centered for avoiding numerical problems
     target_sum_log = tf.reduce_sum(target_log_pdf_split, axis=1)
+    target_sum_log_mean = tf.reduce_sum(target_sum_log)/iter_number_
     behavioral_sum_log = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
     behavioral_sum_log_mean = tf.reduce_sum(behavioral_sum_log)/iter_number_
     behavioral_sum_log_centered = \
@@ -359,7 +381,7 @@ def learn(make_env, make_policy, *,
 
     den_mise_log_mean = tf.reduce_sum(den_mise_log_)/iter_number_
     den_mise_log_last = den_mise_log_[iter_number_int-1]
-    losses_with_name.extend([(behavioral_sum_log_mean, 'BehavSumLogMean'),
+    losses_with_name.extend([(target_sum_log_mean, 'target_sum_log_mean'),
                              (den_mise_log_mean, 'DenMISEMeanLog'),
                              (den_mise_log_[0], 'DenMISELogFirst'),
                              (den_mise_log_last, 'DenMISELogLast'),
@@ -395,10 +417,12 @@ def learn(make_env, make_policy, *,
     # mis = tf.reduce_sum(iw * ep_return)/iter_number_
     # losses_with_name.append((mis, 'ISE'))
 
-    # Renyi divergence
+    # Bounds
     if bound == 'J':
         bound_ = mise
     elif bound == 'max-ess':
+        eps = 1e-10
+        miw_ess = (tf.exp(log_ratio_split) + eps) * mask_iters_
         miw_1 = tf.log(tf.linalg.norm(miw, 1))
         miw_2 = tf.log(tf.linalg.norm(miw, 2))
         sqrt_ess_classic = tf.exp(miw_1 - miw_2)
@@ -431,7 +455,7 @@ def learn(make_env, make_policy, *,
         miw, updates=None, givens=None)
     compute_bound = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_,
-         mask_iters_, den_mise_log_], [bound_, assert_ops, print_ops])
+         mask_iters_, den_mise_log_], [bound_, target_sum_log_mean, miw_1, miw, mise, assert_ops, print_ops])
     compute_grad = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, mask_iters_,
          den_mise_log_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
@@ -468,6 +492,7 @@ def learn(make_env, make_policy, *,
         all_seg[i] = np.zeros(max_samples)
 
     theta = theta_start = get_parameter()
+    print('Optimization of the %s bound' % (bound))
     while True:
         iters_so_far += 1
 
@@ -541,7 +566,7 @@ def learn(make_env, make_policy, *,
 
         def evaluate_bound(den_mise_log):
             args_bound = args + (den_mise_log,)
-            return compute_bound(*args_bound)[0]
+            return compute_bound(*args_bound)[0:5]
 
         def evaluate_gradient(den_mise_log):
             args_gradient = args + (den_mise_log,)
@@ -555,7 +580,7 @@ def learn(make_env, make_policy, *,
         line_search = line_search_parabola
         with timed("Optimization"):
             theta, improvement, den_mise_log = \
-                optimize_offline(evaluate_roba, theta_start, old_thetas_list,
+                optimize_offline(evaluate_roba, theta, old_thetas_list,
                                  iters_so_far,
                                  mask_iters, set_parameter,
                                  set_parameter_old, line_search,

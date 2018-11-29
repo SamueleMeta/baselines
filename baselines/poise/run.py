@@ -39,7 +39,7 @@ def get_env_type(env_id):
 
 
 def train(env, policy, horizon, seed, bounded_policy,
-          trainable_var, njobs=1, **alg_args):
+          trainable_std, njobs=1, **alg_args):
 
     # Prepare environment maker
     if env.startswith('rllab.'):
@@ -80,20 +80,22 @@ def train(env, policy, horizon, seed, bounded_policy,
 
     if policy == 'linear' or policy == 'nn':
         if bounded_policy:
+            print('Bounded policy with trainable_std=', trainable_std)
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicyBounded(
                     name=name, ob_space=ob_space, ac_space=ac_space,
                     hid_size=hid_size, num_hid_layers=num_hid_layers,
-                    gaussian_fixed_var=True, trainable_var=trainable_var,
+                    gaussian_fixed_var=True, trainable_std=trainable_std,
                     use_bias=False, use_critic=False,
                     #hidden_W_init=tf.constant_initializer(1.1),
-                    gain_init = -0.1,
+                    gain_init = -0.3,
                     max_mean=0,
                     min_mean=-1,
                     max_std=None,
                     min_std=0.1,
                     std_init=0.11)  # added 0.01 to avoid warning
         else:
+            print('Unbounded policy')
             def make_policy(name, ob_space, ac_space):
                 return MlpPolicy(
                     name=name, ob_space=ob_space, ac_space=ac_space,
@@ -132,7 +134,7 @@ def train(env, policy, horizon, seed, bounded_policy,
     # sampler.close()
 
 
-def single_run(args, delta=None, seed=None):
+def single_run(args, delta_theta=None, delta=None, seed=None):
 
     # Import custom envs
     import baselines.envs.lqg1d  # registered at import as gym env
@@ -142,14 +144,21 @@ def single_run(args, delta=None, seed=None):
         args.delta = delta
     if seed:
         args.seed = seed
+    if delta_theta:
+        args.delta_theta = delta_theta
 
     # Log file name
+    t = time.localtime(time.time())
+    tt = int(str(time.time())[-5:])
+    time_str = '%s-%s-%s_%s%s%s_%s' % (
+        t.tm_hour, t.tm_min, t.tm_sec, t.tm_mday, t.tm_mon, t.tm_year, tt)
+    args_str = '%s_delta=%s_seed=%s_dtheta=%s' % (
+        args.env.upper(), args.delta, args.seed, args.delta_theta)
+
     if args.file_name == 'progress':
-        file_name = '%s_delta=%s_seed=%s_%s' % (
-            args.env.upper(), args.delta, args.seed, time.time())
+        file_name = args_str + '_' + time_str
     else:
-        file_name = args.file_name + '_%s_delta=%s_seed=%s_%s' % (
-            args.env.upper(), args.delta, args.seed, time.time())
+        file_name = args.file_name + '_' + args_str + '_' + time_str
 
     # Configure logger
     logger.configure(dir=args.logdir,
@@ -162,9 +171,11 @@ def single_run(args, delta=None, seed=None):
           horizon=args.horizon,
           seed=args.seed,
           bounded_policy=args.bounded_policy,
-          trainable_var=args.trainable_var,
+          trainable_std=args.trainable_std,
           njobs=args.njobs,
+          bound=args.bound,
           delta=args.delta,
+          delta_theta=args.delta_theta,
           gamma=args.gamma,
           max_offline_iters=args.max_offline_iters,
           max_iters=args.max_iters,
@@ -177,18 +188,23 @@ def multiple_runs(args):
     from joblib import Parallel, delayed
 
     # Define range() for floats
+    delta_theta = []
     delta = []
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
-    for i in [0.1, 0.2, 0.3, 0.99]:
-        for j in range(3):
-            delta.append(i)
-            seed.append(j)
+    for k in [1., 0.1, 0.01]:
+        for i in [0.1, 0.2, 0.3, 0.99]:
+            for j in range(3):
+                delta_theta.append(k)
+                delta.append(i)
+                seed.append(j)
 
     # Parallelize single runs
+    print('WAAAAAAAAAAAAAAAAAAAAAAAAAAa', list(zip(zip(delta_theta, delta), seed)))
     n_jobs = len(delta)
     Parallel(n_jobs=n_jobs)(delayed(single_run)(
         args,
+        delta_theta[i],
         delta[i],
         seed[i]
         ) for i in range(n_jobs))
@@ -215,6 +231,7 @@ def main(args):
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--delta', type=float, default=0.2)
+    parser.add_argument('--delta_theta', type=float, default=1)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=1000)
@@ -222,7 +239,7 @@ def main(args):
     parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
     add_bool_arg(parser, 'bounded_policy', default=True)
-    add_bool_arg(parser, 'trainable_var', default=True)
+    add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'experiment', default=False)
     args = parser.parse_args(args)
 

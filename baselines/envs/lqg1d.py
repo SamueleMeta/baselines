@@ -51,7 +51,7 @@ class LQG1D(gym.Env):
         self.B = np.array([1]).reshape((1, 1))
         self.Q = np.array([0.9]).reshape((1, 1))
         self.R = np.array([0.9]).reshape((1, 1))
-        
+
 
         self.max_cost = np.dot(self.max_pos,
                                np.dot(self.Q, self.max_pos)) + \
