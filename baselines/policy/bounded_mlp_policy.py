@@ -7,11 +7,13 @@ import numpy as np
 import scipy.stats as sts
 #import time
 
+
 class MlpPolicyBounded(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""
     recurrent = False
+
     def __init__(self, name, *args, **kwargs):
-        #with tf.device('/cpu:0'):
+        # with tf.device('/cpu:0'):
         with tf.variable_scope(name):
             self._init(*args, **kwargs)
             U.initialize()
@@ -20,9 +22,10 @@ class MlpPolicyBounded(object):
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
               max_mean=None, min_mean=None, max_std=None, min_std=None,
-              gaussian_fixed_var=True, trainable_std=True, use_bias=True, use_critic=True,
-              seed=None, hidden_W_init=U.normc_initializer(1.0),
-              std_init = 1, gain_init=None):
+              gaussian_fixed_var=True, trainable_std=True, use_bias=True,
+              use_critic=True, seed=None,
+              hidden_W_init=U.normc_initializer(1.0),
+              std_init=1, gain_init=None):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -47,14 +50,18 @@ class MlpPolicyBounded(object):
         if seed is not None:
             tf.set_random_seed(seed)
 
-        #Boundaries
-        #Default values
-        if max_mean == None: max_mean = ob_space.high
-        if min_mean == None: min_mean = ob_space.low
-        if min_std == None: min_std = std_init/np.sqrt(2)
-        if max_std == None: max_std = np.sqrt(2) * std_init
+        # Boundaries
+        # Default values
+        if max_mean is None:
+            max_mean = ob_space.high
+        if min_mean is None:
+            min_mean = ob_space.low
+        if min_std is None:
+            min_std = std_init/np.sqrt(2)
+        if max_std is None:
+            max_std = np.sqrt(2) * std_init
 
-        #Illegal values
+        # Illegal values
         if(max_mean <= min_mean):
             raise ValueError("max_mean should be greater than min_mean!")
         if(min_std <= 0):
@@ -70,60 +77,70 @@ class MlpPolicyBounded(object):
         self.min_std = min_std
         self.std_init = std_init
 
-
         self.pdtype = pdtype = make_pdtype(ac_space)
         sequence_length = None
-        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[sequence_length] + list(ob_space.shape))
+        ob = U.get_placeholder(name="ob", dtype=tf.float32,
+                               shape=[sequence_length] + list(ob_space.shape))
 
         with tf.variable_scope("obfilter"):
             self.ob_rms = RunningMeanStd(shape=ob_space.shape)
 
-        #Critic
+        # Critic
         if use_critic:
             with tf.variable_scope('vf'):
-                obz = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
+                obz = tf.clip_by_value(
+                    (ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
                 last_out = obz
                 for i in range(num_hid_layers):
-                    last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size[i], name="fc%i"%(i+1), kernel_initializer=hidden_W_init))
-                self.vpred = tf.layers.dense(last_out, 1, name='final', kernel_initializer=hidden_W_init)[:,0]
+                    last_out = tf.nn.tanh(
+                        tf.layers.dense(
+                            last_out, hid_size[i],
+                            name="fc%i" % (i+1),
+                            kernel_initializer=hidden_W_init))
+                self.vpred = tf.layers.dense(
+                    last_out, 1, name='final',
+                    kernel_initializer=hidden_W_init)[:, 0]
 
-        #Actor
+        # Actor
         with tf.variable_scope('pol'):
-            last_out = tf.clip_by_value((ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
+            last_out = tf.clip_by_value(
+                (ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
             for i in range(num_hid_layers):
-                last_out = tf.nn.tanh(tf.layers.dense(last_out,
-                                                          hid_size[i],
-                                                          name='fc%i'%(i+1),
-                                                          kernel_initializer=hidden_W_init,
-                                                          use_bias=use_bias))
+                last_out = tf.nn.tanh(
+                    tf.layers.dense(last_out,
+                                    hid_size[i],
+                                    name='fc%i'%(i+1),
+                                    kernel_initializer=hidden_W_init,
+                                    use_bias=use_bias))
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
-                #Bounded mean
+                # Bounded mean
                 mu_range = max_mean - min_mean
                 if gain_init is not None:
-                    mean_param_initializer = tf.constant_initializer(np.arctanh(2./mu_range*
-                                                                           (gain_init +
-                                                                            mu_range/2. -
-                                                                            max_mean)))
-
-                mean = mean = tf.nn.tanh(tf.layers.dense(last_out,
-                                                     pdtype.param_shape()[0]//2,
-                                                     kernel_initializer=mean_param_initializer,
-                                                     use_bias=use_bias))
+                    mean_initializer = tf.constant_initializer(
+                        np.arctanh(2./mu_range * (gain_init + mu_range/2. - max_mean)))
+                    mean = mean = tf.nn.tanh(
+                        tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
+                                        kernel_initializer=mean_initializer,
+                                        use_bias=use_bias))
                 mean = mean * mu_range/2.
                 self.mean = mean = tf.add(mean, - mu_range/2 + max_mean, name='final')
 
-                #Bounded std
+                # Bounded std
                 logstd_range = np.log(max_std) - np.log(min_std)
-                std_param_initializer = tf.constant_initializer(np.arctanh(2./logstd_range*
-                                                                           (np.log(std_init) +
-                                                                            logstd_range/2. -
-                                                                            np.log(max_std))))
-                std_param = tf.get_variable(name="std_param", shape=[1, pdtype.param_shape()[0]//2],
-                                                                     initializer=std_param_initializer,
-                                                                     trainable=trainable_std)
+                std_param_initializer = tf.constant_initializer(
+                    np.arctanh(2./logstd_range * (np.log(std_init)
+                                                  + logstd_range/2.
+                                                  - np.log(max_std))))
+                std_param = tf.get_variable(
+                    name="std_param", shape=[1, pdtype.param_shape()[0]//2],
+                    initializer=std_param_initializer,
+                    trainable=trainable_std)
                 logstd = tf.nn.tanh(std_param)
                 logstd = logstd * logstd_range/2.
-                logstd = self.logstd = tf.add(logstd, - logstd_range/2 + np.log(max_std), name="pol_logstd")
+                logstd = self.logstd = tf.add(logstd,
+                                              - logstd_range/2
+                                              + np.log(max_std),
+                                              name="pol_logstd")
                 self.logstd = logstd
 
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
@@ -135,7 +152,7 @@ class MlpPolicyBounded(object):
                                           kernel_initializer=output_W_init)
                 """
 
-        #Acting
+        # Acting
         self.pd = pdtype.pdfromflat(pdparam)
         self.state_in = []
         self.state_out = []
@@ -146,7 +163,7 @@ class MlpPolicyBounded(object):
         else:
             self._act = U.function([stochastic, ob], [ac, tf.zeros(1)])
 
-        #Evaluating
+        # Evaluating
         self.ob = ob
         self.ac_in = U.get_placeholder(name="ac_in", dtype=ac_space.dtype,
                                        shape=[sequence_length] +
@@ -159,7 +176,7 @@ class MlpPolicyBounded(object):
         self._get_mean = U.function([ob], [self.mean])
         self._get_std = U.function([], [tf.exp(self.logstd)])
 
-        #Fisher
+        # Fisher
         with tf.variable_scope('pol') as vs:
             self.weights = weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
@@ -168,10 +185,10 @@ class MlpPolicyBounded(object):
         self.score = score = U.flatgrad(self.logprobs, weights) # \nabla\log p(\tau)
         self.fisher = tf.einsum('i,j->ij', score, score)
 
-        #Performance graph initializations
+        # Performance graph initializations
         self._setting = []
 
-    #Acting
+    # Acting
     def act(self, stochastic, ob):
         """
         Actions sampled from the policy
@@ -188,16 +205,14 @@ class MlpPolicyBounded(object):
             ac1, vpred1 = ac1[0], vpred1[0]
         return ac1, vpred1
 
-    #Distribution parameters
+    # Distribution parameters
     def eval_mean(self, ob):
         return self._get_mean(ob)[0]
 
     def eval_std(self):
         return self._get_std()[0]
 
-
-
-    #Divergence
+    # Divergence
     def eval_renyi(self, states, other, order=2):
         """Exponentiated Renyi divergence exp(Renyi(self, other)) for each state
 
@@ -221,8 +236,7 @@ class MlpPolicyBounded(object):
         fun = U.function([self.ob],[e_renyi])
         return fun(states)[0]
 
-
-    #Performance evaluation
+    # Performance evaluation
     def eval_J(self, states, actions, rewards, lens_or_batch_size=1, horizon=None, gamma=.99, behavioral=None, per_decision=False,
                    normalize=False, truncate_at=np.infty):
         """
@@ -239,14 +253,14 @@ class MlpPolicyBounded(object):
         Returns:
             sample variance of episodic performance Var_J_hat,
         """
-        #Prepare data
+        # Prepare data
         batch_size, horizon, _states, _actions, _rewards, _mask = self._prepare_data(states, actions, rewards, lens_or_batch_size, horizon)
 
-        #Build performance evaluation graph (lazy)
+        # Build performance evaluation graph (lazy)
         assert horizon>0 and batch_size>0
         self._build(batch_size, horizon, behavioral, per_decision, normalize, truncate_at)
 
-        #Evaluate performance stats
+        # Evaluate performance stats
         result = self._get_avg_J(_states, _actions, _rewards, gamma, _mask)[0]
         return np.asscalar(result)
 
@@ -622,3 +636,125 @@ class MlpPolicyBounded(object):
         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)
     def get_initial_state(self):
         return []
+
+
+def set_script_test(env, policy, horizon, seed, bounded_policy, trainable_std,
+                    gain_init, max_mean, min_mean, max_std, min_std, std_init):
+
+    # Common imports
+    import sys, re, os, time, logging
+    from collections import defaultdict
+    # Framework imports
+    import gym
+    import tensorflow as tf
+    # Self imports: utils
+    from baselines.common import set_global_seeds
+    from baselines import logger
+    import baselines.common.tf_util as U
+    from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
+    from baselines.common.atari_wrappers import make_atari, wrap_deepmind
+    # Import custom envs
+    import baselines.envs.lqg1d  # registered at import as gym env
+
+
+    def get_env_type(env_id):
+        # First load all envs
+        _game_envs = defaultdict(set)
+        for env in gym.envs.registry.all():
+            env_type = env._entry_point.split(':')[0].split('.')[-1]
+            _game_envs[env_type].add(env.id)
+        # Get env type
+        env_type = None
+        for g, e in _game_envs.items():
+            if env_id in e:
+                env_type = g
+                break
+        return env_type
+
+    env = 'LQG1D-v0'
+    # Prepare environment maker
+    if env.startswith('rllab.'):
+        # Get env name and class
+        env_name = re.match('rllab.(\w+)', env).group(1)
+        env_rllab_class = rllab_env_from_name(env_name)
+
+        # Define env maker
+        def make_env():
+            env_rllab = env_rllab_class()
+            _env = Rllab2GymWrapper(env_rllab)
+            return _env
+
+        # Used later
+        env_type = 'rllab'
+    else:
+        # Normal gym, get if Atari or not.
+        env_type = get_env_type(env)
+        assert env_type is not None, "Env not recognized."
+        # Define the correct env maker
+        if env_type == 'atari':
+            # Atari, custom env creation
+            def make_env():
+                _env = make_atari(env)
+                return wrap_deepmind(_env)
+        else:
+            # Not atari, standard env creation
+            def make_env():
+                env_rllab = gym.make(env)
+                return env_rllab
+
+    # Prepare policy maker
+    if policy == 'linear':
+        hid_size = num_hid_layers = 0
+    elif policy == 'nn':
+        hid_size = [100, 50, 25]
+        num_hid_layers = 3
+
+    def make_policy(name, ob_space, ac_space):
+        return MlpPolicyBounded(
+            name=name, ob_space=ob_space, ac_space=ac_space,
+            hid_size=hid_size, num_hid_layers=num_hid_layers,
+            gaussian_fixed_var=True, trainable_std=trainable_std,
+            use_bias=False, use_critic=False,
+            #hidden_W_init=tf.constant_initializer(1.1),
+            gain_init=gain_init,
+            max_mean=0,
+            min_mean=-1,
+            max_std=None,
+            min_std=0.1,
+            std_init=0.11)
+
+    # Initialize
+    affinity = len(os.sched_getaffinity(0))
+    sess = U.make_session(affinity)
+    sess.__enter__()
+    set_global_seeds(seed)
+    gym.logger.setLevel(logging.WARN)
+
+    env = make_env()
+    ob_space = env.observation_space
+    ac_space = env.action_space
+    pi = make_policy('pi', ob_space, ac_space)
+
+    return pi
+
+
+if __name__ == '__main__':
+
+        pi = set_script_test(
+            env='LQG1D-v0',
+            policy='linear',
+            horizon=20,
+            seed=1,
+            bounded_policy=True,
+            trainable_std=False,
+            gain_init=-0.6,
+            max_mean=0,
+            min_mean=-1,
+            max_std=None,
+            min_std=0.1,
+            std_init=0.11)
+
+        mu = pi.eval_mean([[1]])
+        sigma = pi.eval_std()
+        print(mu)
+        print(sigma)

@@ -1,5 +1,4 @@
 import numpy as np
-from copy import deepcopy
 import warnings
 import baselines.common.tf_util as U
 import tensorflow as tf
@@ -143,7 +142,7 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     epsilon = 1.
     epsilon_old = 0.
     delta_bound_old = -np.inf
-    bound_init, _, _, _, _ = evaluate_bound(den_mise)
+    bound_init = evaluate_bound(den_mise)
     theta_old = theta_init
 
     for i in range(max_line_search_ite):
@@ -151,7 +150,7 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
         theta = theta_init + epsilon * alpha * natural_gradient
         set_parameter(theta)
 
-        bound, _, _, _, _ = evaluate_bound(den_mise)
+        bound = evaluate_bound(den_mise)
 
         if np.isnan(bound):
             print('Got NaN bound value: rolling back!')
@@ -173,95 +172,111 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def optimize_offline(theta_init, delta_theta, old_thetas_list,
+def optimize_offline(evaluate_roba, theta_init, delta_theta, old_thetas_list,
                      iters_so_far, mask_iters,
-                     set_parameter, set_parameter_old,
-                     line_search, evaluate_behav, evaluate_bound,
-                     evaluate_gradient, evaluate_natural_gradient=None,
-                     gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=10):
+                     set_parameter, set_parameter_old, evaluate_behav,
+                     evaluate_bound, evaluate_gradient,
+                     line_search=None, evaluate_natural_gradient=None,
+                     gradient_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
 
     # Compute MISE's denominator
-    den_mise = 0
+    den_mise = np.zeros(mask_iters.shape).astype(np.float32)
     for i in range(len(old_thetas_list)):
         set_parameter_old(old_thetas_list[i])
         behav = evaluate_behav()
         # print('behavioral', behav[0:10])
-        den_mise += np.exp(behav).astype(np.float32)
+        # print(behav)
+        # print("MEAANNN", np.mean(behav))
+        # e = np.exp(behav)
+        # print(e)
+        den_mise = den_mise + np.exp(behav)
 
     # Compute log of MISE's denominator
+    # print(den_mise)
+    # den_mise = den_mise.astype(np.float32)
     den_mise = den_mise / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
     # print('den_mise_log=', den_mise_log)
     # print('len den_mise=', len(den_mise))
 
-    # Print infos about optimization loop
-    fmtstr = '%6i %10.3g %18.3g %18.3g %18.3g'
-    titlestr = '%6s %10s %18s %18s %18s'
-    print(titlestr % ('iter', 'step size', 'gradient norm',
-                      'delta bound ite', 'delta bound tot'))
-
     # Optimization loop
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
     set_parameter(theta)
-    bound, target_sum_log_mean, miw_1, miw, mise = evaluate_bound(den_mise_log)
+    bound = evaluate_bound(den_mise_log)
     bound_old = bound
+    print('Initial bound after new sampling:', bound)
 
+    # Print infos about optimization loop
+    fmtstr = '%6i %10.3g %18.3g %18.3g %18.3g %18.3g'
+    titlestr = '%6s %10s %18s %18s %18s %18s'
+    print(titlestr % ('iter', 'step size', 'gradient norm', 'delta theta',
+                      'delta bound ite', 'delta bound tot'))
 
-    for i in range(max_offline_ite):
-        # miw, ep_return = evaluate_roba(den_mise_log)
-        # print('ep_return =', ep_return)
-        # print('miw =', miw)
-        # print('miw*ep_return', np.sum(miw*ep_return))
-        gradient = evaluate_gradient(den_mise_log)
+    if max_offline_ite > 0:
+        for i in range(max_offline_ite):
+            # miw, ep_return = evaluate_roba(den_mise_log)
+            # print('ep_return =', ep_return)
+            # print('miw =', miw)
+            # print('miw*ep_return', np.sum(miw*ep_return))
+            gradient = evaluate_gradient(den_mise_log)
 
-        # print('target_sum_log_mean', target_sum_log_mean)
-        # print('den_mise_log_mean', np.sum(den_mise)/iters_so_far)
-        # print('miw_1', miw_1)
-        # print('mise', mise)
-        # print('bound', bound)
-        # print('miw', miw)
+            # print('target_sum_log_mean', target_sum_log_mean)
+            # print('den_mise_log_mean', np.sum(den_mise)/iters_so_far)
+            # print('miw_1', miw_1)
+            # print('mise', mise)
+            # print('bound', bound)
+            # print('miw', miw)
 
-        if np.any(np.isnan(gradient)):
-            print('Got NaN gradient! Stopping!')
-            set_parameter(theta_old)
-            return theta_old, improvement, den_mise_log
+            if np.any(np.isnan(gradient)):
+                print('Got NaN gradient! Stopping!')
+                set_parameter(theta_old)
+                return theta_old, improvement, den_mise_log
 
-        gradient_norm = np.sqrt(np.dot(gradient, gradient))
+            gradient_norm = np.sqrt(np.dot(gradient, gradient))
 
-        if gradient_norm < gradient_tol:
-            print('stopping - gradient norm < gradient_tol')
-            return theta, improvement, den_mise_log
+            if gradient_norm < gradient_tol:
+                print('stopping - gradient norm < gradient_tol')
+                print('theta', theta)
+                print('theta_old', theta_old)
+                print('theta_init', theta_init)
+                return theta_init, improvement, den_mise_log
 
-        # Set step size
-        delta_theta = delta_theta
-        alpha = delta_theta / gradient_norm ** 2
-        # Save old values
-        theta_old = deepcopy(theta)
-        improvement_old = improvement
-        # Make an optimization step
-        print('theta_old', theta_old)
-        theta += alpha*gradient
-        print('theta', theta)
-        # theta, epsilon, delta_bound, num_line_search = \
-        #     line_search(den_mise_log, theta, alpha, gradient,
-        #                 set_parameter, evaluate_bound, iters_so_far, bound_tol)
-        set_parameter(theta)
+            # Set step size
+            delta_theta = delta_theta
+            if gradient_norm >= 1:
+                alpha = delta_theta / gradient_norm ** 2
+            else:
+                alpha = 1 / gradient_norm
+            # alpha = delta_theta / gradient_norm  # not in 1D scenario
+            # alpha = delta_theta
+            # Save old values
+            theta_old = theta
+            improvement_old = improvement
+            # Make an optimization step
+            dtheta = alpha*gradient
+            # print('gradient', gradient)
+            # print('gradient_norm', gradient_norm)
+            # print('dtheta', dtheta)
+            theta = theta + dtheta
+            # theta, epsilon, delta_bound, num_line_search = \
+            #     line_search(den_mise_log, theta, alpha, gradient,
+            #                 set_parameter, evaluate_bound, iters_so_far, bound_tol)
+            set_parameter(theta)
 
-        bound, target_sum_log_mean, miw_1, miw, mise = evaluate_bound(den_mise_log)
+            bound = evaluate_bound(den_mise_log)
 
-        if np.isnan(bound):
-            print('Got NaN bound! Stopping!')
-            set_parameter(theta_old)
-            print('theta', theta)
-            print('theta_old', theta_old)
-            return theta_old, improvement_old, den_mise_log
+            if np.isnan(bound):
+                print('Got NaN bound! Stopping!')
+                set_parameter(theta_old)
+                return theta_old, improvement_old, den_mise_log
 
-        delta_bound = bound - bound_old
-        improvement += delta_bound
-        bound_old = bound
+            delta_bound = bound - bound_old
+            improvement = improvement + delta_bound
+            bound_old = bound
 
-        print(fmtstr % (i+1, alpha, gradient_norm, delta_bound, improvement))
+            print(fmtstr % (i+1, alpha, gradient_norm,
+                            dtheta, delta_bound, improvement))
 
     print('Max number of offline iterations reached.')
     return theta, improvement, den_mise_log
@@ -372,10 +387,11 @@ def learn(make_env, make_policy, *,
     target_sum_log = tf.reduce_sum(target_log_pdf_split, axis=1)
     target_sum_log_mean = tf.reduce_sum(target_sum_log)/iter_number_
     behavioral_sum_log = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
-    behavioral_sum_log_mean = tf.reduce_sum(behavioral_sum_log)/iter_number_
-    behavioral_sum_log_centered = \
-        (behavioral_sum_log - behavioral_sum_log_mean) * mask_iters_
-    log_ratio_split = target_sum_log - behavioral_sum_log_mean - den_mise_log_
+    # behavioral_sum_log_mean = tf.reduce_sum(behavioral_sum_log)/iter_number_
+    # behavioral_sum_log_centered = \
+    #     (behavioral_sum_log - behavioral_sum_log_mean) * mask_iters_
+    # log_ratio_split = target_sum_log - behavioral_sum_log_mean - den_mise_log_
+    log_ratio_split = target_sum_log - den_mise_log_
     log_ratio_split = log_ratio_split * mask_iters_
     miw = tf.exp(log_ratio_split) * mask_iters_
 
@@ -418,14 +434,14 @@ def learn(make_env, make_policy, *,
     # losses_with_name.append((mis, 'ISE'))
 
     # Bounds
+    eps = 1e-10
+    miw_ess = (tf.exp(log_ratio_split) + eps) * mask_iters_
+    miw_1 = tf.reduce_sum(miw_ess)
+    miw_2 = tf.linalg.norm(miw_ess, 2)
     if bound == 'J':
         bound_ = mise
     elif bound == 'max-ess':
-        eps = 1e-10
-        miw_ess = (tf.exp(log_ratio_split) + eps) * mask_iters_
-        miw_1 = tf.log(tf.linalg.norm(miw, 1))
-        miw_2 = tf.log(tf.linalg.norm(miw, 2))
-        sqrt_ess_classic = tf.exp(miw_1 - miw_2)
+        sqrt_ess_classic = miw_1 / miw_2
         mise_variance = \
             tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
         bound_ = mise + mise_variance
@@ -448,14 +464,14 @@ def learn(make_env, make_policy, *,
 
     compute_behav = U.function(
         [ob_, ac_, mask_, iter_number_, mask_iters_],
-        behavioral_sum_log_centered,
+        behavioral_sum_log,
         updates=None, givens=None)
     compute_miw = U.function(
         [ob_, ac_, mask_, den_mise_log_],
         miw, updates=None, givens=None)
     compute_bound = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_,
-         mask_iters_, den_mise_log_], [bound_, target_sum_log_mean, miw_1, miw, mise, assert_ops, print_ops])
+         mask_iters_, den_mise_log_], [bound_, assert_ops, print_ops])
     compute_grad = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, mask_iters_,
          den_mise_log_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
@@ -464,7 +480,7 @@ def learn(make_env, make_policy, *,
          mask_iters_, den_mise_log_], losses)
     compute_roba = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_,
-         mask_iters_, den_mise_log_], [miw, ep_return])
+         mask_iters_, den_mise_log_], [target_sum_log_mean, miw_1, miw, mise])
 
     # Set sampler (default: sequential)
     if sampler is None:
@@ -566,7 +582,7 @@ def learn(make_env, make_policy, *,
 
         def evaluate_bound(den_mise_log):
             args_bound = args + (den_mise_log,)
-            return compute_bound(*args_bound)[0:5]
+            return compute_bound(*args_bound)[0]
 
         def evaluate_gradient(den_mise_log):
             args_gradient = args + (den_mise_log,)
@@ -577,13 +593,12 @@ def learn(make_env, make_policy, *,
             return compute_roba(*args_roba)
 
         # Perform optimization
-        line_search = line_search_parabola
         with timed("Optimization"):
             theta, improvement, den_mise_log = \
-                optimize_offline(theta, delta_theta, old_thetas_list,
+                optimize_offline(evaluate_roba, theta, delta_theta, old_thetas_list,
                                  iters_so_far,
                                  mask_iters, set_parameter,
-                                 set_parameter_old, line_search,
+                                 set_parameter_old,
                                  evaluate_behav, evaluate_bound,
                                  evaluate_gradient,
                                  max_offline_ite=max_offline_iters)

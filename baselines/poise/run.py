@@ -16,6 +16,8 @@ from baselines import logger
 import baselines.common.tf_util as U
 from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
+# Import custom envs
+import baselines.envs.lqg1d  # registered at import as gym env
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.bounded_mlp_policy import MlpPolicyBounded
@@ -39,7 +41,7 @@ def get_env_type(env_id):
 
 
 def train(env, policy, horizon, seed, bounded_policy,
-          trainable_std, njobs=1, **alg_args):
+          trainable_std, gain_init, njobs=1, **alg_args):
 
     # Prepare environment maker
     if env.startswith('rllab.'):
@@ -88,7 +90,7 @@ def train(env, policy, horizon, seed, bounded_policy,
                     gaussian_fixed_var=True, trainable_std=trainable_std,
                     use_bias=False, use_critic=False,
                     #hidden_W_init=tf.constant_initializer(1.1),
-                    gain_init = -0.3,
+                    gain_init=gain_init,
                     max_mean=0,
                     min_mean=-1,
                     max_std=None,
@@ -136,9 +138,6 @@ def train(env, policy, horizon, seed, bounded_policy,
 
 def single_run(args, delta_theta=None, delta=None, seed=None):
 
-    # Import custom envs
-    import baselines.envs.lqg1d  # registered at import as gym env
-
     # Manage call from multiple runs
     if delta:
         args.delta = delta
@@ -172,6 +171,7 @@ def single_run(args, delta_theta=None, delta=None, seed=None):
           seed=args.seed,
           bounded_policy=args.bounded_policy,
           trainable_std=args.trainable_std,
+          gain_init=args.gain_init,  # LQG only
           njobs=args.njobs,
           bound=args.bound,
           delta=args.delta,
@@ -200,7 +200,6 @@ def multiple_runs(args):
                 seed.append(j)
 
     # Parallelize single runs
-    print('WAAAAAAAAAAAAAAAAAAAAAAAAAAa', list(zip(zip(delta_theta, delta), seed)))
     n_jobs = len(delta)
     Parallel(n_jobs=n_jobs)(delayed(single_run)(
         args,
@@ -230,6 +229,7 @@ def main(args):
     parser.add_argument('--bound', type=str, default='max-ess')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
+    parser.add_argument('--gain_init', type=float, default=-0.5)  # LQG only
     parser.add_argument('--delta', type=float, default=0.2)
     parser.add_argument('--delta_theta', type=float, default=1)
     parser.add_argument('--njobs', type=int, default=-1)
