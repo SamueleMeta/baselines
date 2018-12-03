@@ -92,7 +92,7 @@ def train(env, policy, horizon, seed, bounded_policy,
                     #hidden_W_init=tf.constant_initializer(1.1),
                     gain_init=gain_init,
                     max_mean=0,
-                    min_mean=-1,
+                    min_mean=-3,
                     max_std=None,
                     min_std=0.1,
                     std_init=0.11)  # added 0.01 to avoid warning
@@ -140,7 +140,7 @@ def single_run(args, delta_theta=None, delta=None, seed=None):
 
     # Manage call from multiple runs
     if delta:
-        args.delta = delta
+        args.gain_init = delta
     if seed:
         args.seed = seed
     if delta_theta:
@@ -192,9 +192,9 @@ def multiple_runs(args):
     delta = []
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
-    for k in [1., 0.1, 0.01]:
-        for i in [0.1, 0.2, 0.3, 0.99]:
-            for j in range(3):
+    for k in [1.]:
+        for i in [-0.5, -0.6, -0.7, -0.8, -0.9, -1, -1.1, -1.2, -1.3, -1.4, -1.5]:
+            for j in range(1):
                 delta_theta.append(k)
                 delta.append(i)
                 seed.append(j)

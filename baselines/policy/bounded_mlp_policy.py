@@ -109,7 +109,7 @@ class MlpPolicyBounded(object):
                 last_out = tf.nn.tanh(
                     tf.layers.dense(last_out,
                                     hid_size[i],
-                                    name='fc%i'%(i+1),
+                                    name='fc%i' % (i+1),
                                     kernel_initializer=hidden_W_init,
                                     use_bias=use_bias))
             if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
@@ -117,13 +117,16 @@ class MlpPolicyBounded(object):
                 mu_range = max_mean - min_mean
                 if gain_init is not None:
                     mean_initializer = tf.constant_initializer(
-                        np.arctanh(2./mu_range * (gain_init + mu_range/2. - max_mean)))
+                        np.arctanh(2./mu_range
+                                   * (gain_init + mu_range/2. - max_mean)))
                     mean = mean = tf.nn.tanh(
                         tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
                                         kernel_initializer=mean_initializer,
                                         use_bias=use_bias))
                 mean = mean * mu_range/2.
-                self.mean = mean = tf.add(mean, - mu_range/2 + max_mean, name='final')
+                self.mean = mean = tf.add(mean,
+                                          - mu_range/2 + max_mean,
+                                          name='final')
 
                 # Bounded std
                 logstd_range = np.log(max_std) - np.log(min_std)
@@ -166,15 +169,16 @@ class MlpPolicyBounded(object):
         # Evaluating
         self.ob = ob
         self.ac_in = U.get_placeholder(name="ac_in", dtype=ac_space.dtype,
-                                       shape=[sequence_length] +
-                                       list(ac_space.shape))
-        self.gamma = U.get_placeholder(name="gamma",
-                                        dtype=tf.float32,shape=[])
+                                       shape=[sequence_length]
+                                       + list(ac_space.shape))
+        self.gamma = U.get_placeholder(name="gamma", dtype=tf.float32,
+                                       shape=[])
         self.rew = U.get_placeholder(name="rew", dtype=tf.float32,
-                                       shape=[sequence_length]+[1])
-        self.logprobs = self.pd.logp(self.ac_in) #  [\log\pi(a|s)]
+                                     shape=[sequence_length]+[1])
+        self.logprobs = self.pd.logp(self.ac_in)  # [\log\pi(a|s)]
         self._get_mean = U.function([ob], [self.mean])
         self._get_std = U.function([], [tf.exp(self.logstd)])
+        self._get_stuff = U.function([ob], [last_out])
 
         # Fisher
         with tf.variable_scope('pol') as vs:
@@ -211,6 +215,9 @@ class MlpPolicyBounded(object):
 
     def eval_std(self):
         return self._get_std()[0]
+
+    def eval_stuff(self, ob):
+        return self._get_stuff(ob)
 
     # Divergence
     def eval_renyi(self, states, other, order=2):
@@ -749,12 +756,14 @@ if __name__ == '__main__':
             trainable_std=False,
             gain_init=-0.6,
             max_mean=0,
-            min_mean=-1,
+            min_mean=-10,
             max_std=None,
             min_std=0.1,
             std_init=0.11)
 
         mu = pi.eval_mean([[1]])
+        print('mu', mu)
+        stuff = pi.eval_stuff([[0]])
+        print('stuff', stuff[0])
         sigma = pi.eval_std()
-        print(mu)
-        print(sigma)
+        print('sigma', sigma)
