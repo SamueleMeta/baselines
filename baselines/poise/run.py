@@ -16,8 +16,6 @@ from baselines import logger
 import baselines.common.tf_util as U
 from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
-# Import custom envs
-import baselines.envs.lqg1d  # registered at import as gym env
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.bounded_mlp_policy import MlpPolicyBounded
@@ -137,6 +135,9 @@ def train(env, policy, horizon, seed, bounded_policy,
 
 
 def single_run(args, delta_theta=None, delta=None, seed=None):
+
+    # Import custom envs (must be imported here or wont work with multiple_run)
+    import baselines.envs.lqg1d  # registered at import as gym env
 
     # Manage call from multiple runs
     if delta:
