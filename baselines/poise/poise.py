@@ -136,7 +136,7 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
 
 
 def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
-                         set_parameter, evaluate_bound, delta_theta,
+                         set_parameter, evaluate_bound, dtheta,
                          iters_so_far, delta_bound_tol=1e-4,
                          max_line_search_ite=30):
     epsilon = 1.
@@ -172,7 +172,7 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def optimize_offline(evaluate_roba, theta_init, delta_theta, old_thetas_list,
+def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                      iters_so_far, mask_iters,
                      set_parameter, set_parameter_old, evaluate_behav,
                      evaluate_bound, evaluate_gradient,
@@ -244,13 +244,13 @@ def optimize_offline(evaluate_roba, theta_init, delta_theta, old_thetas_list,
                 return theta_init, improvement, den_mise_log
 
             # Set step size
-            delta_theta = delta_theta
+            dtheta = dtheta
             if gradient_norm >= 1:
-                alpha = delta_theta / gradient_norm ** 2
+                alpha = dtheta / gradient_norm ** 2
             else:
                 alpha = 1 / gradient_norm
-            # alpha = delta_theta / gradient_norm  # not in 1D scenario
-            # alpha = delta_theta
+            # alpha = dtheta / gradient_norm  # not in 1D scenario
+            # alpha = dtheta
             # Save old values
             theta_old = theta
             improvement_old = improvement
@@ -306,7 +306,7 @@ def render(env, pi, horizon):
 def learn(make_env, make_policy, *,
           max_iters,
           horizon,
-          delta_theta,
+          dtheta,
           delta,
           gamma,
           sampler=None,
@@ -596,7 +596,7 @@ def learn(make_env, make_policy, *,
         # Perform optimization
         with timed("Optimization"):
             theta, improvement, den_mise_log = \
-                optimize_offline(evaluate_roba, theta, delta_theta, old_thetas_list,
+                optimize_offline(evaluate_roba, theta, dtheta, old_thetas_list,
                                  iters_so_far,
                                  mask_iters, set_parameter,
                                  set_parameter_old,

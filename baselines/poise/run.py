@@ -134,18 +134,18 @@ def train(env, policy, horizon, seed, bounded_policy,
     # sampler.close()
 
 
-def single_run(args, delta_theta=None, delta=None, seed=None):
+def single_run(args, dtheta=None, delta=None, seed=None):
 
     # Import custom envs (must be imported here or wont work with multiple_run)
     import baselines.envs.lqg1d  # registered at import as gym env
 
     # Manage call from multiple runs
     if delta:
-        args.gain_init = delta
+        args.delta = delta
     if seed:
         args.seed = seed
-    if delta_theta:
-        args.delta_theta = delta_theta
+    if dtheta:
+        args.dtheta = dtheta
 
     # Log file name
     t = time.localtime(time.time())
@@ -153,7 +153,7 @@ def single_run(args, delta_theta=None, delta=None, seed=None):
     time_str = '%s-%s-%s_%s%s%s_%s' % (
         t.tm_hour, t.tm_min, t.tm_sec, t.tm_mday, t.tm_mon, t.tm_year, tt)
     args_str = '%s_delta=%s_seed=%s_dtheta=%s' % (
-        args.env.upper(), args.delta, args.seed, args.delta_theta)
+        args.env.upper(), args.delta, args.seed, args.dtheta)
 
     if args.file_name == 'progress':
         file_name = args_str + '_' + time_str
@@ -176,7 +176,7 @@ def single_run(args, delta_theta=None, delta=None, seed=None):
           njobs=args.njobs,
           bound=args.bound,
           delta=args.delta,
-          delta_theta=args.delta_theta,
+          dtheta=args.dtheta,
           gamma=args.gamma,
           max_offline_iters=args.max_offline_iters,
           max_iters=args.max_iters,
@@ -189,14 +189,14 @@ def multiple_runs(args):
     from joblib import Parallel, delayed
 
     # Define range() for floats
-    delta_theta = []
+    dtheta = []
     delta = []
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
-    for k in [1.]:
-        for i in [-0.3, -0.4, -0.5, -0.62, -0.7, -0.8, -0.9, -1]:
-            for j in range(1):
-                delta_theta.append(k)
+    for k in [1., 0.5, 0.1]:
+        for i in [-0.1, -0.2, -0.99]:
+            for j in range(3):
+                dtheta.append(k)
                 delta.append(i)
                 seed.append(j)
 
@@ -204,7 +204,7 @@ def multiple_runs(args):
     n_jobs = len(delta)
     Parallel(n_jobs=n_jobs)(delayed(single_run)(
         args,
-        delta_theta[i],
+        dtheta[i],
         delta[i],
         seed[i]
         ) for i in range(n_jobs))
@@ -230,9 +230,9 @@ def main(args):
     parser.add_argument('--bound', type=str, default='max-ess')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
-    parser.add_argument('--gain_init', type=float, default=-0.6)  # LQG only
+    parser.add_argument('--gain_init', type=float, default=-0.1)  # LQG only
     parser.add_argument('--delta', type=float, default=0.2)
-    parser.add_argument('--delta_theta', type=float, default=1)
+    parser.add_argument('--dtheta', type=float, default=1)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=1000)
