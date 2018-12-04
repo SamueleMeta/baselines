@@ -89,8 +89,8 @@ def train(env, policy, horizon, seed, bounded_policy,
                     use_bias=False, use_critic=False,
                     #hidden_W_init=tf.constant_initializer(1.1),
                     gain_init=gain_init,
-                    max_mean=0,
-                    min_mean=-3,
+                    max_mean=1,
+                    min_mean=-1,
                     max_std=None,
                     min_std=0.1,
                     std_init=0.11)  # added 0.01 to avoid warning
@@ -194,7 +194,7 @@ def multiple_runs(args):
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
     for k in [1.]:
-        for i in [-0.5, -0.6, -0.7, -0.8, -0.9, -1, -1.1, -1.2, -1.3, -1.4, -1.5, -1.6, -1.7, -1.8, -1.9, -2, -2.5, -2.6, -2.7, -2.8, -2.9, -3]:
+        for i in [-0.3, -0.4, -0.5, -0.6, -0.62, -68, -0.7, -0.8, -0.9]:
             for j in range(1):
                 delta_theta.append(k)
                 delta.append(i)

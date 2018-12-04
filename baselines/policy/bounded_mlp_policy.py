@@ -103,8 +103,9 @@ class MlpPolicyBounded(object):
 
         # Actor
         with tf.variable_scope('pol'):
-            last_out = tf.clip_by_value(
+            obz = tf.clip_by_value(
                 (ob - self.ob_rms.mean) / self.ob_rms.std, -5.0, 5.0)
+            last_out = obz
             for i in range(num_hid_layers):
                 last_out = tf.nn.tanh(
                     tf.layers.dense(last_out,
@@ -178,7 +179,7 @@ class MlpPolicyBounded(object):
         self.logprobs = self.pd.logp(self.ac_in)  # [\log\pi(a|s)]
         self._get_mean = U.function([ob], [self.mean])
         self._get_std = U.function([], [tf.exp(self.logstd)])
-        self._get_stuff = U.function([ob], [last_out])
+        self._get_stuff = U.function([ob], [obz, last_out, pdparam])
 
         # Fisher
         with tf.variable_scope('pol') as vs:
@@ -724,11 +725,11 @@ def set_script_test(env, policy, horizon, seed, bounded_policy, trainable_std,
             use_bias=False, use_critic=False,
             #hidden_W_init=tf.constant_initializer(1.1),
             gain_init=gain_init,
-            max_mean=0,
-            min_mean=-1,
-            max_std=None,
-            min_std=0.1,
-            std_init=0.11)
+            max_mean=max_mean,
+            min_mean=min_mean,
+            max_std=max_std,
+            min_std=min_std,
+            std_init=std_init)
 
     # Initialize
     affinity = len(os.sched_getaffinity(0))
@@ -754,16 +755,18 @@ if __name__ == '__main__':
             seed=1,
             bounded_policy=True,
             trainable_std=False,
-            gain_init=-0.6,
-            max_mean=0,
-            min_mean=-10,
+            gain_init=-0.61525125,
+            max_mean=1,
+            min_mean=-1,
             max_std=None,
             min_std=0.1,
             std_init=0.11)
 
         mu = pi.eval_mean([[1]])
         print('mu', mu)
-        stuff = pi.eval_stuff([[0]])
-        print('stuff', stuff[0])
+        obz, last_out, pdparam = pi.eval_stuff([[-1]])
+        print('obz', obz)
+        print('last_out', last_out)
+        print('pdparam', pdparam[0])
         sigma = pi.eval_std()
         print('sigma', sigma)
