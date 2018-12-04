@@ -194,7 +194,7 @@ def multiple_runs(args):
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
     for k in [1.]:
-        for i in [-0.3, -0.4, -0.5, -0.6, -0.62, -68, -0.7, -0.8, -0.9]:
+        for i in [-0.3, -0.4, -0.5, -0.62, -0.7, -0.8, -0.9, -1]:
             for j in range(1):
                 delta_theta.append(k)
                 delta.append(i)
@@ -230,7 +230,7 @@ def main(args):
     parser.add_argument('--bound', type=str, default='max-ess')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
-    parser.add_argument('--gain_init', type=float, default=-0.5)  # LQG only
+    parser.add_argument('--gain_init', type=float, default=-0.6)  # LQG only
     parser.add_argument('--delta', type=float, default=0.2)
     parser.add_argument('--delta_theta', type=float, default=1)
     parser.add_argument('--njobs', type=int, default=-1)

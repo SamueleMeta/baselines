@@ -201,6 +201,7 @@ def optimize_offline(evaluate_roba, theta_init, delta_theta, old_thetas_list,
 
     # Optimization loop
     theta = theta_old = theta_init
+    print('THETAAA', theta)
     improvement = improvement_old = 0.
     set_parameter(theta)
     bound = evaluate_bound(den_mise_log)
