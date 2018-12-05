@@ -243,7 +243,10 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                 print('theta_init', theta_init)
                 return theta, improvement, den_mise_log
 
-            alpha = dtheta / gradient_norm ** 2
+            if gradient_norm > 1:
+                alpha = dtheta / gradient_norm ** 2
+            else:
+                alpha = 1
             # alpha = dtheta / gradient_norm  # not in 1D scenario
             # alpha = dtheta
             # Save old values
