@@ -193,7 +193,7 @@ def multiple_runs(args):
     delta = []
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
-    for i in range(11):
+    for i in [10, 5, 1, 0.5, 0.1, 0.05, 0.01, 0.005, 0.001]:
         for j in [0.1, 0.2, 0.99]:
             for k in range(3):
                 dtheta.append(i/10)
