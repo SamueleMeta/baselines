@@ -193,12 +193,12 @@ def multiple_runs(args):
     delta = []
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
-    for k in [1., 0.5, 0.1]:
-        for i in [-0.1, -0.2, -0.99]:
-            for j in range(3):
-                dtheta.append(k)
-                delta.append(i)
-                seed.append(j)
+    for i in range(11):
+        for j in [-0.1, -0.2, -0.99]:
+            for k in range(3):
+                dtheta.append(i/10)
+                delta.append(j)
+                seed.append(k)
 
     # Parallelize single runs
     n_jobs = len(delta)

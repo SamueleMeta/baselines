@@ -194,14 +194,14 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
     # Compute log of MISE's denominator
     # print(den_mise)
     # den_mise = den_mise.astype(np.float32)
-    den_mise = den_mise / iters_so_far
+    eps = 1e-4  # to avoid inf weights and nan bound
+    den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
     # print('den_mise_log=', den_mise_log)
     # print('len den_mise=', len(den_mise))
 
     # Optimization loop
     theta = theta_old = theta_init
-    print('THETAAA', theta)
     improvement = improvement_old = 0.
     set_parameter(theta)
     bound = evaluate_bound(den_mise_log)
@@ -241,25 +241,23 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                 print('theta', theta)
                 print('theta_old', theta_old)
                 print('theta_init', theta_init)
-                return theta_init, improvement, den_mise_log
+                return theta, improvement, den_mise_log
 
-            # Set step size
-            dtheta = dtheta
-            if gradient_norm >= 1:
+            if gradient_norm > 1:
                 alpha = dtheta / gradient_norm ** 2
             else:
-                alpha = 1 / gradient_norm
+                alpha = dtheta
             # alpha = dtheta / gradient_norm  # not in 1D scenario
             # alpha = dtheta
             # Save old values
             theta_old = theta
             improvement_old = improvement
             # Make an optimization step
-            dtheta = alpha*gradient
+            delta_theta = alpha*gradient
             # print('gradient', gradient)
             # print('gradient_norm', gradient_norm)
             # print('dtheta', dtheta)
-            theta = theta + dtheta
+            theta = theta + delta_theta
             # theta, epsilon, delta_bound, num_line_search = \
             #     line_search(den_mise_log, theta, alpha, gradient,
             #                 set_parameter, evaluate_bound, iters_so_far, bound_tol)
@@ -277,7 +275,7 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
             bound_old = bound
 
             print(fmtstr % (i+1, alpha, gradient_norm,
-                            dtheta, delta_bound, improvement))
+                            delta_theta, delta_bound, improvement))
 
     print('Max number of offline iterations reached.')
     return theta, improvement, den_mise_log
@@ -556,18 +554,11 @@ def learn(make_env, make_policy, *,
         args = all_seg['ob'], all_seg['ac'],  all_seg['rew'], \
             all_seg['disc_rew'], all_seg['mask'], iters_so_far, mask_iters
 
-        if env.spec.id == 'LQG1D-v0':
-            mu = pi.eval_mean([[1]])
-            sigma = pi.eval_std()
-
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
             logger.record_tabular("URet", u_rets[0])
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
-            if env.spec.id == 'LQG1D-v0':
-                logger.record_tabular("LQGmu", mu)
-                logger.record_tabular("LQGsigma", sigma)
 
         # Save policy parameters to disk
         # if save_weights:
@@ -605,9 +596,15 @@ def learn(make_env, make_policy, *,
                                  max_offline_ite=max_offline_iters)
         set_parameter(theta)
 
-        # Info
         args += (den_mise_log,)
         with timed('summaries after'):
+            if env.spec.id == 'LQG1D-v0':
+                mu1 = pi.eval_mean([[1]])
+                mu01 = pi.eval_mean([[0.1]])
+                sigma = pi.eval_std()
+                logger.record_tabular("LQGmu1", mu1)
+                logger.record_tabular("LQGmu01", mu01)
+                logger.record_tabular("LQGsigma", sigma)
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
