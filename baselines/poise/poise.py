@@ -176,7 +176,7 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                      iters_so_far, mask_iters,
                      set_parameter, set_parameter_old, evaluate_behav,
                      evaluate_bound, evaluate_gradient,
-                     line_search=None, evaluate_natural_gradient=None,
+                     line_search, evaluate_natural_gradient=None,
                      gradient_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
 
     # Compute MISE's denominator
@@ -184,21 +184,12 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
     for i in range(len(old_thetas_list)):
         set_parameter_old(old_thetas_list[i])
         behav = evaluate_behav()
-        # print('behavioral', behav[0:10])
-        # print(behav)
-        # print("MEAANNN", np.mean(behav))
-        # e = np.exp(behav)
-        # print(e)
         den_mise = den_mise + np.exp(behav)
 
     # Compute log of MISE's denominator
-    # print(den_mise)
-    # den_mise = den_mise.astype(np.float32)
     eps = 1e-4  # to avoid inf weights and nan bound
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
-    # print('den_mise_log=', den_mise_log)
-    # print('len den_mise=', len(den_mise))
 
     # Optimization loop
     theta = theta_old = theta_init
@@ -209,33 +200,23 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
     print('Initial bound after new sampling:', bound)
 
     # Print infos about optimization loop
-    fmtstr = '%6i %10.3g %18.3g %18.3g %18.3g %18.3g'
-    titlestr = '%6s %10s %18s %18s %18s %18s'
-    print(titlestr % ('iter', 'step size', 'gradient norm', 'delta theta',
-                      'delta bound ite', 'delta bound tot'))
-
+    fmtstr = '%6i %10.3g %16i %18.3g %18.3g %18.3g %18.3g'
+    titlestr = '%6s %10s  %18s %16s %18s %18s %18s'
+    print(titlestr % ('iter', 'step size', 'line searches', 'gradient norm',
+                      'delta theta', 'delta bound ite', 'delta bound tot'))
+    num_line_search = 0
     if max_offline_ite > 0:
         for i in range(max_offline_ite):
-            # miw, ep_return = evaluate_roba(den_mise_log)
-            # print('ep_return =', ep_return)
-            # print('miw =', miw)
-            # print('miw*ep_return', np.sum(miw*ep_return))
+
             gradient = evaluate_gradient(den_mise_log)
-
-            # print('target_sum_log_mean', target_sum_log_mean)
-            # print('den_mise_log_mean', np.sum(den_mise)/iters_so_far)
-            # print('miw_1', miw_1)
-            # print('mise', mise)
-            # print('bound', bound)
-            # print('miw', miw)
-
+            # Sanity check for the gradient
             if np.any(np.isnan(gradient)):
                 print('Got NaN gradient! Stopping!')
                 set_parameter(theta_old)
                 return theta_old, improvement, den_mise_log
 
             gradient_norm = np.sqrt(np.dot(gradient, gradient))
-
+            # Check that the gradient norm is not too small
             if gradient_norm < gradient_tol:
                 print('stopping - gradient norm < gradient_tol')
                 print('theta', theta)
@@ -243,37 +224,36 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                 print('theta_init', theta_init)
                 return theta, improvement, den_mise_log
 
-            alpha = dtheta
-            # alpha = dtheta / gradient_norm ** 2
-            # alpha = dtheta / gradient_norm  # not in 1D scenario
             # alpha = dtheta
+            alpha = dtheta / gradient_norm ** 2
             # Save old values
             theta_old = theta
             improvement_old = improvement
             # Make an optimization step
-            delta_theta = alpha*gradient
-            # print('gradient', gradient)
-            # print('gradient_norm', gradient_norm)
-            # print('dtheta', dtheta)
-            theta = theta + delta_theta
-            # theta, epsilon, delta_bound, num_line_search = \
-            #     line_search(den_mise_log, theta, alpha, gradient,
-            #                 set_parameter, evaluate_bound, iters_so_far, bound_tol)
-            set_parameter(theta)
+            if line_search is not None:
+                theta, epsilon, delta_bound, num_line_search = \
+                    line_search(den_mise_log, theta, alpha, gradient,
+                                set_parameter, evaluate_bound,
+                                iters_so_far, bound_tol)
+                set_parameter(theta)
+                delta_theta = theta - theta_old
+            else:
+                delta_theta = alpha*gradient
+                theta = theta + delta_theta
+                set_parameter(theta)
+                # Sanity check for the bound
+                bound = evaluate_bound(den_mise_log)
+                if np.isnan(bound):
+                    print('Got NaN bound! Stopping!')
+                    set_parameter(theta_old)
+                    return theta_old, improvement_old, den_mise_log
 
-            bound = evaluate_bound(den_mise_log)
-
-            if np.isnan(bound):
-                print('Got NaN bound! Stopping!')
-                set_parameter(theta_old)
-                return theta_old, improvement_old, den_mise_log
-
-            delta_bound = bound - bound_old
+                delta_bound = bound - bound_old
             improvement = improvement + delta_bound
             bound_old = bound
 
-            print(fmtstr % (i+1, alpha, gradient_norm,
-                            delta_theta, delta_bound, improvement))
+            print(fmtstr % (i+1, alpha, num_line_search, gradient_norm,
+                            delta_theta[0], delta_bound, improvement))
 
     print('Max number of offline iterations reached.')
     return theta, improvement, den_mise_log
@@ -311,7 +291,8 @@ def learn(make_env, make_policy, *,
           max_offline_iters=10,
           save_weights=False,
           render_after=None,
-          callback=None):
+          callback=None,
+          line_search=None):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -487,6 +468,11 @@ def learn(make_env, make_policy, *,
         sampler = type("SequentialSampler", (object,),
                        {"collect": lambda self, _: seg_gen.__next__()})()
 
+    # Set line search
+    if str(line_search) == "parabola":
+        print('Step size optimization through parabolic line search.')
+        line_search = line_search_parabola
+
     # Tf initialization
     U.initialize()
 
@@ -540,7 +526,7 @@ def learn(make_env, make_policy, *,
         episodes_so_far += 1
         timesteps_so_far += lens[0]
 
-        # Set arguments
+        # Set arguments for U.functions
         args = ()
         mask_iters = np.zeros(max_iters)
         mask_iters[:iters_so_far] = 1
@@ -590,7 +576,7 @@ def learn(make_env, make_policy, *,
                                  mask_iters, set_parameter,
                                  set_parameter_old,
                                  evaluate_behav, evaluate_bound,
-                                 evaluate_gradient,
+                                 evaluate_gradient, line_search,
                                  max_offline_ite=max_offline_iters)
         set_parameter(theta)
 

@@ -180,7 +180,8 @@ def single_run(args, dtheta=None, delta=None, seed=None):
           gamma=args.gamma,
           max_offline_iters=args.max_offline_iters,
           max_iters=args.max_iters,
-          render_after=args.render_after)
+          render_after=args.render_after,
+          line_search=args.line_search)
 
 
 def multiple_runs(args):
@@ -239,6 +240,7 @@ def main(args):
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
+    parser.add_argument('--line_search', type=str, default=None)  # 'parabola'
     add_bool_arg(parser, 'bounded_policy', default=True)
     add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'experiment', default=False)

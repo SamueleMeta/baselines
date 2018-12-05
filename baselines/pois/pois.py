@@ -140,7 +140,7 @@ def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, eva
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
-            return theta_old, epsilon_old, delta_bound_old, i + 1
+            return theta_old, epsilon_old, 0, i + 1
 
         delta_bound = bound - bound_init
 
@@ -706,10 +706,6 @@ def learn(make_env, make_policy, *,
         else:
             evaluate_natural_gradient = None
 
-        if env.spec.id == 'LQG1D-v0':
-            mu = pi.eval_mean([[1]])
-            sigma = pi.eval_std()
-
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
             logger.record_tabular("InitialBound", evaluate_loss())
@@ -719,9 +715,6 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("EpisodesSoFar", episodes_so_far)
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
-            if env.spec.id == 'LQG1D-v0':
-                logger.record_tabular("LQGmu", mu)
-                logger.record_tabular("LQGsigma", sigma)
 
         if save_weights:
             logger.record_tabular('Weights', str(get_parameter()))
@@ -741,6 +734,13 @@ def learn(make_env, make_policy, *,
         set_parameter(theta)
 
         with timed('summaries after'):
+            if env.spec.id == 'LQG1D-v0':
+                mu1 = pi.eval_mean([[1]])
+                mu01 = pi.eval_mean([[0.1]])
+                sigma = pi.eval_std()
+                logger.record_tabular("LQGmu1", mu1)
+                logger.record_tabular("LQGmu01", mu01)
+                logger.record_tabular("LQGsigma", sigma)
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
