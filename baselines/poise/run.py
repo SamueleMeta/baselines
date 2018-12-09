@@ -7,6 +7,7 @@
 # Common imports
 import sys, re, os, time, logging
 from collections import defaultdict
+import numpy as np
 # Framework imports
 import gym
 import tensorflow as tf
@@ -39,7 +40,8 @@ def get_env_type(env_id):
 
 
 def train(env, policy, horizon, seed, bounded_policy,
-          trainable_std, gain_init, njobs=1, **alg_args):
+          trainable_std, gain_init, multiple_init,
+          njobs=1, **alg_args):
 
     # Prepare environment maker
     if env.startswith('rllab.'):
@@ -127,7 +129,7 @@ def train(env, policy, horizon, seed, bounded_policy,
     gym.logger.setLevel(logging.WARN)
 
     # Learn
-    poise.learn(make_env, make_policy, horizon=horizon,
+    poise.learn(make_env, make_policy, multiple_init=multiple_init, horizon=horizon,
                 sampler=sampler, **alg_args)
 
     # Close sampler in the end
@@ -173,6 +175,7 @@ def single_run(args, dtheta=None, delta=None, seed=None):
           bounded_policy=args.bounded_policy,
           trainable_std=args.trainable_std,
           gain_init=args.gain_init,  # LQG only
+          multiple_init=args.multiple_init,
           njobs=args.njobs,
           bound=args.bound,
           delta=args.delta,
@@ -241,6 +244,7 @@ def main(args):
     parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--line_search', type=str, default=None)  # 'parabola'
+    parser.add_argument('--multiple_init', type=int, default=None)
     add_bool_arg(parser, 'bounded_policy', default=True)
     add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'experiment', default=False)

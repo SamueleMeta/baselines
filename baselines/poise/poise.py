@@ -197,7 +197,7 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
     set_parameter(theta)
     bound = evaluate_bound(den_mise_log)
     bound_old = bound
-    print('Initial bound after new sampling:', bound)
+    print('Initial bound after last sampling:', bound)
 
     # Print infos about optimization loop
     fmtstr = '%6i %10.3g %16i %18.3g %18.3g %18.3g %18.3g'
@@ -213,16 +213,16 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
             if np.any(np.isnan(gradient)):
                 print('Got NaN gradient! Stopping!')
                 set_parameter(theta_old)
-                return theta_old, improvement, den_mise_log
+                return theta_old, improvement, den_mise_log, bound_old
 
             gradient_norm = np.sqrt(np.dot(gradient, gradient))
             # Check that the gradient norm is not too small
             if gradient_norm < gradient_tol:
                 print('stopping - gradient norm < gradient_tol')
-                print('theta', theta)
-                print('theta_old', theta_old)
-                print('theta_init', theta_init)
-                return theta, improvement, den_mise_log
+                # print('theta', theta)
+                # print('theta_old', theta_old)
+                # print('theta_init', theta_init)
+                return theta, improvement, den_mise_log, bound
 
             # alpha = dtheta
             alpha = dtheta / gradient_norm ** 2
@@ -246,9 +246,9 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                 if np.isnan(bound):
                     print('Got NaN bound! Stopping!')
                     set_parameter(theta_old)
-                    return theta_old, improvement_old, den_mise_log
-
+                    return theta_old, improvement_old, den_mise_log, bound_old
                 delta_bound = bound - bound_old
+
             improvement = improvement + delta_bound
             bound_old = bound
 
@@ -256,7 +256,7 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                             delta_theta[0], delta_bound, improvement))
 
     print('Max number of offline iterations reached.')
-    return theta, improvement, den_mise_log
+    return theta, improvement, den_mise_log, bound
 
 
 def render(env, pi, horizon):
@@ -285,6 +285,7 @@ def learn(make_env, make_policy, *,
           dtheta,
           delta,
           gamma,
+          multiple_init,
           sampler=None,
           iw_norm='none',
           bound='max-ess',
@@ -568,24 +569,46 @@ def learn(make_env, make_policy, *,
             args_roba = args + (den_mise_log,)
             return compute_roba(*args_roba)
 
-        # Perform optimization
-        with timed("Optimization"):
-            theta, improvement, den_mise_log = \
-                optimize_offline(evaluate_roba, theta, dtheta, old_thetas_list,
-                                 iters_so_far,
-                                 mask_iters, set_parameter,
-                                 set_parameter_old,
-                                 evaluate_behav, evaluate_bound,
-                                 evaluate_gradient, line_search,
-                                 max_offline_ite=max_offline_iters)
+        if multiple_init:
+            with timed("Optimization"):
+                bound = 0
+                for i in range(multiple_init):
+                    print('mUUUUUUUUUUUUUUUUU')
+                    theta_init = [np.random.uniform(
+                        pi.min_mean, pi.max_mean)]
+                    theta_i, improvement_i, den_mise_log_i, bound_i = \
+                        optimize_offline(evaluate_roba, theta_init, dtheta,
+                                         old_thetas_list,
+                                         iters_so_far,
+                                         mask_iters, set_parameter,
+                                         set_parameter_old,
+                                         evaluate_behav, evaluate_bound,
+                                         evaluate_gradient, line_search,
+                                         max_offline_ite=max_offline_iters)
+                    if bound_i > bound:
+                        theta = theta_i
+                        improvement = improvement_i
+                        den_mise_log = den_mise_log_i
+        else:
+            # Perform optimization
+            with timed("Optimization"):
+                theta, improvement, den_mise_log = \
+                    optimize_offline(evaluate_roba, theta, dtheta,
+                                     old_thetas_list,
+                                     iters_so_far,
+                                     mask_iters, set_parameter,
+                                     set_parameter_old,
+                                     evaluate_behav, evaluate_bound,
+                                     evaluate_gradient, line_search,
+                                     max_offline_ite=max_offline_iters)
         set_parameter(theta)
 
         args += (den_mise_log,)
         with timed('summaries after'):
             if env.spec.id == 'LQG1D-v0':
-                mu1 = pi.eval_mean([[1]])
-                mu01 = pi.eval_mean([[0.1]])
-                sigma = pi.eval_std()
+                mu1 = pi.eval_mean([[1]])[0][0]
+                mu01 = pi.eval_mean([[0.1]])[0][0]
+                sigma = pi.eval_std()[0][0]
                 logger.record_tabular("LQGmu1", mu1)
                 logger.record_tabular("LQGmu01", mu01)
                 logger.record_tabular("LQGsigma", sigma)
