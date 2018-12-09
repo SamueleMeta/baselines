@@ -573,7 +573,6 @@ def learn(make_env, make_policy, *,
             with timed("Optimization"):
                 bound = 0
                 for i in range(multiple_init):
-                    print('mUUUUUUUUUUUUUUUUU')
                     theta_init = [np.random.uniform(
                         pi.min_mean, pi.max_mean)]
                     theta_i, improvement_i, den_mise_log_i, bound_i = \
