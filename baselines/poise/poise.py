@@ -591,7 +591,7 @@ def learn(make_env, make_policy, *,
         else:
             # Perform optimization
             with timed("Optimization"):
-                theta, improvement, den_mise_log = \
+                theta, improvement, den_mise_log, bound = \
                     optimize_offline(evaluate_roba, theta, dtheta,
                                      old_thetas_list,
                                      iters_so_far,
