@@ -187,7 +187,7 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
         den_mise = den_mise + np.exp(behav)
 
     # Compute log of MISE's denominator
-    eps = 1e-4  # to avoid inf weights and nan bound
+    eps = 0  # to avoid inf weights and nan bound
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
 
@@ -222,7 +222,7 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                 # print('theta', theta)
                 # print('theta_old', theta_old)
                 # print('theta_init', theta_init)
-                return theta, improvement, den_mise_log, bound
+                return theta_old, improvement_old, den_mise_log, bound_old
 
             # alpha = dtheta
             alpha = dtheta / gradient_norm ** 2
@@ -421,10 +421,11 @@ def learn(make_env, make_policy, *,
         bound_ = mise
     elif bound == 'max-ess':
         sqrt_ess_classic = miw_1 / miw_2
-        mise_variance = \
+        exploration_bonus = \
             tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
-        bound_ = mise + mise_variance
+        bound_ = mise + exploration_bonus
         losses_with_name.extend([(sqrt_ess_classic, 'SqrtESSClassic'),
+                                 (exploration_bonus, 'ExplorationBonus'),
                                  (miw_1, 'IWNorm1'),
                                  (miw_2, 'IWNorm2')])
 
@@ -470,9 +471,13 @@ def learn(make_env, make_policy, *,
                        {"collect": lambda self, _: seg_gen.__next__()})()
 
     # Set line search
-    if str(line_search) == "parabola":
-        print('Step size optimization through parabolic line search.')
-        line_search = line_search_parabola
+    if line_search is not None:
+        s = str(line_search)
+        if s == "parabola" or s == "parabolic":
+            print('Step size optimization through parabolic line search.')
+            line_search = line_search_parabola
+        else:
+            raise ValueError("{} l.s. not implemented".format(line_search))
 
     # Tf initialization
     U.initialize()
@@ -571,7 +576,8 @@ def learn(make_env, make_policy, *,
 
         if multiple_init:
             with timed("Optimization"):
-                bound = 0
+                bound = improvement = 0
+                check = False
                 for i in range(multiple_init):
                     theta_init = [np.random.uniform(
                         pi.min_mean, pi.max_mean)]
@@ -585,9 +591,12 @@ def learn(make_env, make_policy, *,
                                          evaluate_gradient, line_search,
                                          max_offline_ite=max_offline_iters)
                     if bound_i > bound:
+                        check = True
                         theta = theta_i
                         improvement = improvement_i
                         den_mise_log = den_mise_log_i
+                if not check:
+                    den_mise_log = den_mise_log_i
         else:
             # Perform optimization
             with timed("Optimization"):
