@@ -236,7 +236,7 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                                 set_parameter, evaluate_bound,
                                 iters_so_far, bound_tol)
                 set_parameter(theta)
-                delta_theta = theta - theta_old
+                delta_theta = np.array(theta) - np.array(theta_old)
             else:
                 delta_theta = alpha*gradient
                 theta = theta + delta_theta
