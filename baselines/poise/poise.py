@@ -188,7 +188,7 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
         den_mise = den_mise + np.exp(behav)
 
     # Compute log of MISE's denominator
-    eps = 0  # to avoid inf weights and nan bound
+    eps = 1e-24  # to avoid inf weights and nan bound
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
 

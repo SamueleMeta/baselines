@@ -105,7 +105,6 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
 
     gym.logger.setLevel(logging.WARN)
 
-
     learner.learn(
           make_env,
           make_policy,
