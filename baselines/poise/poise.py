@@ -173,12 +173,11 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def best_of_grid(evaluate_roba, theta_init, dtheta, old_thetas_list,
+def best_of_grid(policy, n_points, theta_init,
+                 old_thetas_list,
                  iters_so_far, mask_iters,
                  set_parameter, set_parameter_old, evaluate_behav,
-                 evaluate_bound, evaluate_gradient,
-                 line_search, evaluate_natural_gradient=None,
-                 gradient_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
+                 evaluate_bound):
 
     # Compute MISE's denominator
     den_mise = np.zeros(mask_iters.shape).astype(np.float32)
@@ -192,7 +191,23 @@ def best_of_grid(evaluate_roba, theta_init, dtheta, old_thetas_list,
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
 
-    return den_mise_log
+    # Find the set of parameters to evaluate
+    theta_grid = np.linspace(policy.min_mean, policy.max_mean, n_points)
+    # Evaluate the set of parameters and retain the best one
+    bound_best = 0
+    theta_best = theta_init
+    for theta in theta_grid:
+        set_parameter([theta])
+        bound = evaluate_bound(den_mise_log)
+        if bound > bound_best:
+            bound_best = bound
+            theta_best = [theta]
+
+    # Calculate improvement
+    set_parameter(theta_init)
+    improvement = bound_best - evaluate_bound(den_mise_log)
+
+    return theta_best, improvement, den_mise_log
 
 
 
@@ -309,7 +324,7 @@ def learn(make_env, make_policy, *,
           dtheta,
           delta,
           gamma,
-          multiple_init,
+          multiple_init=None,
           sampler=None,
           iw_norm='none',
           bound='max-ess',
@@ -318,7 +333,7 @@ def learn(make_env, make_policy, *,
           render_after=None,
           callback=None,
           line_search=None,
-          grid_optimization=False):
+          grid_optimization=None):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -604,8 +619,8 @@ def learn(make_env, make_policy, *,
                 bound = improvement = 0
                 check = False
                 for i in range(multiple_init):
-                    theta_init = np.arctanh(np.random.uniform(
-                        pi.min_mean, pi.max_mean))
+                    theta_init = [np.arctanh(np.random.uniform(
+                        pi.min_mean, pi.max_mean))]
                     theta_i, improvement_i, den_mise_log_i, bound_i = \
                         optimize_offline(evaluate_roba, theta_init, dtheta,
                                          old_thetas_list,
@@ -623,7 +638,13 @@ def learn(make_env, make_policy, *,
                 if not check:
                     den_mise_log = den_mise_log_i
             elif grid_optimization:
-                print('GNEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE')
+                theta, improvement, den_mise_log = \
+                    best_of_grid(pi, grid_optimization, theta,
+                                 old_thetas_list,
+                                 iters_so_far, mask_iters,
+                                 set_parameter, set_parameter_old,
+                                 evaluate_behav,
+                                 evaluate_bound)
             else:
                 theta, improvement, den_mise_log, bound = \
                     optimize_offline(evaluate_roba, theta, dtheta,

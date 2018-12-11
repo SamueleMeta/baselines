@@ -40,7 +40,7 @@ def get_env_type(env_id):
 
 
 def train(env, policy, horizon, seed, bounded_policy,
-          trainable_std, gain_init, multiple_init,
+          trainable_std, gain_init,
           njobs=1, **alg_args):
 
     # Prepare environment maker
@@ -129,7 +129,7 @@ def train(env, policy, horizon, seed, bounded_policy,
     gym.logger.setLevel(logging.WARN)
 
     # Learn
-    poise.learn(make_env, make_policy, multiple_init=multiple_init, horizon=horizon,
+    poise.learn(make_env, make_policy, horizon=horizon,
                 sampler=sampler, **alg_args)
 
     # Close sampler in the end
@@ -246,10 +246,10 @@ def main(args):
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--line_search', type=str, default=None)  # 'parabola'
     parser.add_argument('--multiple_init', type=int, default=None)
+    parser.add_argument('--grid_optimization', type=int, default=None)
     add_bool_arg(parser, 'bounded_policy', default=True)
     add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'experiment', default=False)
-    add_bool_arg(parser, 'grid_optimization', default=False)
     args = parser.parse_args(args)
 
     if args.experiment:
