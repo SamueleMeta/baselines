@@ -10,6 +10,7 @@ from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
 
+
 @contextmanager
 def timed(msg):
     print(colorize(msg, color='magenta'))
@@ -518,7 +519,7 @@ def learn(make_env, make_policy, *,
         # Learning iteration
         logger.log('********** Iteration %i ************' % iters_so_far)
 
-        # Generate trajectories
+        # Generate one trajectory
         with timed('sampling'):
             seg = sampler.collect(theta)
 
@@ -551,11 +552,11 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("TimeElapsed", time.time() - tstart)
 
         # Save policy parameters to disk
-        # if save_weights:
-        #     logger.record_tabular('Weights', str(get_parameter()))
-        #     import pickle
-        #     file = open('checkpoint.pkl', 'wb')
-        #     pickle.dump(theta, file)
+        if save_weights:
+            logger.record_tabular('Weights', str(get_parameter()))
+            import pickle
+            file = open('checkpoint.pkl', 'wb')
+            pickle.dump(theta, file)
 
         def evaluate_behav():
             args_behav = all_seg['ob'], all_seg['ac'], \
