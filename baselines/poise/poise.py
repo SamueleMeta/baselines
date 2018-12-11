@@ -173,6 +173,29 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
+def best_of_grid(evaluate_roba, theta_init, dtheta, old_thetas_list,
+                 iters_so_far, mask_iters,
+                 set_parameter, set_parameter_old, evaluate_behav,
+                 evaluate_bound, evaluate_gradient,
+                 line_search, evaluate_natural_gradient=None,
+                 gradient_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
+
+    # Compute MISE's denominator
+    den_mise = np.zeros(mask_iters.shape).astype(np.float32)
+    for i in range(len(old_thetas_list)):
+        set_parameter_old(old_thetas_list[i])
+        behav = evaluate_behav()
+        den_mise = den_mise + np.exp(behav)
+
+    # Compute log of MISE's denominator
+    eps = 1e-24  # to avoid inf weights and nan bound
+    den_mise = (den_mise + eps) / iters_so_far
+    den_mise_log = np.log(den_mise) * mask_iters
+
+    return den_mise_log
+
+
+
 def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                      iters_so_far, mask_iters,
                      set_parameter, set_parameter_old, evaluate_behav,
@@ -294,7 +317,8 @@ def learn(make_env, make_policy, *,
           save_weights=False,
           render_after=None,
           callback=None,
-          line_search=None):
+          line_search=None,
+          grid_optimization=False):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -575,13 +599,13 @@ def learn(make_env, make_policy, *,
             args_roba = args + (den_mise_log,)
             return compute_roba(*args_roba)
 
-        if multiple_init:
-            with timed("Optimization"):
+        with timed("Optimization"):
+            if multiple_init:
                 bound = improvement = 0
                 check = False
                 for i in range(multiple_init):
-                    theta_init = [np.random.uniform(
-                        pi.min_mean, pi.max_mean)]
+                    theta_init = np.arctanh(np.random.uniform(
+                        pi.min_mean, pi.max_mean))
                     theta_i, improvement_i, den_mise_log_i, bound_i = \
                         optimize_offline(evaluate_roba, theta_init, dtheta,
                                          old_thetas_list,
@@ -598,9 +622,9 @@ def learn(make_env, make_policy, *,
                         den_mise_log = den_mise_log_i
                 if not check:
                     den_mise_log = den_mise_log_i
-        else:
-            # Perform optimization
-            with timed("Optimization"):
+            elif grid_optimization:
+                print('GNEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE')
+            else:
                 theta, improvement, den_mise_log, bound = \
                     optimize_offline(evaluate_roba, theta, dtheta,
                                      old_thetas_list,
@@ -610,7 +634,7 @@ def learn(make_env, make_policy, *,
                                      evaluate_behav, evaluate_bound,
                                      evaluate_gradient, line_search,
                                      max_offline_ite=max_offline_iters)
-        set_parameter(theta)
+            set_parameter(theta)
 
         args += (den_mise_log,)
         with timed('summaries after'):

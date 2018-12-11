@@ -39,13 +39,16 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, seed, policy, max_offline_iters, aggregate, adaptive_batch, njobs=1):
+
+def train(env, max_iters, num_episodes, horizon, iw_norm,
+          bound, delta, gamma, seed, policy, max_offline_iters,
+          aggregate, adaptive_batch, njobs=1):
 
     if env.startswith('rllab.'):
-        # Get env name and class
+        # Get env name and class
         env_name = re.match('rllab.(\w+)', env).group(1)
         env_rllab_class = rllab_env_from_name(env_name)
-        # Define env maker
+        # Define env maker
         def make_env():
             env_rllab = env_rllab_class()
             _env = Rllab2GymWrapper(env_rllab)
@@ -58,7 +61,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
         assert env_type is not None, "Env not recognized."
         # Define the correct env maker
         if env_type == 'atari':
-            # Atari is not tested here
+            # Atari is not tested here
             raise Exception('Not tested on atari.')
         else:
             # Not atari, standard env creation
@@ -74,10 +77,10 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
     elif policy == 'cnn':
         raise Exception('CNN policy not tested.')
 
-    if aggregate=='none':
+    if aggregate == 'none':
         learner = pbpois
         PolicyClass = PeMlpPolicy
-    elif aggregate=='neuron':
+    elif aggregate == 'neuron':
         learner = nbpois
         PolicyClass = MultiPeMlpPolicy
     else:
@@ -85,14 +88,12 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
         learner = pbpois
         PolicyClass = PeMlpPolicy
 
-    make_policy = lambda name, observation_space, action_space: PolicyClass(name,
-                      observation_space,
-                      action_space,
-                      hid_layers,
-                      use_bias=True,
-                      seed=seed)
+    def make_policy(name, ob_space, ac_space, hid_layers):
+        return PolicyClass(name, ob_space, ac_space, hid_layers,
+                           use_bias=True, seed=seed)
 
-    sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
+    sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel,
+                              num_episodes, njobs, seed)
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -124,6 +125,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
           adaptive_batch=adaptive_batch)
 
     sampler.close()
+
 
 def main():
     import argparse
@@ -164,6 +166,7 @@ def main():
           njobs=args.njobs,
           aggregate=args.aggregate,
           adaptive_batch=args.adaptive_batch)
+
 
 if __name__ == '__main__':
     main()

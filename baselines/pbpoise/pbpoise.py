@@ -34,8 +34,6 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
 
     return ret, disc_ret, t
 
-# BINARY line search
-
 
 def line_search_binary(pol, newpol, actor_params,
                        rets, alpha, natgrad,
@@ -149,8 +147,9 @@ def optimize_offline(pol, newpol, actor_params,
     fmtstr = "%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g"
     titlestr = "%6s %10s %10s %18s %18s %18s %18s"
     if verbose:
-        print(titlestr % ("iter", "epsilon", "step size", "num line search",
-                          "gradient norm", "delta bound ite", "delta bound tot"))
+        print(titlestr
+              % ("iter", "epsilon", "step size", "num line search",
+                 "gradient norm", "delta bound ite", "delta bound tot"))
 
     natgrad = None
 
@@ -159,50 +158,59 @@ def optimize_offline(pol, newpol, actor_params,
         newpol.set_params(rho)
 
         # Bound with gradient
-        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta)
+        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, pol,
+                                                 rmax, normalize, use_rmax,
+                                                 use_renyi, delta)
         if np.any(np.isnan(grad)):
-            warnings.warn('Got NaN gradient! Stopping!')
+            print('Got NaN gradient! Stopping!')
             return rho, improvement
         if np.isnan(bound):
-            warnings.warn('Got NaN bound! Stopping!')
+            print('Got NaN bound! Stopping!')
             return rho, improvement
 
-
-        #Natural gradient
+        # Natural gradient
         if newpol.diagonal:
             natgrad = grad/(newpol.eval_fisher() + 1e-24)
         else:
             raise NotImplementedError
-        #assert np.dot(grad, natgrad) >= 0
+        # assert np.dot(grad, natgrad) >= 0
 
         grad_norm = np.sqrt(np.dot(grad, natgrad))
         if grad_norm < grad_tol:
-            if verbose: print("stopping - gradient norm < gradient_tol")
-            if verbose>1: print(rho)
+            if verbose:
+                print("stopping - gradient norm < gradient_tol")
+            if verbose > 1:
+                print(rho)
             return rho, improvement
 
-        #Step size search
+        # Step size search
         alpha = 1. / grad_norm ** 2
-        line_search = line_search_parabola if use_parabola else line_search_binary
-        rho, epsilon, delta_bound, num_line_search = line_search(pol,
-                                                                 newpol,
-                                                                 actor_params,
-                                                                 rets,
-                                                                 alpha,
-                                                                 natgrad,
-                                                                 normalize=normalize,
-                                                                 use_rmax=use_rmax,
-                                                                 use_renyi=use_renyi,
-                                                                 max_search_ite=max_search_ite,
-                                                                 rmax=rmax,
-                                                                 delta=delta)
+        line_search = \
+            line_search_parabola if use_parabola else line_search_binary
+        rho, epsilon, delta_bound, num_line_search = \
+            line_search(pol,
+                        newpol,
+                        actor_params,
+                        rets,
+                        alpha,
+                        natgrad,
+                        normalize=normalize,
+                        use_rmax=use_rmax,
+                        use_renyi=use_renyi,
+                        max_search_ite=max_search_ite,
+                        rmax=rmax,
+                        delta=delta)
         newpol.set_params(rho)
-        improvement+=delta_bound
-        if verbose: print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, grad_norm, delta_bound, improvement))
+        improvement += delta_bound
+        if verbose:
+            print(fmtstr % (i+1, epsilon, alpha*epsilon,
+                            num_line_search, grad_norm,
+                            delta_bound, improvement))
         if delta_bound < bound_tol:
-            if verbose: print("stopping - delta bound < bound_tol")
-            if verbose>1: print(rho)
+            if verbose:
+                print("stopping - delta bound < bound_tol")
+            if verbose > 1:
+                print(rho)
             return rho, improvement
 
     return rho, improvement

@@ -184,7 +184,8 @@ def single_run(args, dtheta=None, delta=None, seed=None):
           max_offline_iters=args.max_offline_iters,
           max_iters=args.max_iters,
           render_after=args.render_after,
-          line_search=args.line_search)
+          line_search=args.line_search,
+          grid_optimization=args.grid_optimization)
 
 
 def multiple_runs(args):
@@ -197,7 +198,7 @@ def multiple_runs(args):
     delta = []
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
-    for i in [0.1, 0.01, 0.001]:
+    for i in [0.5, 0.1]:
         for j in [0.2, 0.99]:
             for k in range(3):
                 dtheta.append(i)
@@ -248,6 +249,7 @@ def main(args):
     add_bool_arg(parser, 'bounded_policy', default=True)
     add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'experiment', default=False)
+    add_bool_arg(parser, 'grid_optimization', default=False)
     args = parser.parse_args(args)
 
     if args.experiment:
