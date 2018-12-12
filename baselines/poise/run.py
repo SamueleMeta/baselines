@@ -136,7 +136,7 @@ def train(env, policy, horizon, seed, bounded_policy,
     # sampler.close()
 
 
-def single_run(args, dtheta=None, delta=None, seed=None):
+def single_run(args, dtheta=None, grid_opt=None, delta=None, seed=None):
 
     # Import custom envs (must be imported here or wont work with multiple_run)
     import baselines.envs.lqg1d  # registered at import as gym env
@@ -148,6 +148,8 @@ def single_run(args, dtheta=None, delta=None, seed=None):
         args.seed = seed
     if dtheta:
         args.dtheta = dtheta
+    if grid_opt:
+        args.grid_optimization = grid_opt
 
     # Log file name
     t = time.localtime(time.time())
@@ -194,14 +196,16 @@ def multiple_runs(args):
     from joblib import Parallel, delayed
 
     # Define range() for floats
-    dtheta = []
+    # dtheta = []
     delta = []
     seed = []
+    #  grid_opt = []
     # for i in [n/10 for n in range(1, 8)]:
-    for i in [0.5, 0.1]:
+    for i in [1000]:
         for j in [0.2, 0.99]:
             for k in range(3):
-                dtheta.append(i)
+                # dtheta.append(i)
+                #  grid_opt.append(i)
                 delta.append(j)
                 seed.append(k)
 
@@ -209,9 +213,10 @@ def multiple_runs(args):
     n_jobs = len(delta)
     Parallel(n_jobs=n_jobs)(delayed(single_run)(
         args,
-        dtheta[i],
-        delta[i],
-        seed[i]
+        # dtheta=dtheta[i],
+        #  grid_opt=grid_opt[i],
+        delta=delta[i],
+        seed=seed[i]
         ) for i in range(n_jobs))
 
 

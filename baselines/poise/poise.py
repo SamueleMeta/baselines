@@ -9,6 +9,8 @@ from contextlib import contextmanager
 from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
+import pathos.pools as pp
+
 
 
 @contextmanager
@@ -192,10 +194,22 @@ def best_of_grid(policy, n_points, theta_init,
     den_mise_log = np.log(den_mise) * mask_iters
 
     # Find the set of parameters to evaluate
-    theta_grid = np.linspace(policy.min_mean, policy.max_mean, n_points)
+    theta_grid = np.linspace(policy.min_mean, policy.max_mean, 1)
     # Evaluate the set of parameters and retain the best one
     bound_best = 0
     theta_best = theta_init
+    # def eval_bounds(theta):
+    #     set_parameter([theta])
+    #     bound = evaluate_bound(den_mise_log)
+    #     theta = theta**2
+    #     return bound, theta
+    # den_mise_log = np.array(den_mise_log)
+    # pool = pp.ProcessPool(4)
+    # thetas = pool.map(eval_bounds, theta_grid)
+    # print(thetas)
+    # i_best = np.argmax(bounds)
+    # bound_best = bounds[i_best]
+    # theta_best = [thetas[i_best]]
     for theta in theta_grid:
         set_parameter([theta])
         bound = evaluate_bound(den_mise_log)
