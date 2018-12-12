@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import warnings
 import baselines.common.tf_util as U
@@ -10,6 +11,8 @@ from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
 import pathos.pools as pp
+import matplotlib.pyplot as plt
+
 
 
 
@@ -175,11 +178,31 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
     return theta_old, epsilon_old, delta_bound_old, i+1
 
 
-def best_of_grid(policy, n_points, theta_init,
+def plot_bound_profile(
+        theta_grid, bound, mise, bonus, point_x, point_y, delta, iter):
+    fig = plt.figure(figsize=(8, 5))
+    ax = fig.add_subplot(111)
+    ax.grid()
+    ax.plot(theta_grid, bound, label='bound', color='red', linewidth='2')
+    ax.plot(theta_grid, mise, label='mise', color='blue', linewidth='0.5')
+    ax.plot(theta_grid, bonus, label='bonus', color='green', linewidth='0.5')
+    ax.plot(point_x, point_y, 'o', color='orange')
+    ax.legend(loc='upper right')
+    # Save plot to given dir
+    dir = './bound_profile/delta_{}/'.format(delta)
+    siter = 'iter_{}'.format(iter)
+    fname = dir + siter
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    fig.savefig(fname)
+    plt.close(fig)
+
+
+def best_of_grid(policy, theta_step, theta_init,
                  old_thetas_list,
                  iters_so_far, mask_iters,
                  set_parameter, set_parameter_old, evaluate_behav,
-                 evaluate_bound):
+                 evaluate_bound, evaluate_roba, delta):
 
     # Compute MISE's denominator
     den_mise = np.zeros(mask_iters.shape).astype(np.float32)
@@ -194,8 +217,11 @@ def best_of_grid(policy, n_points, theta_init,
     den_mise_log = np.log(den_mise) * mask_iters
 
     # Find the set of parameters to evaluate
-    theta_grid = np.linspace(policy.min_mean, policy.max_mean, 1)
+    theta_grid = np.linspace(policy.min_mean, policy.max_mean, theta_step)
     # Evaluate the set of parameters and retain the best one
+    bound = []
+    mise = []
+    bonus = []
     bound_best = 0
     theta_best = theta_init
     # def eval_bounds(theta):
@@ -212,10 +238,19 @@ def best_of_grid(policy, n_points, theta_init,
     # theta_best = [thetas[i_best]]
     for theta in theta_grid:
         set_parameter([theta])
-        bound = evaluate_bound(den_mise_log)
-        if bound > bound_best:
-            bound_best = bound
+        bound_theta = evaluate_bound(den_mise_log)
+        bound.append(bound_theta)
+        mise_theta, bonus_theta = evaluate_roba(den_mise_log)
+        mise.append(mise_theta)
+        bonus.append(bonus_theta)
+        if bound_theta > bound_best:
+            bound_best = bound_theta
             theta_best = [theta]
+
+    # Plot the profile of the bound and its components
+    plot_bound_profile(
+        theta_grid, bound, mise, bonus, theta_best,
+        bound_best, delta, iters_so_far)
 
     # Calculate improvement
     set_parameter(theta_init)
@@ -514,7 +549,7 @@ def learn(make_env, make_policy, *,
          mask_iters_, den_mise_log_], losses)
     compute_roba = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_,
-         mask_iters_, den_mise_log_], [target_sum_log_mean, miw_1, miw, mise])
+         mask_iters_, den_mise_log_], [mise, exploration_bonus])
 
     # Set sampler (default: sequential)
     if sampler is None:
@@ -658,7 +693,8 @@ def learn(make_env, make_policy, *,
                                  iters_so_far, mask_iters,
                                  set_parameter, set_parameter_old,
                                  evaluate_behav,
-                                 evaluate_bound)
+                                 evaluate_bound,
+                                 evaluate_roba, delta)
             else:
                 theta, improvement, den_mise_log, bound = \
                     optimize_offline(evaluate_roba, theta, dtheta,

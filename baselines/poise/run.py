@@ -201,9 +201,9 @@ def multiple_runs(args):
     seed = []
     #  grid_opt = []
     # for i in [n/10 for n in range(1, 8)]:
-    for i in [1000]:
-        for j in [0.2, 0.99]:
-            for k in range(3):
+    for i in [100]:
+        for j in [0.05, 0.1, 0.2, 0.99]:
+            for k in range(1):
                 # dtheta.append(i)
                 #  grid_opt.append(i)
                 delta.append(j)

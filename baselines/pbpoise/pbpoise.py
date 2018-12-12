@@ -35,6 +35,7 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
     return ret, disc_ret, t
 
 
+# BINARY line search
 def line_search_binary(pol, newpol, actor_params,
                        rets, alpha, natgrad,
                        normalize=True,
