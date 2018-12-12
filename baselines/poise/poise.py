@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
-import pathos.pools as pp
 import matplotlib.pyplot as plt
 
 
