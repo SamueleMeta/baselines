@@ -178,17 +178,18 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
 
 
 def plot_bound_profile(
-        theta_grid, bound, mise, bonus, point_x, point_y, delta, iter):
+        theta_grid, bound, mise, bonus, miw_1, point_x, point_y, delta, iter):
     fig = plt.figure(figsize=(8, 5))
     ax = fig.add_subplot(111)
     ax.grid()
     ax.plot(theta_grid, bound, label='bound', color='red', linewidth='2')
     ax.plot(theta_grid, mise, label='mise', color='blue', linewidth='0.5')
     ax.plot(theta_grid, bonus, label='bonus', color='green', linewidth='0.5')
+    ax.plot(theta_grid, miw_1, label='bonus', color='green', linestyle='--')
     ax.plot(point_x, point_y, 'o', color='orange')
     ax.legend(loc='upper right')
     # Save plot to given dir
-    dir = './bound_profile/delta_{}/'.format(delta)
+    dir = './bound_profile/unbounded_policy/miw_1_delta_{}/'.format(delta)
     siter = 'iter_{}'.format(iter)
     fname = dir + siter
     if not os.path.exists(dir):
@@ -216,39 +217,46 @@ def best_of_grid(policy, theta_step, theta_init,
     den_mise_log = np.log(den_mise) * mask_iters
 
     # Find the set of parameters to evaluate
-    theta_grid = np.linspace(policy.min_mean, policy.max_mean, theta_step)
+    if hasattr(policy, 'min_mean'):
+        theta_grid = np.linspace(policy.min_mean, policy.max_mean, theta_step)
+    else:
+        theta_grid = np.linspace(-1, 1, theta_step)
     # Evaluate the set of parameters and retain the best one
     bound = []
     mise = []
     bonus = []
+    miw_1 = []
+    miw_2 = []
     bound_best = 0
     theta_best = theta_init
-    # def eval_bounds(theta):
-    #     set_parameter([theta])
-    #     bound = evaluate_bound(den_mise_log)
-    #     theta = theta**2
-    #     return bound, theta
-    # den_mise_log = np.array(den_mise_log)
-    # pool = pp.ProcessPool(4)
-    # thetas = pool.map(eval_bounds, theta_grid)
-    # print(thetas)
-    # i_best = np.argmax(bounds)
-    # bound_best = bounds[i_best]
-    # theta_best = [thetas[i_best]]
+
     for theta in theta_grid:
         set_parameter([theta])
         bound_theta = evaluate_bound(den_mise_log)
         bound.append(bound_theta)
-        mise_theta, bonus_theta = evaluate_roba(den_mise_log)
+        mise_theta, bonus_theta, miw_1_theta, miw_2_theta = \
+            evaluate_roba(den_mise_log)
         mise.append(mise_theta)
         bonus.append(bonus_theta)
+        miw_1.append(miw_1_theta)
+        miw_2.append(miw_2_theta)
         if bound_theta > bound_best:
             bound_best = bound_theta
             theta_best = [theta]
 
+    # Checkpoint
+    set_parameter([theta_grid[0]])
+    mise_theta, bonus_theta, miw_1_theta, miw_2_theta = \
+        evaluate_roba(den_mise_log)
+    print('miw_1, miw_2 e d2 for p(mu=1,std=0.1):',
+          theta_grid[0],
+          miw_1_theta,
+          miw_2_theta,
+          miw_2_theta/miw_1_theta)
+
     # Plot the profile of the bound and its components
     plot_bound_profile(
-        theta_grid, bound, mise, bonus, theta_best,
+        theta_grid, bound, mise, bonus, miw_1, theta_best,
         bound_best, delta, iters_so_far)
 
     # Calculate improvement
@@ -501,18 +509,26 @@ def learn(make_env, make_policy, *,
     # losses_with_name.append((mis, 'ISE'))
 
     # Bounds
-    eps = 1e-10
+    eps = 1e-18  # for eps<1e-18 miw_2=0 if weights are zero
     miw_ess = (tf.exp(log_ratio_split) + eps) * mask_iters_
-    miw_1 = tf.reduce_sum(miw_ess)
-    miw_2 = tf.linalg.norm(miw_ess, 2)
+    # miw_1 = tf.reduce_sum(miw_ess)
+    miw_1 = tf.linalg.norm(miw_ess, ord=1)
+    miw_2 = tf.linalg.norm(miw_ess, ord=2)
     if bound == 'J':
         bound_ = mise
     elif bound == 'max-ess':
-        sqrt_ess_classic = miw_1 / miw_2
-        exploration_bonus = \
-            tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
+        sqrt_ess = miw_1 / miw_2
+
+        def log10(x):
+            numerator = tf.log(x)
+            denominator = tf.log(tf.constant(10, dtype=numerator.dtype))
+            return numerator / denominator
+
+        delta_t = delta*(1 - 1/log10(iter_number_))
+        const = return_abs_max * tf.sqrt(1 / delta - 1)
+        exploration_bonus = const / (sqrt_ess)
         bound_ = mise + exploration_bonus
-        losses_with_name.extend([(sqrt_ess_classic, 'SqrtESSClassic'),
+        losses_with_name.extend([(sqrt_ess, 'SqrtESSClassic'),
                                  (exploration_bonus, 'ExplorationBonus'),
                                  (miw_1, 'IWNorm1'),
                                  (miw_2, 'IWNorm2')])
@@ -548,7 +564,7 @@ def learn(make_env, make_policy, *,
          mask_iters_, den_mise_log_], losses)
     compute_roba = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_,
-         mask_iters_, den_mise_log_], [mise, exploration_bonus])
+         mask_iters_, den_mise_log_], [mise, exploration_bonus, miw_1, miw_2])
 
     # Set sampler (default: sequential)
     if sampler is None:

@@ -18,9 +18,10 @@ class MlpPolicy(object):
             self.scope = tf.get_variable_scope().name
             self._prepare_getsetters()
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True, use_critic=True,
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers,
+              gaussian_fixed_var=True, trainable_std=False, use_bias=True, use_critic=True,
               seed=None, hidden_W_init=U.normc_initializer(1.0), hidden_b_init=tf.zeros_initializer(),
-                 output_W_init=U.normc_initializer(0.01), output_b_init=tf.zeros_initializer()):
+              output_W_init=U.normc_initializer(0.01), output_b_init=tf.zeros_initializer()):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -67,7 +68,16 @@ class MlpPolicy(object):
                                        name='final',
                                        kernel_initializer=output_W_init,
                                        use_bias=use_bias)
-                self.logstd = logstd = tf.get_variable(name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=output_b_init)
+                if not trainable_std:
+                    self.logstd = logstd = tf.get_variable(
+                        name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2],
+                        initializer=tf.constant_initializer(np.log(0.11)),
+                        trainable=trainable_std)
+                else:
+                    self.logstd = logstd = tf.get_variable(
+                        name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2],
+                        initializer=output_b_init, trainable=trainable_std)
+
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
                 pdparam = tf.layers.dense(last_out, pdtype.param_shape()[0],

@@ -102,7 +102,8 @@ def train(env, policy, horizon, seed, bounded_policy,
                 return MlpPolicy(
                     name=name, ob_space=ob_space, ac_space=ac_space,
                     hid_size=hid_size, num_hid_layers=num_hid_layers,
-                    gaussian_fixed_var=True, use_bias=False, use_critic=False,
+                    gaussian_fixed_var=True, trainable_std=trainable_std,
+                    use_bias=False, use_critic=False,
                     hidden_W_init=tf.constant_initializer(-0.1))
 
     elif policy == 'cnn':
