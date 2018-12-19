@@ -5,7 +5,7 @@ import gym
 from baselines.common.distributions import make_pdtype
 import numpy as np
 import scipy.stats as sts
-#import time
+# import time
 
 class MlpPolicy(object):
     """Gaussian policy with critic, based on multi-layer perceptron"""

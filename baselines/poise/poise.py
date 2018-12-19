@@ -266,7 +266,6 @@ def best_of_grid(policy, theta_step, theta_init,
     return theta_best, improvement, den_mise_log
 
 
-
 def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                      iters_so_far, mask_iters,
                      set_parameter, set_parameter_old, evaluate_behav,
@@ -518,13 +517,12 @@ def learn(make_env, make_policy, *,
         bound_ = mise
     elif bound == 'max-ess':
         sqrt_ess = miw_1 / miw_2
-
-        def log10(x):
-            numerator = tf.log(x)
-            denominator = tf.log(tf.constant(10, dtype=numerator.dtype))
-            return numerator / denominator
-
-        delta_t = delta*(1 - 1/log10(iter_number_))
+        # def log10(x):
+        #     numerator = tf.log(x)
+        #     denominator = tf.log(tf.constant(10, dtype=numerator.dtype))
+        #     return numerator / denominator
+        #
+        # delta_t = delta*(1 - 1/log10(iter_number_))
         const = return_abs_max * tf.sqrt(1 / delta - 1)
         exploration_bonus = const / (sqrt_ess)
         bound_ = mise + exploration_bonus

@@ -217,30 +217,27 @@ def optimize_offline(pol, newpol, actor_params,
     return rho, improvement
 
 
-def learn(env_maker, pol_maker, sampler,
-          gamma, n_episodes,
+def learn(env_maker, pol_maker,
+          gamma,
           horizon, max_iters,
-          iw_norm='sn',
+          iw_norm=False,
           bound='max-ess',
           max_offline_iters=100,
           max_search_ite=30,
           delta=0.2,
+          sampler=None,
           feature_fun=None,
           verbose=True,
           save_weights=False,
           center_return=False,
-          line_search_type='parabola',
-          adaptive_batch=False):
+          line_search_type='parabola'):
 
     # Initialization
     env = env_maker()
     pol = pol_maker('pol', env.observation_space, env.action_space)
     newpol = pol_maker('newpol', env.observation_space, env.action_space)
     newpol.set_params(pol.eval_params())
-    old_rho = pol.eval_params()
-    batch_size = n_episodes
-    normalize = True if iw_norm == 'sn' else False
-    episodes_so_far = 0
+    normalize = False
     timesteps_so_far = 0
     tstart = time.time()
 
@@ -253,19 +250,23 @@ def learn(env_maker, pol_maker, sampler,
     else:
         raise NotImplementedError
 
-    if line_search_type == 'parabola':
-        use_parabola = True
-    elif line_search_type == 'binary':
-        use_parabola = False
-    else:
-        raise NotImplementedError
+    # if line_search_type == 'parabola':
+    #     use_parabola = True
+    # elif line_search_type == 'binary':
+    #     use_parabola = False
+    # else:
+    #     raise NotImplementedError
 
-    promise = -np.inf
     actor_params, rets, disc_rets, lens = [], [], [], []
-    old_actor_params, old_rets, old_disc_rets, old_lens = [], [], [], []
-
+    it = 0
     # Learning
-    for it in range(max_iters):
+    while True:
+        it += 1
+
+        # Exit loop in the end
+        if it >= max_iters:
+            print('Finished...')
+            break
 
         # Learning iteration
         logger.log('\n********** Iteration %i ************' % it)
@@ -279,15 +280,14 @@ def learn(env_maker, pol_maker, sampler,
 
         # Generate one trajectory
         with timed('Sampling', verbose):
-                frozen_pol = pol.freeze()
-                theta = frozen_pol.resample()
+                # Sample actor's parameters from hyperpolicy
+                theta = pol.resample()
                 actor_params.append(theta)
                 ret, disc_ret, ep_len = eval_trajectory(
-                    env, frozen_pol, gamma, horizon, feature_fun)
+                    env, pol, gamma, horizon, feature_fun)
                 rets.append(ret)
                 disc_rets.append(disc_ret)
                 lens.append(ep_len)
-        complete = len(rets) >= batch_size  # Is the batch complete?
 
         # Normalize reward
         norm_disc_rets = np.array(disc_rets)
@@ -295,112 +295,76 @@ def learn(env_maker, pol_maker, sampler,
             norm_disc_rets = norm_disc_rets - np.mean(norm_disc_rets)
         rmax = np.max(abs(norm_disc_rets))
 
-        # Estimate online performance
-        perf = np.mean(norm_disc_rets)
-        episodes_so_far += n_episodes
-        timesteps_so_far += sum(lens[-n_episodes:])
-
+        timesteps_so_far += lens[-1]
         with timed('summaries before'):
-            logger.log("Performance (plain, undiscounted): ", np.mean(rets[-n_episodes:]))
+            logger.record_tabular("ReturnLastEpisode", rets[-1])
+            logger.record_tabular("ReturnLastEpisodeDisc", disc_rets[-1])
             # Data regarding the episodes collected in this iteration
             logger.record_tabular("Iteration", it)
-            logger.record_tabular("InitialBound", newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta))
-            logger.record_tabular("EpLenMean", np.mean(lens[-n_episodes:]))
-            logger.record_tabular("EpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
-            logger.record_tabular("UndEpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
-            logger.record_tabular("EpThisIter", n_episodes)
-            logger.record_tabular("EpisodesSoFar", episodes_so_far)
+            logger.record_tabular("InitialBound", newpol.eval_bound(
+                actor_params, norm_disc_rets, pol, rmax,
+                normalize, use_rmax, use_renyi, delta))
+            logger.record_tabular("EpLenMean", np.mean(lens[-1]))
+            logger.record_tabular("EpRewMean", np.mean(norm_disc_rets[-1]))
+            logger.record_tabular("UndEpRewMean", np.mean(norm_disc_rets[-1]))
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
-            logger.record_tabular("BatchSize", batch_size)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
 
-        if adaptive_batch and complete and perf < promise and batch_size < 5*n_episodes:
-            # The policy is rejected (unless batch size is already maximal)
-            iter_type = 0
-            if verbose:
-                logger.log('Rejecting policy (expected at least %f, got %f instead)!\nIncreasing batch_size' % (promise, perf))
-            batch_size += n_episodes  # Increase batch size
-            newpol.set_params(old_rho)  # Reset to last accepted policy
-            promise = -np.inf  # No need to test last accepted policy
-            # Reuse old trajectories
-            actor_params = old_actor_params
-            rets = old_rets
-            disc_rets = old_disc_rets
-            lens = old_lens
-            if verbose:
-                logger.log('Must collect more data (have %d/%d)'
-                           % (len(rets), batch_size))
-            complete = False
-        elif complete:
-            # The policy is accepted, optimization is performed
-            iter_type = 1
-            old_rho = rho  # Save as last accepted policy (and its trajectories)
-            old_actor_params = actor_params
-            old_rets = rets
-            old_disc_rets = disc_rets
-            old_lens = lens
-            with timed('offline optimization', verbose):
-                rho, improvement = optimize_offline(
-                    pol, newpol, actor_params,
-                    norm_disc_rets,
-                    normalize=normalize,
-                    use_rmax=use_rmax,
-                    use_renyi=use_renyi,
-                    max_offline_ite=max_offline_iters,
-                    max_search_ite=max_search_ite,
-                    rmax=rmax,
-                    delta=delta,
-                    use_parabola=use_parabola,
-                    verbose=verbose)
-                newpol.set_params(rho)
-                # assert(improvement>=0.)
-                # Expected performance
-                promise = newpol.eval_bound(actor_params, norm_disc_rets, pol,
-                                            rmax, normalize, use_rmax, use_renyi, delta)
-        else:
-            # The batch is incomplete, more data will be collected
-            iter_type = 2
-            if verbose:
-                logger.log('Must collect more data (have %d/%d)' % (len(rets), batch_size))
-            newpol.set_params(rho)  # Policy stays the same
+        # The policy is accepted, optimization is performed
+        # iter_type = 1
+        # with timed('offline optimization', verbose):
+        #     rho, improvement = optimize_offline(
+        #         pol, newpol, actor_params,
+        #         norm_disc_rets,
+        #         normalize=normalize,
+        #         use_rmax=use_rmax,
+        #         use_renyi=use_renyi,
+        #         max_offline_ite=max_offline_iters,
+        #         max_search_ite=max_search_ite,
+        #         rmax=rmax,
+        #         delta=delta,
+        #         use_parabola=use_parabola,
+        #         verbose=verbose)
+        #     newpol.set_params(rho)
+            # assert(improvement>=0.)
 
         # Save data
         if save_weights:
             logger.record_tabular('Weights', str(w_to_save))
 
         with timed('summaries after'):
-            unn_iws = newpol.eval_iws(actor_params, behavioral=pol, normalize=False)
+            unn_iws = newpol.eval_iws(actor_params, behavioral=pol,
+                                      normalize=False)
             iws = unn_iws/np.sum(unn_iws)
-            ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
-            J, varJ = newpol.eval_performance(actor_params, norm_disc_rets, behavioral=pol)
+            sqrt_ess = np.linalg.norm(unn_iws, 1) / np.linalg.norm(unn_iws, 2)
+            J, varJ = newpol.eval_performance(actor_params, norm_disc_rets,
+                                              behavioral=pol)
             renyi = newpol.eval_renyi(pol)
             bound = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
-                                                             normalize, use_rmax, use_renyi, delta)
+                                      normalize, use_rmax, use_renyi, delta)
 
-            #Data regarding the whole batch
-            logger.record_tabular('BatchSize', batch_size)
-            logger.record_tabular('IterType', iter_type)
+            # Data regarding the whole batch
+            # logger.record_tabular('IterType', iter_type)
             logger.record_tabular('Bound', bound)
-            #Discounted, [centered]
+            # Discounted, [centered]
             logger.record_tabular('InitialReturnMean', np.mean(norm_disc_rets))
             logger.record_tabular('InitialReturnMax', np.max(norm_disc_rets))
             logger.record_tabular('InitialReturnMin', np.min(norm_disc_rets))
             logger.record_tabular('InitialReturnStd', np.std(norm_disc_rets))
             logger.record_tabular('InitialReturnMin', np.min(norm_disc_rets))
-            #Discounted, uncentered
+            # Discounted, uncentered
             logger.record_tabular('UncReturnMean', np.mean(disc_rets))
             logger.record_tabular('UncReturnMax', np.max(disc_rets))
             logger.record_tabular('UncReturnMin', np.min(disc_rets))
             logger.record_tabular('UncReturnStd', np.std(disc_rets))
             logger.record_tabular('UncReturnMin', np.min(disc_rets))
-            #Undiscounted, uncentered
+            # Undiscounted, uncentered
             logger.record_tabular('PlainReturnMean', np.mean(rets))
             logger.record_tabular('PlainReturnMax', np.max(rets))
             logger.record_tabular('PlainReturnMin', np.min(rets))
             logger.record_tabular('PlainReturnStd', np.std(rets))
             logger.record_tabular('PlainReturnMin', np.min(rets))
-            #Iws
+            # Iws
             logger.record_tabular('D2', renyi)
             logger.record_tabular('ReturnMeanIw', J)
             logger.record_tabular('MaxIWNorm', np.max(iws))
@@ -411,13 +375,9 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('MinIW', np.min(unn_iws))
             logger.record_tabular('MeanIW', np.mean(unn_iws))
             logger.record_tabular('StdIW', np.std(unn_iws))
-            logger.record_tabular('ESSClassic', ess)
-            logger.record_tabular('ESSRenyi', batch_size/np.exp(renyi))
+            logger.record_tabular('ESSClassic', sqrt_ess ** 2)
 
         logger.dump_tabular()
 
-        #Update behavioral
+        # Update behavioral
         pol.set_params(newpol.eval_params())
-        if complete:
-            #Start new batch
-            actor_params, rets, disc_rets, lens = [], [], [], []
