@@ -2,6 +2,7 @@ from baselines.common.mpi_running_mean_std import RunningMeanStd
 import baselines.common.tf_util as U
 import tensorflow as tf
 import gym
+from baselines.common import set_global_seeds
 from baselines.common.distributions import make_pdtype
 import numpy as np
 import scipy.stats as sts
@@ -40,15 +41,16 @@ class MlpPolicyBounded(object):
             min_mean: minimum policy mean
             min_std: minimum policy standard deviation
         """
+        # Check environment's shapes
         assert isinstance(ob_space, gym.spaces.Box)
-
+        # Set hidden layers' size
         if isinstance(hid_size, list):
             num_hid_layers = len(hid_size)
         else:
             hid_size = [hid_size] * num_hid_layers
-
+        # Set seed
         if seed is not None:
-            tf.set_random_seed(seed)
+            set_global_seeds(seed)
 
         # Boundaries
         # Default values
@@ -617,14 +619,14 @@ class MlpPolicyBounded(object):
 
     def _prepare_getsetters(self):
         with tf.variable_scope('pol') as vs:
-            self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
-                                         scope=vs.name)
+            self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES,
+                                              scope=vs.name)
 
         self.get_parameter = U.GetFlat(self.var_list)
         self.set_parameter = U.SetFromFlat(self.var_list)
 
 
-    #Weight manipulation
+    # Weight manipulation
     def eval_param(self):
         """"Policy parameters (numeric,flat)"""
         return self.get_parameter()
@@ -637,7 +639,7 @@ class MlpPolicyBounded(object):
         self.set_parameter(param)
 
 
-    #Used by original implementation
+    # Used by original implementation
     def get_variables(self):
         return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
     def get_trainable_variables(self):

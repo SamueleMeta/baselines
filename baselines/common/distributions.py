@@ -225,7 +225,9 @@ class MultiCategoricalPd(Pd):
 class DiagGaussianPd(Pd):
     def __init__(self, flat):
         self.flat = flat
-        mean, logstd = tf.split(axis=len(flat.shape)-1, num_or_size_splits=2, value=flat)
+        mean, logstd = tf.split(axis=len(flat.shape)-1,
+                                num_or_size_splits=2,
+                                value=flat)
         self.mean = mean
         self.logstd = logstd
         self.std = tf.exp(logstd)

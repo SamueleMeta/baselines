@@ -89,7 +89,6 @@ def train(env, policy, horizon, seed, bounded_policy,
                     hid_size=hid_size, num_hid_layers=num_hid_layers,
                     gaussian_fixed_var=True, trainable_std=trainable_std,
                     use_bias=False, use_critic=False,
-                    #hidden_W_init=tf.constant_initializer(1.1),
                     gain_init=gain_init,
                     max_mean=1,
                     min_mean=-1,
@@ -105,14 +104,6 @@ def train(env, policy, horizon, seed, bounded_policy,
                     gaussian_fixed_var=True, trainable_std=trainable_std,
                     use_bias=False, use_critic=False,
                     hidden_W_init=tf.constant_initializer(-0.1))
-
-    elif policy == 'cnn':
-        def make_policy(name, ob_space, ac_space):
-            return CnnPolicy(
-                name=name, ob_space=ob_space, ac_space=ac_space,
-                gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                output_W_init=tf.contrib.layers.xavier_initializer())
     else:
         raise Exception('Unrecognized policy type.')
 

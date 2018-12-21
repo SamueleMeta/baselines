@@ -542,7 +542,6 @@ def learn(make_env, make_policy, *,
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
     set_parameter_old = U.SetFromFlat(var_list_old)
-    get_parameter_old = U.GetFlat(var_list_old)
 
     compute_behav = U.function(
         [ob_, ac_, mask_, iter_number_, mask_iters_],
@@ -588,6 +587,7 @@ def learn(make_env, make_policy, *,
     episodes_so_far = 0
     timesteps_so_far = 0
     iters_so_far = 0
+    mask_iters = np.zeros(max_iters)
     tstart = time.time()
     # Store behaviorals' params and their trajectories
     old_thetas_list = []
@@ -636,7 +636,6 @@ def learn(make_env, make_policy, *,
 
         # Set arguments for U.functions
         args = ()
-        mask_iters = np.zeros(max_iters)
         mask_iters[:iters_so_far] = 1
 
         for key in all_seg.keys():
