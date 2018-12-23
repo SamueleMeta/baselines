@@ -19,8 +19,8 @@ import baselines.common.tf_util as U
 from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # Self imports: algorithm
-from baselines.policy.weight_hyperpolicy import PeMlpPolicy
-from baselines.pbpoise import pbpoise
+from baselines.policy.mlp_hyperpolicy import PeMlpPolicy
+from baselines.pbpoise import pbpoise2
 
 
 def get_env_type(env_id):
@@ -39,9 +39,9 @@ def get_env_type(env_id):
     return env_type
 
 
-def train(env, max_iters, horizon, iw_norm,
-          bound, delta, gamma, seed, policy, max_offline_iters,
-          aggregate, njobs=1):
+def train(env, policy, horizon, seed, bounded_policy,
+          trainable_std, gain_init,
+          njobs=1, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -73,18 +73,11 @@ def train(env, max_iters, horizon, iw_norm,
     # Create the policy
     if policy == 'linear':
         hid_layers = []
-
-    if aggregate == 'none':
-        learner = pbpoise
-        PolicyClass = PeMlpPolicy
-
     else:
-        print("Unknown aggregation method, defaulting to none")
-        learner = pbpoise
-        PolicyClass = PeMlpPolicy
+        raise NotImplementedError
 
     def make_policy(name, ob_space, ac_space):
-        return PolicyClass(name, ob_space, ac_space, hid_layers,
+        return PeMlpPolicy(name, ob_space, ac_space, hid_layers,
                            use_bias=True, seed=seed)
 
     try:
@@ -98,20 +91,12 @@ def train(env, max_iters, horizon, iw_norm,
 
     gym.logger.setLevel(logging.WARN)
 
-    learner.learn(
-          make_env,
-          make_policy,
-          gamma=gamma,
-          horizon=horizon,
-          max_iters=max_iters,
-          verbose=1,
-          feature_fun=np.ravel,
-          iw_norm=iw_norm,
-          bound=bound,
-          max_offline_iters=max_offline_iters,
-          delta=delta,
-          center_return=False,
-          line_search_type='parabola')
+    # Prepare (sequential) sampler to generate ONE trajectory at a time
+    sampler = None
+
+    # Learn
+    pbpoise2.learn(make_env, make_policy, horizon=horizon,
+                   sampler=sampler, **alg_args)
 
 
 def single_run(args):
@@ -137,25 +122,32 @@ def single_run(args):
                      format_strs=['stdout', 'csv', 'tensorboard'],
                      file_name=file_name)
 
+    # Learn
     train(env=args.env,
-          max_iters=args.max_iters,
+          policy=args.policy,
           horizon=args.horizon,
-          iw_norm=args.iw_norm,
+          seed=args.seed,
+          bounded_policy=args.bounded_policy,
+          trainable_std=args.trainable_std,
+          gain_init=args.gain_init,  # LQG only
+          multiple_init=args.multiple_init,
+          njobs=args.njobs,
           bound=args.bound,
           delta=args.delta,
+          drho=args.drho,
           gamma=args.gamma,
-          seed=args.seed,
-          policy=args.policy,
           max_offline_iters=args.max_offline_iters,
-          njobs=args.njobs,
-          aggregate=args.aggregate)
+          max_iters=args.max_iters,
+          render_after=args.render_after,
+          line_search=args.line_search,
+          grid_optimization=args.grid_optimization)
 
 
 def multiple_runs(args):
     pass
 
 
-def main():
+def main(args):
     import argparse
 
     # Easily add a boolean argument to the parser with default value
@@ -169,21 +161,27 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--env', type=str, default='CartPole-v0')
+    parser.add_argument('--env', type=str, default='LQG1D-v0')
     parser.add_argument('--horizon', type=int, default=20)
-    parser.add_argument('--iw_norm', type=str, default='sn')
+    parser.add_argument('--bound', type=str, default='max-ess')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
-    parser.add_argument('--bound', type=str, default='max-d2')
-    parser.add_argument('--aggregate', type=str, default='none')
-    parser.add_argument('--delta', type=float, default=0.99)
+    parser.add_argument('--gain_init', type=float, default=-0.1)  # LQG only
+    parser.add_argument('--delta', type=float, default=0.2)
+    parser.add_argument('--drho', type=float, default=1)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
-    parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=1000)
+    parser.add_argument('--max_offline_iters', type=int, default=10)
+    parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
+    parser.add_argument('--line_search', type=str, default=None)  # 'parabola'
+    parser.add_argument('--multiple_init', type=int, default=None)
+    parser.add_argument('--grid_optimization', type=int, default=None)
+    add_bool_arg(parser, 'bounded_policy', default=True)
+    add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'experiment', default=False)
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     if args.experiment:
         multiple_runs(args)
@@ -192,4 +190,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
