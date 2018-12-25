@@ -20,7 +20,7 @@ from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # Self imports: algorithm
 from baselines.policy.mlp_hyperpolicy import PeMlpPolicy
-from baselines.pbpoise import pbpoise2
+from baselines.pbpoise import pbpoise
 
 
 def get_env_type(env_id):
@@ -78,7 +78,11 @@ def train(env, policy, horizon, seed, bounded_policy,
 
     def make_policy(name, ob_space, ac_space):
         return PeMlpPolicy(name, ob_space, ac_space, hid_layers,
-                           use_bias=True, seed=seed)
+                           deterministic=True, diagonal=True,
+                           trainable_std=trainable_std,
+                           use_bias=False, use_critic=False,
+                           seed=seed, verbose=True,
+                           hidden_W_init=U.normc_initializer(1.0))
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -95,7 +99,7 @@ def train(env, policy, horizon, seed, bounded_policy,
     sampler = None
 
     # Learn
-    pbpoise2.learn(make_env, make_policy, horizon=horizon,
+    pbpoise.learn(make_env, make_policy, horizon=horizon,
                    sampler=sampler, **alg_args)
 
 

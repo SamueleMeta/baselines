@@ -198,7 +198,7 @@ def plot_bound_profile(
     plt.close(fig)
 
 
-def best_of_grid(policy, theta_step, theta_init,
+def best_of_grid(policy, grid_size, theta_init,
                  old_thetas_list,
                  iters_so_far, mask_iters,
                  set_parameter, set_parameter_old, evaluate_behav,
@@ -216,11 +216,11 @@ def best_of_grid(policy, theta_step, theta_init,
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
 
-    # Find the set of parameters to evaluate
+    # Calculate the grid of parameters to evaluate
     if hasattr(policy, 'min_mean'):
-        theta_grid = np.linspace(policy.min_mean, policy.max_mean, theta_step)
+        theta_grid = np.linspace(policy.min_mean, policy.max_mean, grid_size)
     else:
-        theta_grid = np.linspace(-1, 1, theta_step)
+        theta_grid = np.linspace(-1, 1, grid_size)
     # Evaluate the set of parameters and retain the best one
     bound = []
     mise = []

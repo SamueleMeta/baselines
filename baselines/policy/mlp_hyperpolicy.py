@@ -26,7 +26,7 @@ class PeMlpPolicy(object):
             tf.get_default_session().run(self._use_sampled_actor_params)
 
     def _init(self, ob_space, ac_space, hid_layers=[],
-              deterministic=True, diagonal=True,
+              deterministic=True, diagonal=True, trainable_std=True,
               use_bias=True, use_critic=False,
               seed=None, verbose=True,
               hidden_W_init=U.normc_initializer(1.0)):
@@ -98,13 +98,22 @@ class PeMlpPolicy(object):
                 tf.zeros(shape=[n_actor_weights]))  # bias init must stay zero
             self.higher_mean = higher_mean = tf.get_variable(
                 name='higher_mean', initializer=higher_mean_init)
-
             if diagonal:
-                # Diagonal covariance matrix; all stds initialized to 0
-                self.higher_logstd = higher_logstd = \
-                    tf.get_variable(name='higher_logstd',
-                                    shape=[n_actor_weights],
-                                    initializer=tf.initializers.constant(0.))
+                # Diagonal covariance matrix
+                if not trainable_std:
+                    self.higher_logstd = higher_logstd = \
+                        tf.get_variable(
+                            name='higher_logstd',
+                            shape=[n_actor_weights],
+                            initializer=tf.constant_initializer(np.log(0.11)),
+                            trainable=trainable_std)
+                else:  # initialize std in a different way
+                    self.higher_logstd = higher_logstd = \
+                        tf.get_variable(
+                            name='higher_logstd',
+                            shape=[n_actor_weights],
+                            initializer=tf.constant_initializer(np.log(0.11)),
+                            trainable=trainable_std)
                 pdparam = tf.concat([higher_mean,
                                      higher_mean * 0. + higher_logstd],
                                     axis=0)
@@ -169,6 +178,8 @@ class PeMlpPolicy(object):
         self._get_pgpe_times_n = U.function([actor_params_in, rets_in],
                                             [pgpe_times_n])
         self._get_actor_mean = U.function([ob], [self.actor_mean])
+        self._get_higher_mean = U.function([ob], [self.higher_mean])
+        self._get_higher_std = U.function([], tf.exp([self.higher_logstd]))
 
         # Batch off-policy PGPE
         self._probs = tf.exp(logprobs)
@@ -219,13 +230,22 @@ class PeMlpPolicy(object):
         if seed is not None:
             set_global_seeds(seed)
 
-    def eval_mean(self, ob):
+    def eval_actor_mean(self, ob):
         return self._get_actor_mean(ob)[0]
+
+    def eval_higher_mean(self, ob):
+        return self._get_higher_mean(ob)[0]
+
+    def eval_higher_std(self):
+        return self._get_higher_std()[0]
 
     # Weights manipulation
     def set_params(self, new_higher_params):
         """Set higher order policy parameters from flat sequence"""
         self._set_higher_params(new_higher_params)
+
+    def set_mean(self, mean):
+        pass
 
     def eval_params(self):
         """Get current params of the higher order policy"""

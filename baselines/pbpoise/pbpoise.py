@@ -191,18 +191,18 @@ def line_search_parabola(den_mise, rho_init, alpha, natural_gradient,
 
 
 def plot_bound_profile(
-        rho_grid, bound, mise, bonus, miw_1, point_x, point_y, delta, iter):
+        rho_grid, bound, mise, point_x, point_y, delta, iter):
     fig = plt.figure(figsize=(8, 5))
     ax = fig.add_subplot(111)
     ax.grid()
     ax.plot(rho_grid, bound, label='bound', color='red', linewidth='2')
     ax.plot(rho_grid, mise, label='mise', color='blue', linewidth='0.5')
-    ax.plot(rho_grid, bonus, label='bonus', color='green', linewidth='0.5')
-    ax.plot(rho_grid, miw_1, label='bonus', color='green', linestyle='--')
+    # ax.plot(rho_grid, bonus, label='bonus', color='green', linewidth='0.5')
+    # ax.plot(rho_grid, miw_1, label='bonus', color='green', linestyle='--')
     ax.plot(point_x, point_y, 'o', color='orange')
     ax.legend(loc='upper right')
     # Save plot to given dir
-    dir = './bound_profile/unbounded_policy/miw_1_delta_{}/'.format(delta)
+    dir = './bound_profile/test/delta_{}/'.format(delta)
     siter = 'iter_{}'.format(iter)
     fname = dir + siter
     if not os.path.exists(dir):
@@ -211,13 +211,12 @@ def plot_bound_profile(
     plt.close(fig)
 
 
-def best_of_grid(policy, rho_step, rho_init,
+def best_of_grid(policy, grid_size, rho_init,
                  old_rhos_list,
                  iters_so_far, mask_iters,
                  set_parameters, set_parameters_old, evaluate_behav,
                  evaluate_bound, evaluate_roba, delta):
 
-    print('rho_init', rho_init)
     # Compute MISE's denominator
     den_mise = np.zeros(mask_iters.shape).astype(np.float32)
     for i in range(len(old_rhos_list)):
@@ -230,11 +229,9 @@ def best_of_grid(policy, rho_step, rho_init,
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
 
-    # Find the set of parameters to evaluate
-    if hasattr(policy, 'min_mean'):
-        rho_grid = np.linspace(policy.min_mean, policy.max_mean, rho_step)
-    else:
-        rho_grid = np.linspace(-1, 1, rho_step)
+    # Calculate the grid of parameters to evaluate
+    gain_grid = np.linspace(-1, 1, grid_size)
+    rho_grid = [[x, np.log(0.11)] for x in gain_grid]
     # Evaluate the set of parameters and retain the best one
     bound = []
     mise = []
@@ -245,7 +242,7 @@ def best_of_grid(policy, rho_step, rho_init,
     rho_best = rho_init
 
     for rho in rho_grid:
-        set_parameters([rho]+[0, 0, 0])
+        set_parameters(rho)
         bound_rho = evaluate_bound(den_mise_log)
         bound.append(bound_rho)
         mise_rho = \
@@ -256,7 +253,7 @@ def best_of_grid(policy, rho_step, rho_init,
         # miw_2.append(miw_2_rho)
         if bound_rho > bound_best:
             bound_best = bound_rho
-            rho_best = [rho]+[0, 0, 0]
+            rho_best = rho
 
     # # Checkpoint
     # set_parameters([rho_grid[0]])
@@ -267,11 +264,10 @@ def best_of_grid(policy, rho_step, rho_init,
     #       miw_1_rho,
     #       miw_2_rho,
     #       miw_2_rho/miw_1_rho)
-    #
-    # # Plot the profile of the bound and its components
-    # plot_bound_profile(
-    #     rho_grid, bound, mise, bonus, miw_1, rho_best,
-    #     bound_best, delta, iters_so_far)
+
+    # Plot the profile of the bound and its components
+    plot_bound_profile(gain_grid, bound, mise, rho_best[0],
+                       bound_best, delta, iters_so_far)
 
     # Calculate improvement
     set_parameters(rho_init)
@@ -583,14 +579,14 @@ def learn(make_env, make_policy, *,
 
         # Generate one trajectory
         with timed('sampling'):
-            # Sample actor's parameters from hyperpolicy
+            # Sample actor's parameters from hyperpolicy and assign to actor
             theta = pi.resample()
             all_eps['actor_params'][iters_so_far-1, :] = theta
+            # Sample a trajectory with the newly parametrized actor
             ret, disc_ret, ep_len = eval_trajectory(
                 env, pi, gamma, horizon, feature_fun)
-            start = (iters_so_far-1)*horizon
-            all_eps['ret'][start:start + horizon] = ret
-            all_eps['disc_ret'][start:start + horizon] = disc_ret
+            all_eps['ret'][iters_so_far-1] = ret
+            all_eps['disc_ret'][iters_so_far-1] = disc_ret
             timesteps_so_far += ep_len
             # seg = sampler.collect(rho)
 
@@ -601,8 +597,6 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("Iteration", iters_so_far)
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
-            logger.record_tabular("ReturnLastEpisode", ret)
-            logger.record_tabular("ReturnLastEpisodeDisc", disc_ret)
 
         # Save policy parameters to disk
         if save_weights:
@@ -677,12 +671,12 @@ def learn(make_env, make_policy, *,
 
         with timed('summaries after'):
             if env.spec.id == 'LQG1D-v0':
-                mu1 = pi.eval_mean([[1]])[0][0]
-                mu01 = pi.eval_mean([[0.1]])[0][0]
-                # sigma = pi.eval_std()[0][0]
-                logger.record_tabular("LQGmu1", mu1)
-                logger.record_tabular("LQGmu01", mu01)
-                logger.record_tabular("LQGsigma", 0)
+                mu1_actor = pi.eval_actor_mean([[1]])[0][0]
+                mu1_higher = pi.eval_higher_mean([[1]])[0]
+                sigma = pi.eval_higher_std()[0]
+                logger.record_tabular("LQGmu1_actor", mu1_actor)
+                logger.record_tabular("LQGmu1_higher", mu1_higher)
+                logger.record_tabular("LQGsigma_higher", sigma)
             args = all_eps['actor_params'], all_eps['disc_ret'], \
                 all_eps['ret'], iters_so_far, mask_iters, den_mise_log
             meanlosses = np.array(compute_losses(*args))
