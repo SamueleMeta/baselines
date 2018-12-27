@@ -211,16 +211,21 @@ def plot_bound_profile(
     plt.close(fig)
 
 
-def best_of_grid(policy, grid_size, rho_init,
-                 old_rhos_list,
+def best_of_grid(policy, grid_size,
+                 rho_init, old_rhos_list,
                  iters_so_far, mask_iters,
-                 set_parameters, set_parameters_old, evaluate_behav,
-                 evaluate_bound, evaluate_roba, delta):
+                 set_parameters, set_parameters_old,
+                 delta,
+                 evaluate_behav, evaluate_bound,
+                 evaluate_renyi, evaluate_roba):
 
-    # Compute MISE's denominator
+    # Compute MISE's denominator and Renyi bound
     den_mise = np.zeros(mask_iters.shape).astype(np.float32)
+    renyi_bound = 0
     for i in range(len(old_rhos_list)):
         set_parameters_old(old_rhos_list[i])
+        renyi_component = evaluate_renyi()
+        renyi_bound += 1 / renyi_component
         behav = evaluate_behav()
         den_mise = den_mise + np.exp(behav)
 
@@ -438,6 +443,7 @@ def learn(make_env, make_policy, *,
     actor_params_ = tf.placeholder(shape=[max_iters, pi._n_actor_weights],
                                    name='actor_params', dtype=tf.float32)
     den_mise_log_ = tf.placeholder(dtype=tf.float32, name='den_mise')
+    renyi_bound_ = tf.placeholder(dtype=tf.float32, name='renyi_bound')
     ret_ = tf.placeholder(dtype=tf.float32, shape=(max_iters), name='ret')
     disc_ret_ = tf.placeholder(dtype=tf.float32, shape=(max_iters),
                                name='disc_ret')
@@ -499,11 +505,23 @@ def learn(make_env, make_policy, *,
     # miw_ess = (tf.exp(log_ratio) + eps) * mask_iters_
     # miw_1 = tf.reduce_sum(miw_ess)
     if bound == 'J':
-        bound_ = mise
-    elif bound == 'max-ess':
-        raise NotImplementedError
+        bound = mise
+    elif bound == 'max-renyi':
+        # Exponentiated Renyi divergence between the target and one behavioral
+        renyi_component = pi.pd.renyi(oldpi.pd)
+        renyi_component = tf.cond(tf.is_nan(renyi_component),
+                                  lambda: tf.constant(np.inf),
+                                  lambda: renyi_component)
+        renyi_component = tf.cond(renyi_component < 0.,
+                                  lambda: tf.constant(np.inf),
+                                  lambda: renyi_component)
+        # Bound to d2(target || mixture of behaviorals)/n
+        renyi_bound = renyi_bound_
+        const = return_abs_max * tf.sqrt(1 / delta - 1)
+        exploration_bonus = const * tf.sqrt(renyi_bound)
+        bound = mise + exploration_bonus
 
-    losses_with_name.append((bound_, 'Bound'))
+    losses_with_name.append((bound, 'Bound'))
 
     # Infos
     assert_ops = tf.group(*tf.get_collection('asserts'))
@@ -517,23 +535,23 @@ def learn(make_env, make_policy, *,
 
     compute_behav = U.function(
         [actor_params_, disc_ret_, iter_number_, mask_iters_],
-        behavioral_log_pdf,
-        updates=None, givens=None)
+        behavioral_log_pdf)
+    compute_renyi = U.function(
+        [], renyi_component)
     compute_bound = U.function(
         [actor_params_, disc_ret_, ret_, iter_number_,
-         mask_iters_, den_mise_log_],
-        [bound_, assert_ops, print_ops])
+         mask_iters_, den_mise_log_, renyi_bound_],
+        [bound, assert_ops, print_ops])
     compute_grad = U.function(
         [actor_params_, disc_ret_, ret_, iter_number_,
          mask_iters_, den_mise_log_],
-        [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+        [U.flatgrad(bound, var_list), assert_ops, print_ops])
     compute_losses = U.function(
         [actor_params_, disc_ret_, ret_, iter_number_,
          mask_iters_, den_mise_log_], losses)
     compute_roba = U.function(
         [actor_params_, disc_ret_, ret_, iter_number_,
-         mask_iters_, den_mise_log_],
-        [mise])
+         mask_iters_, den_mise_log_], [mise])
 
     # Set line search
     if line_search is not None:
@@ -605,10 +623,14 @@ def learn(make_env, make_policy, *,
             file = open('checkpoint.pkl', 'wb')
             pickle.dump(rho, file)
 
+        # Tensor evaluations
         def evaluate_behav():
             args = all_eps['actor_params'], all_eps['disc_ret'], \
                 iters_so_far, mask_iters
             return compute_behav(*args)
+
+        def evaluate_renyi_component():
+            return compute_renyi()
 
         def evaluate_bound(den_mise_log):
             args = all_eps['actor_params'], all_eps['disc_ret'], \
@@ -624,6 +646,11 @@ def learn(make_env, make_policy, *,
             args = all_eps['actor_params'], all_eps['disc_ret'], \
                 all_eps['ret'], iters_so_far, mask_iters, den_mise_log
             return compute_roba(*args)
+
+        if bound == 'J':
+            evaluate_renyi = None
+        elif bound == 'max-renyi':
+            evaluate_renyi = evaluate_renyi_component
 
         with timed("Optimization"):
             if multiple_init:
@@ -650,13 +677,13 @@ def learn(make_env, make_policy, *,
                     den_mise_log = den_mise_log_i
             elif grid_optimization:
                 rho, improvement, den_mise_log = \
-                    best_of_grid(pi, grid_optimization, rho,
-                                 old_rhos_list,
+                    best_of_grid(pi, grid_optimization,
+                                 rho, old_rhos_list,
                                  iters_so_far, mask_iters,
                                  set_parameters, set_parameters_old,
-                                 evaluate_behav,
-                                 evaluate_bound,
-                                 evaluate_roba, delta)
+                                 delta,
+                                 evaluate_behav, evaluate_bound,
+                                 evaluate_renyi, evaluate_roba)
             else:
                 rho, improvement, den_mise_log, bound = \
                     optimize_offline(evaluate_roba, rho, drho,

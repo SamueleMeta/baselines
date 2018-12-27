@@ -546,7 +546,7 @@ class PeMlpPolicy(object):
         #Renyi
         renyi = self.pd.renyi(behavioral.pd)
         renyi = tf.cond(tf.is_nan(renyi), lambda: tf.constant(np.inf), lambda: renyi)
-        renyi = tf.cond(renyi<0., lambda: tf.constant(np.inf), lambda: renyi)
+        renyi = tf.cond(renyi < 0., lambda: tf.constant(np.inf), lambda: renyi)
 
         #Weight norm
         iws2norm = tf.norm(iws)

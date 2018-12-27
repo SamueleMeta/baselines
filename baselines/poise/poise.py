@@ -514,7 +514,7 @@ def learn(make_env, make_policy, *,
     miw_1 = tf.linalg.norm(miw_ess, ord=1)
     miw_2 = tf.linalg.norm(miw_ess, ord=2)
     if bound == 'J':
-        bound_ = mise
+        bound = mise
     elif bound == 'max-ess':
         sqrt_ess = miw_1 / miw_2
         # def log10(x):
@@ -525,13 +525,13 @@ def learn(make_env, make_policy, *,
         # delta_t = delta*(1 - 1/log10(iter_number_))
         const = return_abs_max * tf.sqrt(1 / delta - 1)
         exploration_bonus = const / (sqrt_ess)
-        bound_ = mise + exploration_bonus
+        bound = mise + exploration_bonus
         losses_with_name.extend([(sqrt_ess, 'SqrtESSClassic'),
                                  (exploration_bonus, 'ExplorationBonus'),
                                  (miw_1, 'IWNorm1'),
                                  (miw_2, 'IWNorm2')])
 
-    losses_with_name.append((bound_, 'Bound'))
+    losses_with_name.append((bound, 'Bound'))
 
     # Infos
     assert_ops = tf.group(*tf.get_collection('asserts'))
@@ -552,10 +552,10 @@ def learn(make_env, make_policy, *,
         miw, updates=None, givens=None)
     compute_bound = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_,
-         mask_iters_, den_mise_log_], [bound_, assert_ops, print_ops])
+         mask_iters_, den_mise_log_], [bound, assert_ops, print_ops])
     compute_grad = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_, mask_iters_,
-         den_mise_log_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+         den_mise_log_], [U.flatgrad(bound, var_list), assert_ops, print_ops])
     compute_losses = U.function(
         [ob_, ac_, rew_, disc_rew_, mask_, iter_number_,
          mask_iters_, den_mise_log_], losses)
