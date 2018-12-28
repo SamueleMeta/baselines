@@ -136,7 +136,7 @@ def single_run(args):
           gain_init=args.gain_init,  # LQG only
           multiple_init=args.multiple_init,
           njobs=args.njobs,
-          bound=args.bound,
+          bound_type=args.bound_type,
           delta=args.delta,
           drho=args.drho,
           gamma=args.gamma,
@@ -167,7 +167,7 @@ def main(args):
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--env', type=str, default='LQG1D-v0')
     parser.add_argument('--horizon', type=int, default=20)
-    parser.add_argument('--bound', type=str, default='max-ess')
+    parser.add_argument('--bound_type', type=str, default='max-renyi')
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--gain_init', type=float, default=-0.1)  # LQG only

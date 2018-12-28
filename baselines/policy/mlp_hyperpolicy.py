@@ -107,7 +107,7 @@ class PeMlpPolicy(object):
                             shape=[n_actor_weights],
                             initializer=tf.constant_initializer(np.log(0.11)),
                             trainable=trainable_std)
-                else:  # initialize std in a different way
+                else:  # in case we want to initialize std in a different way
                     self.higher_logstd = higher_logstd = \
                         tf.get_variable(
                             name='higher_logstd',

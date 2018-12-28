@@ -191,14 +191,13 @@ def line_search_parabola(den_mise, rho_init, alpha, natural_gradient,
 
 
 def plot_bound_profile(
-        rho_grid, bound, mise, point_x, point_y, delta, iter):
+        rho_grid, bound, mise, bonus, point_x, point_y, delta, iter):
     fig = plt.figure(figsize=(8, 5))
     ax = fig.add_subplot(111)
     ax.grid()
     ax.plot(rho_grid, bound, label='bound', color='red', linewidth='2')
     ax.plot(rho_grid, mise, label='mise', color='blue', linewidth='0.5')
-    # ax.plot(rho_grid, bonus, label='bonus', color='green', linewidth='0.5')
-    # ax.plot(rho_grid, miw_1, label='bonus', color='green', linestyle='--')
+    ax.plot(rho_grid, bonus, label='bonus', color='green', linewidth='0.5')
     ax.plot(point_x, point_y, 'o', color='orange')
     ax.legend(loc='upper right')
     # Save plot to given dir
@@ -221,18 +220,23 @@ def best_of_grid(policy, grid_size,
 
     # Compute MISE's denominator and Renyi bound
     den_mise = np.zeros(mask_iters.shape).astype(np.float32)
-    renyi_bound = 0
+    # renyi_components_sum = 0
     for i in range(len(old_rhos_list)):
         set_parameters_old(old_rhos_list[i])
-        renyi_component = evaluate_renyi()
-        renyi_bound += 1 / renyi_component
+        # renyi_component = evaluate_renyi()
+        # print('renyi_component', renyi_component)
+        # renyi_components_sum += 1 / renyi_component
+        # print('renyi_components_sum', renyi_components_sum)
         behav = evaluate_behav()
         den_mise = den_mise + np.exp(behav)
 
-    # Compute log of MISE's denominator
+    # Compute the log of MISE's denominator
     eps = 1e-24  # to avoid inf weights and nan bound
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
+    # Bound the Renyi between the target and the mixture of behaviorals
+    # renyi_bound = 1 / renyi_components_sum
+    # print('renyi_bound', renyi_bound)
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
@@ -240,7 +244,7 @@ def best_of_grid(policy, grid_size,
     # Evaluate the set of parameters and retain the best one
     bound = []
     mise = []
-    # bonus = []
+    bonus = []
     # miw_1 = []
     # miw_2 = []
     bound_best = 0
@@ -248,12 +252,19 @@ def best_of_grid(policy, grid_size,
 
     for rho in rho_grid:
         set_parameters(rho)
-        bound_rho = evaluate_bound(den_mise_log)
+        renyi_components_sum = 0
+        for i in range(len(old_rhos_list)):
+            set_parameters_old(old_rhos_list[i])
+            renyi_component = evaluate_renyi()
+            renyi_components_sum += 1 / renyi_component
+        renyi_bound = 1 / renyi_components_sum
+        # print('renyi_bound', renyi_bound)
+        bound_rho = evaluate_bound(den_mise_log, renyi_bound)
         bound.append(bound_rho)
-        mise_rho = \
-            evaluate_roba(den_mise_log)
+        mise_rho, bonus_rho = \
+            evaluate_roba(den_mise_log, renyi_bound)
         mise.append(mise_rho)
-        # bonus.append(bonus_rho)
+        bonus.append(bonus_rho)
         # miw_1.append(miw_1_rho)
         # miw_2.append(miw_2_rho)
         if bound_rho > bound_best:
@@ -271,14 +282,14 @@ def best_of_grid(policy, grid_size,
     #       miw_2_rho/miw_1_rho)
 
     # Plot the profile of the bound and its components
-    plot_bound_profile(gain_grid, bound, mise, rho_best[0],
+    plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
                        bound_best, delta, iters_so_far)
 
     # Calculate improvement
     set_parameters(rho_init)
-    improvement = bound_best - evaluate_bound(den_mise_log)
+    improvement = bound_best - evaluate_bound(den_mise_log, renyi_bound)
 
-    return rho_best, improvement, den_mise_log
+    return rho_best, improvement, den_mise_log, renyi_bound
 
 
 def optimize_offline(evaluate_roba, rho_init, drho, old_rhos_list,
@@ -398,7 +409,7 @@ def learn(make_env, make_policy, *,
           sampler=None,
           feature_fun=None,
           iw_norm='none',
-          bound='max-ess',
+          bound_type='max-ess',
           max_offline_iters=10,
           save_weights=False,
           render_after=None,
@@ -504,9 +515,9 @@ def learn(make_env, make_policy, *,
     # eps = 1e-18  # for eps<1e-18 miw_2=0 if weights are zero
     # miw_ess = (tf.exp(log_ratio) + eps) * mask_iters_
     # miw_1 = tf.reduce_sum(miw_ess)
-    if bound == 'J':
+    if bound_type == 'J':
         bound = mise
-    elif bound == 'max-renyi':
+    elif bound_type == 'max-renyi':
         # Exponentiated Renyi divergence between the target and one behavioral
         renyi_component = pi.pd.renyi(oldpi.pd)
         renyi_component = tf.cond(tf.is_nan(renyi_component),
@@ -515,17 +526,18 @@ def learn(make_env, make_policy, *,
         renyi_component = tf.cond(renyi_component < 0.,
                                   lambda: tf.constant(np.inf),
                                   lambda: renyi_component)
+        renyi_component = tf.exp(0.5 * renyi_component)
         # Bound to d2(target || mixture of behaviorals)/n
         renyi_bound = renyi_bound_
         const = return_abs_max * tf.sqrt(1 / delta - 1)
         exploration_bonus = const * tf.sqrt(renyi_bound)
         bound = mise + exploration_bonus
+    else:
+        raise NotImplementedError
 
     losses_with_name.append((bound, 'Bound'))
 
     # Infos
-    assert_ops = tf.group(*tf.get_collection('asserts'))
-    print_ops = tf.group(*tf.get_collection('prints'))
     losses, loss_names = map(list, zip(*losses_with_name))
 
     # TF functions
@@ -540,18 +552,17 @@ def learn(make_env, make_policy, *,
         [], renyi_component)
     compute_bound = U.function(
         [actor_params_, disc_ret_, ret_, iter_number_,
-         mask_iters_, den_mise_log_, renyi_bound_],
-        [bound, assert_ops, print_ops])
+         mask_iters_, den_mise_log_, renyi_bound_], bound)
     compute_grad = U.function(
         [actor_params_, disc_ret_, ret_, iter_number_,
-         mask_iters_, den_mise_log_],
-        [U.flatgrad(bound, var_list), assert_ops, print_ops])
+         mask_iters_, den_mise_log_, renyi_bound_],
+        U.flatgrad(bound, var_list))
     compute_losses = U.function(
         [actor_params_, disc_ret_, ret_, iter_number_,
-         mask_iters_, den_mise_log_], losses)
+         mask_iters_, den_mise_log_, renyi_bound_], losses)
     compute_roba = U.function(
         [actor_params_, disc_ret_, ret_, iter_number_,
-         mask_iters_, den_mise_log_], [mise])
+         mask_iters_, den_mise_log_, renyi_bound_], [mise, exploration_bonus])
 
     # Set line search
     if line_search is not None:
@@ -624,33 +635,36 @@ def learn(make_env, make_policy, *,
             pickle.dump(rho, file)
 
         # Tensor evaluations
+
         def evaluate_behav():
-            args = all_eps['actor_params'], all_eps['disc_ret'], \
+            args_behav = all_eps['actor_params'], all_eps['disc_ret'], \
                 iters_so_far, mask_iters
-            return compute_behav(*args)
+            return compute_behav(*args_behav)
 
         def evaluate_renyi_component():
             return compute_renyi()
 
-        def evaluate_bound(den_mise_log):
-            args = all_eps['actor_params'], all_eps['disc_ret'], \
-                all_eps['ret'], iters_so_far, mask_iters, den_mise_log
-            return compute_bound(*args)[0]
+        args = all_eps['actor_params'], all_eps['disc_ret'], \
+            all_eps['ret'], iters_so_far, mask_iters
 
-        def evaluate_gradient(den_mise_log):
-            args = all_eps['actor_params'], all_eps['disc_ret'], \
-                all_eps['ret'], iters_so_far, mask_iters, den_mise_log
-            return compute_grad(*args)[0]
+        def evaluate_bound(den_mise_log, renyi_bound):
+            args_bound = args + (den_mise_log, renyi_bound, )
+            return compute_bound(*args_bound)
 
-        def evaluate_roba(den_mise_log):
-            args = all_eps['actor_params'], all_eps['disc_ret'], \
-                all_eps['ret'], iters_so_far, mask_iters, den_mise_log
-            return compute_roba(*args)
+        def evaluate_gradient(den_mise_log, renyi_bound):
+            args_gradient = args + (den_mise_log, renyi_bound, )
+            return compute_grad(*args_gradient)
 
-        if bound == 'J':
+        def evaluate_roba(den_mise_log, renyi_bound):
+            args_roba = args + (den_mise_log, renyi_bound, )
+            return compute_roba(*args_roba)
+
+        if bound_type == 'J':
             evaluate_renyi = None
-        elif bound == 'max-renyi':
+        elif bound_type == 'max-renyi':
             evaluate_renyi = evaluate_renyi_component
+        else:
+            raise NotImplementedError
 
         with timed("Optimization"):
             if multiple_init:
@@ -676,7 +690,7 @@ def learn(make_env, make_policy, *,
                 if not check:
                     den_mise_log = den_mise_log_i
             elif grid_optimization:
-                rho, improvement, den_mise_log = \
+                rho, improvement, den_mise_log, renyi_bound = \
                     best_of_grid(pi, grid_optimization,
                                  rho, old_rhos_list,
                                  iters_so_far, mask_iters,
@@ -685,7 +699,7 @@ def learn(make_env, make_policy, *,
                                  evaluate_behav, evaluate_bound,
                                  evaluate_renyi, evaluate_roba)
             else:
-                rho, improvement, den_mise_log, bound = \
+                rho, improvement, den_mise_log, renyi_bound, bound = \
                     optimize_offline(evaluate_roba, rho, drho,
                                      old_rhos_list,
                                      iters_so_far,
@@ -704,9 +718,8 @@ def learn(make_env, make_policy, *,
                 logger.record_tabular("LQGmu1_actor", mu1_actor)
                 logger.record_tabular("LQGmu1_higher", mu1_higher)
                 logger.record_tabular("LQGsigma_higher", sigma)
-            args = all_eps['actor_params'], all_eps['disc_ret'], \
-                all_eps['ret'], iters_so_far, mask_iters, den_mise_log
-            meanlosses = np.array(compute_losses(*args))
+            args_losses = args + (den_mise_log, renyi_bound, )
+            meanlosses = np.array(compute_losses(*args_losses))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
 
