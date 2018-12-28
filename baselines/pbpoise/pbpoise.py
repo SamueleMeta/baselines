@@ -223,10 +223,6 @@ def best_of_grid(policy, grid_size,
     # renyi_components_sum = 0
     for i in range(len(old_rhos_list)):
         set_parameters_old(old_rhos_list[i])
-        # renyi_component = evaluate_renyi()
-        # print('renyi_component', renyi_component)
-        # renyi_components_sum += 1 / renyi_component
-        # print('renyi_components_sum', renyi_components_sum)
         behav = evaluate_behav()
         den_mise = den_mise + np.exp(behav)
 
@@ -234,9 +230,6 @@ def best_of_grid(policy, grid_size,
     eps = 1e-24  # to avoid inf weights and nan bound
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
-    # Bound the Renyi between the target and the mixture of behaviorals
-    # renyi_bound = 1 / renyi_components_sum
-    # print('renyi_bound', renyi_bound)
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
@@ -245,8 +238,6 @@ def best_of_grid(policy, grid_size,
     bound = []
     mise = []
     bonus = []
-    # miw_1 = []
-    # miw_2 = []
     bound_best = 0
     rho_best = rho_init
 
@@ -258,28 +249,16 @@ def best_of_grid(policy, grid_size,
             renyi_component = evaluate_renyi()
             renyi_components_sum += 1 / renyi_component
         renyi_bound = 1 / renyi_components_sum
-        # print('renyi_bound', renyi_bound)
         bound_rho = evaluate_bound(den_mise_log, renyi_bound)
         bound.append(bound_rho)
         mise_rho, bonus_rho = \
             evaluate_roba(den_mise_log, renyi_bound)
         mise.append(mise_rho)
         bonus.append(bonus_rho)
-        # miw_1.append(miw_1_rho)
-        # miw_2.append(miw_2_rho)
+
         if bound_rho > bound_best:
             bound_best = bound_rho
             rho_best = rho
-
-    # # Checkpoint
-    # set_parameters([rho_grid[0]])
-    # mise_rho, bonus_rho, miw_1_rho, miw_2_rho = \
-    #     evaluate_roba(den_mise_log)
-    # print('miw_1, miw_2 e d2 for p(mu=1,std=0.1):',
-    #       rho_grid[0],
-    #       miw_1_rho,
-    #       miw_2_rho,
-    #       miw_2_rho/miw_1_rho)
 
     # Plot the profile of the bound and its components
     plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
@@ -526,7 +505,7 @@ def learn(make_env, make_policy, *,
         renyi_component = tf.cond(renyi_component < 0.,
                                   lambda: tf.constant(np.inf),
                                   lambda: renyi_component)
-        renyi_component = tf.exp(0.5 * renyi_component)
+        renyi_component = tf.exp(renyi_component)
         # Bound to d2(target || mixture of behaviorals)/n
         renyi_bound = renyi_bound_
         const = return_abs_max * tf.sqrt(1 / delta - 1)
