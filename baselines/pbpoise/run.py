@@ -100,7 +100,7 @@ def train(env, policy, horizon, seed, bounded_policy,
 
     # Learn
     pbpoise.learn(make_env, make_policy, horizon=horizon,
-                   sampler=sampler, **alg_args)
+                  sampler=sampler, **alg_args)
 
 
 def single_run(args):
@@ -144,7 +144,8 @@ def single_run(args):
           max_iters=args.max_iters,
           render_after=args.render_after,
           line_search=args.line_search,
-          grid_optimization=args.grid_optimization)
+          grid_optimization=args.grid_optimization,
+          truncated_mise=args.truncated_mise)
 
 
 def multiple_runs(args):
@@ -184,6 +185,7 @@ def main(args):
     parser.add_argument('--grid_optimization', type=int, default=None)
     add_bool_arg(parser, 'bounded_policy', default=True)
     add_bool_arg(parser, 'trainable_std', default=True)
+    add_bool_arg(parser, 'truncated_mise', default=True)
     add_bool_arg(parser, 'experiment', default=False)
     args = parser.parse_args(args)
 

@@ -393,7 +393,8 @@ def learn(make_env, make_policy, *,
           save_weights=False,
           render_after=None,
           line_search=None,
-          grid_optimization=None):
+          grid_optimization=None,
+          truncated_mise=True):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -432,7 +433,8 @@ def learn(make_env, make_policy, *,
     # My Placeholders
     actor_params_ = tf.placeholder(shape=[max_iters, pi._n_actor_weights],
                                    name='actor_params', dtype=tf.float32)
-    den_mise_log_ = tf.placeholder(dtype=tf.float32, name='den_mise')
+    den_mise_log_ = tf.placeholder(shape=[max_iters], dtype=tf.float32,
+                                   name='den_mise')
     renyi_bound_ = tf.placeholder(dtype=tf.float32, name='renyi_bound')
     ret_ = tf.placeholder(dtype=tf.float32, shape=(max_iters), name='ret')
     disc_ret_ = tf.placeholder(dtype=tf.float32, shape=(max_iters),
@@ -480,23 +482,7 @@ def learn(make_env, make_policy, *,
                              (return_abs_max, 'ReturnAbsMax'),
                              (return_step_max, 'ReturnStepMax')])
 
-    # MISE
-    mise = tf.reduce_sum(miw * ep_return * mask_iters_)/iter_number_
-    losses_with_name.append((mise, 'MISE'))
-    # test MISE = ISE when sampling always from the same distribution
-    # lr_is = target_log_pdf - behavioral_log_pdf
-    # lrs_is = tf.stack(tf.split(lr_is * mask_, max_iters))
-    # iw = tf.exp(tf.reduce_sum(lrs_is, axis=1))
-    # mis = tf.reduce_sum(iw * ep_return)/iter_number_
-    # losses_with_name.append((mis, 'ISE'))
-
-    # Bounds
-    # eps = 1e-18  # for eps<1e-18 miw_2=0 if weights are zero
-    # miw_ess = (tf.exp(log_ratio) + eps) * mask_iters_
-    # miw_1 = tf.reduce_sum(miw_ess)
-    if bound_type == 'J':
-        bound = mise
-    elif bound_type == 'max-renyi':
+    if truncated_mise:
         # Exponentiated Renyi divergence between the target and one behavioral
         renyi_component = pi.pd.renyi(oldpi.pd)
         renyi_component = tf.cond(tf.is_nan(renyi_component),
@@ -508,9 +494,32 @@ def learn(make_env, make_policy, *,
         renyi_component = tf.exp(renyi_component)
         # Bound to d2(target || mixture of behaviorals)/n
         renyi_bound = renyi_bound_
-        const = return_abs_max * tf.sqrt(1 / delta - 1)
-        exploration_bonus = const * tf.sqrt(renyi_bound)
-        bound = mise + exploration_bonus
+        mn = tf.sqrt((iter_number_ * renyi_bound_) / tf.log(1 / delta))
+        mn_broadcasted = \
+            tf.ones(shape=miw.get_shape().as_list(), dtype=np.float32) * mn
+        min = tf.where(tf.less(miw, mn_broadcasted), mn_broadcasted, miw)
+        mise = tf.reduce_sum(min * ep_return * mask_iters_)/iter_number_
+    else:
+        # MISE
+        mise = tf.reduce_sum(miw * ep_return * mask_iters_)/iter_number_
+        losses_with_name.append((mise, 'MISE'))
+
+    # Bounds
+    # eps = 1e-18  # for eps<1e-18 miw_2=0 if weights are zero
+    # miw_ess = (tf.exp(log_ratio) + eps) * mask_iters_
+    # miw_1 = tf.reduce_sum(miw_ess)
+    if bound_type == 'J':
+        bound = mise
+    elif bound_type == 'max-renyi':
+        if truncated_mise:
+            const = return_abs_max * (np.sqrt(2) + 1 / 3) \
+                * tf.sqrt(tf.log(1 / delta))
+            exploration_bonus = const * tf.sqrt(renyi_bound)
+            bound = mise + exploration_bonus
+        else:
+            const = return_abs_max * tf.sqrt(1 / delta - 1)
+            exploration_bonus = const * tf.sqrt(renyi_bound)
+            bound = mise + exploration_bonus
     else:
         raise NotImplementedError
 
