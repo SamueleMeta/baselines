@@ -150,7 +150,7 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
     if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
         return epsilon_old * max_increase
     else:
-        return epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
+        return epsilon_old**2 / (2 * (epsilon_old - delta_bound))
 
 
 def line_search_parabola(den_mise, rho_init, alpha, natural_gradient,
@@ -214,7 +214,7 @@ def best_of_grid(policy, grid_size,
                  rho_init, old_rhos_list,
                  iters_so_far, mask_iters,
                  set_parameters, set_parameters_old,
-                 delta,
+                 delta_cst,
                  evaluate_behav, evaluate_bound,
                  evaluate_renyi, evaluate_roba):
 
@@ -233,7 +233,10 @@ def best_of_grid(policy, grid_size,
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    rho_grid = [[x, np.log(0.11)] for x in gain_grid]
+    if len(rho_init) == 2:
+        rho_grid = [[x, np.log(0.11)] for x in gain_grid]
+    else:
+        rho_grid = [[x] for x in gain_grid]
     # Evaluate the set of parameters and retain the best one
     bound = []
     mise = []
@@ -262,7 +265,7 @@ def best_of_grid(policy, grid_size,
 
     # Plot the profile of the bound and its components
     plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
-                       bound_best, delta, iters_so_far)
+                       bound_best, delta_cst, iters_so_far)
 
     # Calculate improvement
     set_parameters(rho_init)
@@ -324,7 +327,7 @@ def optimize_offline(evaluate_roba, rho_init, drho, old_rhos_list,
                 return rho_old, improvement_old, den_mise_log, bound_old
 
             # alpha = drho
-            alpha = drho / gradient_norm ** 2
+            alpha = drho / gradient_norm**2
             # Save old values
             rho_old = rho
             improvement_old = improvement
@@ -494,7 +497,7 @@ def learn(make_env, make_policy, *,
                                   lambda: renyi_component)
         renyi_component = tf.exp(renyi_component)
         # Bound to d2(target || mixture of behaviorals)/n
-        mn = tf.sqrt((n_ ** 2 * renyi_bound_) / tf.log(1 / delta))
+        mn = tf.sqrt((n_**2 * renyi_bound_) / tf.log(1 / delta))
         mn_broadcasted = \
             tf.ones(shape=miw.get_shape().as_list(), dtype=np.float32) * mn
         min = tf.where(tf.less(miw, mn_broadcasted), miw, mn_broadcasted)
@@ -506,7 +509,11 @@ def learn(make_env, make_policy, *,
 
     # Bounds
     if delta_t:
-        delta = 6 * delta / ((np.pi * n_) ** 2 * (1 + n_ ** (n_params * 2)))
+        delta_cst = delta
+        delta = 6 * delta_cst / ((np.pi * n_)**2 * (1 + n_**(n_params * 2)))
+    else:
+        delta_cst = delta
+    losses_with_name.append((delta, 'delta'))
     if bound_type == 'J':
         bound = mise
     elif bound_type == 'max-renyi':
@@ -682,7 +689,7 @@ def learn(make_env, make_policy, *,
                                  rho, old_rhos_list,
                                  iters_so_far, mask_iters,
                                  set_parameters, set_parameters_old,
-                                 delta,
+                                 delta_cst,
                                  evaluate_behav, evaluate_bound,
                                  evaluate_renyi, evaluate_roba)
             else:
