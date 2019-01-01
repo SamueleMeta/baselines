@@ -394,7 +394,8 @@ def learn(make_env, make_policy, *,
           render_after=None,
           line_search=None,
           grid_optimization=None,
-          truncated_mise=True):
+          truncated_mise=True,
+          delta_t=True):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -421,8 +422,8 @@ def learn(make_env, make_policy, *,
     all_var_list = pi.get_trainable_variables()
     var_list = \
         [v for v in all_var_list if v.name.split('/')[1].startswith('higher')]
-    # shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
-    # n_params = sum(shapes)
+    shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
+    n_params = sum(shapes)
 
     # Get all oldpi's learnable parameters
     all_var_list_old = oldpi.get_trainable_variables()
@@ -439,8 +440,8 @@ def learn(make_env, make_policy, *,
     ret_ = tf.placeholder(dtype=tf.float32, shape=(max_iters), name='ret')
     disc_ret_ = tf.placeholder(dtype=tf.float32, shape=(max_iters),
                                name='disc_ret')
-    iter_number_ = tf.placeholder(dtype=tf.float32, name='iter_number')
-    iter_number_int = tf.cast(iter_number_, dtype=tf.int32)
+    n_ = tf.placeholder(dtype=tf.float32, name='iter_number')
+    n_int = tf.cast(n_, dtype=tf.int32)
     mask_iters_ = tf.placeholder(dtype=tf.float32, shape=(max_iters),
                                  name='mask_iters')
     losses_with_name = []
@@ -455,21 +456,21 @@ def learn(make_env, make_policy, *,
     log_ratio = target_log_pdf - den_mise_log_
     miw = tf.exp(log_ratio) * mask_iters_
 
-    den_mise_log_mean = tf.reduce_sum(den_mise_log_)/iter_number_
-    den_mise_log_last = den_mise_log_[iter_number_int-1]
+    den_mise_log_mean = tf.reduce_sum(den_mise_log_) / n_
+    den_mise_log_last = den_mise_log_[n_int-1]
     losses_with_name.extend([(den_mise_log_mean, 'DenMISEMeanLog'),
                              (den_mise_log_[0], 'DenMISELogFirst'),
                              (den_mise_log_last, 'DenMISELogLast'),
                              (miw[0], 'IWFirstEpisode'),
-                             (miw[iter_number_int-1], 'IWLastEpisode'),
-                             (tf.reduce_sum(miw)/iter_number_, 'IWMean'),
+                             (miw[n_int-1], 'IWLastEpisode'),
+                             (tf.reduce_sum(miw)/n_, 'IWMean'),
                              (tf.reduce_max(miw), 'IWMax'),
                              (tf.reduce_min(miw), 'IWMin')])
 
     # Return
     ep_return = disc_ret_
-    return_mean = tf.reduce_sum(ep_return)/iter_number_
-    return_last = ep_return[iter_number_int - 1]
+    return_mean = tf.reduce_sum(ep_return) / n_
+    return_last = ep_return[n_int - 1]
     return_max = tf.reduce_max(ep_return)
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
@@ -493,32 +494,30 @@ def learn(make_env, make_policy, *,
                                   lambda: renyi_component)
         renyi_component = tf.exp(renyi_component)
         # Bound to d2(target || mixture of behaviorals)/n
-        renyi_bound = renyi_bound_
-        mn = tf.sqrt((iter_number_ * renyi_bound_) / tf.log(1 / delta))
+        mn = tf.sqrt((n_ ** 2 * renyi_bound_) / tf.log(1 / delta))
         mn_broadcasted = \
             tf.ones(shape=miw.get_shape().as_list(), dtype=np.float32) * mn
         min = tf.where(tf.less(miw, mn_broadcasted), miw, mn_broadcasted)
-        mise = tf.reduce_sum(min * ep_return * mask_iters_)/iter_number_
+        mise = tf.reduce_sum(min * ep_return * mask_iters_)/n_
     else:
         # MISE
-        mise = tf.reduce_sum(miw * ep_return * mask_iters_)/iter_number_
+        mise = tf.reduce_sum(miw * ep_return * mask_iters_)/n_
         losses_with_name.append((mise, 'MISE'))
 
     # Bounds
-    # eps = 1e-18  # for eps<1e-18 miw_2=0 if weights are zero
-    # miw_ess = (tf.exp(log_ratio) + eps) * mask_iters_
-    # miw_1 = tf.reduce_sum(miw_ess)
+    if delta_t:
+        delta = 6 * delta / ((np.pi * n_) ** 2 * (1 + n_ ** (n_params * 2)))
     if bound_type == 'J':
         bound = mise
     elif bound_type == 'max-renyi':
         if truncated_mise:
             const = return_abs_max * (np.sqrt(2) + 1 / 3) \
                 * tf.sqrt(tf.log(1 / delta))
-            exploration_bonus = const * tf.sqrt(renyi_bound)
+            exploration_bonus = const * tf.sqrt(renyi_bound_)
             bound = mise + exploration_bonus
         else:
             const = return_abs_max * tf.sqrt(1 / delta - 1)
-            exploration_bonus = const * tf.sqrt(renyi_bound)
+            exploration_bonus = const * tf.sqrt(renyi_bound_)
             bound = mise + exploration_bonus
     else:
         raise NotImplementedError
@@ -534,22 +533,22 @@ def learn(make_env, make_policy, *,
     set_parameters_old = U.SetFromFlat(var_list_old)
 
     compute_behav = U.function(
-        [actor_params_, disc_ret_, iter_number_, mask_iters_],
+        [actor_params_, disc_ret_, n_, mask_iters_],
         behavioral_log_pdf)
     compute_renyi = U.function(
         [], renyi_component)
     compute_bound = U.function(
-        [actor_params_, disc_ret_, ret_, iter_number_,
+        [actor_params_, disc_ret_, ret_, n_,
          mask_iters_, den_mise_log_, renyi_bound_], bound)
     compute_grad = U.function(
-        [actor_params_, disc_ret_, ret_, iter_number_,
+        [actor_params_, disc_ret_, ret_, n_,
          mask_iters_, den_mise_log_, renyi_bound_],
         U.flatgrad(bound, var_list))
     compute_losses = U.function(
-        [actor_params_, disc_ret_, ret_, iter_number_,
+        [actor_params_, disc_ret_, ret_, n_,
          mask_iters_, den_mise_log_, renyi_bound_], losses)
     compute_roba = U.function(
-        [actor_params_, disc_ret_, ret_, iter_number_,
+        [actor_params_, disc_ret_, ret_, n_,
          mask_iters_, den_mise_log_, renyi_bound_], [mise, exploration_bonus])
 
     # Set line search

@@ -145,7 +145,8 @@ def single_run(args):
           render_after=args.render_after,
           line_search=args.line_search,
           grid_optimization=args.grid_optimization,
-          truncated_mise=args.truncated_mise)
+          truncated_mise=args.truncated_mise,
+          delta_t=args.delta_t)
 
 
 def multiple_runs(args):
@@ -186,6 +187,7 @@ def main(args):
     add_bool_arg(parser, 'bounded_policy', default=True)
     add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'truncated_mise', default=True)
+    add_bool_arg(parser, 'delta_t', default=True)
     add_bool_arg(parser, 'experiment', default=False)
     args = parser.parse_args(args)
 
