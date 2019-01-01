@@ -497,7 +497,7 @@ def learn(make_env, make_policy, *,
         mn = tf.sqrt((iter_number_ * renyi_bound_) / tf.log(1 / delta))
         mn_broadcasted = \
             tf.ones(shape=miw.get_shape().as_list(), dtype=np.float32) * mn
-        min = tf.where(tf.less(miw, mn_broadcasted), mn_broadcasted, miw)
+        min = tf.where(tf.less(miw, mn_broadcasted), miw, mn_broadcasted)
         mise = tf.reduce_sum(min * ep_return * mask_iters_)/iter_number_
     else:
         # MISE
