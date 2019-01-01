@@ -510,10 +510,11 @@ def learn(make_env, make_policy, *,
     # Bounds
     if delta_t:
         delta_cst = delta
-        delta = 6 * delta_cst / ((np.pi * n_)**2 * (1 + n_**(n_params * 2)))
+        delta = 6 * delta / ((np.pi * n_)**2 * (1 + n_**(n_params * 2)))
     else:
         delta_cst = delta
     losses_with_name.append((delta, 'delta'))
+
     if bound_type == 'J':
         bound = mise
     elif bound_type == 'max-renyi':
