@@ -29,7 +29,8 @@ class PeMlpPolicy(object):
               deterministic=True, diagonal=True, trainable_std=True,
               use_bias=True, use_critic=False,
               seed=None, verbose=True,
-              hidden_W_init=U.normc_initializer(1.0)):
+              hidden_W_init=U.normc_initializer(1.0),
+              std_init=tf.constant_initializer(np.log(0.11))):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -99,21 +100,12 @@ class PeMlpPolicy(object):
             self.higher_mean = higher_mean = tf.get_variable(
                 name='higher_mean', initializer=higher_mean_init)
             if diagonal:
-                # Diagonal covariance matrix
-                if not trainable_std:
-                    self.higher_logstd = higher_logstd = \
-                        tf.get_variable(
-                            name='higher_logstd',
-                            shape=[n_actor_weights],
-                            initializer=tf.constant_initializer(np.log(0.11)),
-                            trainable=trainable_std)
-                else:  # in case we want to initialize std in a different way
-                    self.higher_logstd = higher_logstd = \
-                        tf.get_variable(
-                            name='higher_logstd',
-                            shape=[n_actor_weights],
-                            initializer=tf.constant_initializer(np.log(0.11)),
-                            trainable=trainable_std)
+                self.higher_logstd = higher_logstd = \
+                    tf.get_variable(
+                        name='higher_logstd',
+                        shape=[n_actor_weights],
+                        initializer=std_init,
+                        trainable=trainable_std)
                 pdparam = tf.concat([higher_mean,
                                      higher_mean * 0. + higher_logstd],
                                     axis=0)

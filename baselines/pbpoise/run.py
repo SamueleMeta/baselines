@@ -82,7 +82,8 @@ def train(env, policy, horizon, seed, bounded_policy,
                            trainable_std=trainable_std,
                            use_bias=False, use_critic=False,
                            seed=seed, verbose=True,
-                           hidden_W_init=U.normc_initializer(1.0))
+                           hidden_W_init=U.normc_initializer(1.0),
+                           std_init=tf.constant_initializer(np.log(0.3)))
 
     try:
         affinity = len(os.sched_getaffinity(0))
