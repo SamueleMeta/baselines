@@ -198,7 +198,8 @@ def best_of_grid(policy, grid_size,
                  set_parameters, set_parameters_old,
                  delta_cst,
                  evaluate_behav, evaluate_bound,
-                 evaluate_renyi, evaluate_roba):
+                 evaluate_renyi, evaluate_roba,
+                 filename):
 
     threeDplot = False
 
@@ -217,7 +218,6 @@ def best_of_grid(policy, grid_size,
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    # gain_grid = np.zeros(shape=(grid_size, ))
     logstd_grid = np.linspace(-20, 0, grid_size)
     if len(rho_init) == 2:
         threeDplot = True
@@ -225,7 +225,6 @@ def best_of_grid(policy, grid_size,
         X = x.reshape((np.prod(x.shape),))
         Y = y.reshape((np.prod(y.shape),))
         rho_grid = list(zip(X, Y))
-        # rho_grid = [[x, np.log(0.11)] for x in gain_grid]
     else:
         rho_grid = [[x] for x in gain_grid]
     # Evaluate the set of parameters and retain the best one
@@ -259,10 +258,10 @@ def best_of_grid(policy, grid_size,
     if threeDplot:
         bound = np.array(bound).reshape((grid_size, grid_size))
         plot3D_bound_profile(x, y, bound, rho_best, bound_best,
-                             delta_cst, iters_so_far)
+                             iters_so_far, filename)
     else:
         plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
-                           bound_best, delta_cst, iters_so_far)
+                           bound_best, iters_so_far, filename)
 
     # Calculate improvement
     set_parameters(rho_init)
@@ -376,7 +375,8 @@ def learn(make_env, make_policy, *,
           line_search=None,
           grid_optimization=None,
           truncated_mise=True,
-          delta_t=True):
+          delta_t=True,
+          filename=None):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -669,7 +669,8 @@ def learn(make_env, make_policy, *,
                                  set_parameters, set_parameters_old,
                                  delta_cst,
                                  evaluate_behav, evaluate_bound,
-                                 evaluate_renyi, evaluate_roba)
+                                 evaluate_renyi, evaluate_roba,
+                                 filename)
             else:
                 rho, improvement, den_mise_log, renyi_bound, bound = \
                     optimize_offline(evaluate_roba, rho, drho,
@@ -685,7 +686,7 @@ def learn(make_env, make_policy, *,
         with timed('summaries after'):
             # Sample actor's parameters from hyperpolicy and assign to actor
             theta = pi.resample()
-            all_eps['actor_params'][iters_so_far-1, :] = theta
+            all_eps['actor_params'][iters_so_far, :] = theta
 
             if env.spec.id == 'LQG1D-v0':
                 mu1_actor = pi.eval_actor_mean([[1]])[0][0]

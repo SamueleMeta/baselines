@@ -5,8 +5,8 @@ import numpy as np
 import time
 
 
-def plot_bound_profile(
-        rho_grid, bound, mise, bonus, point_x, point_y, delta, iter):
+def plot_bound_profile(rho_grid, bound, mise, bonus,
+                       point_x, point_y, iter, filename):
     fig = plt.figure(figsize=(8, 5))
     ax = fig.add_subplot(111)
     ax.grid()
@@ -16,7 +16,7 @@ def plot_bound_profile(
     ax.plot(point_x, point_y, 'o', color='orange')
     ax.legend(loc='upper right')
     # Save plot to given dir
-    dir = './bound_profile/test/delta_{}/'.format(delta)
+    dir = './bound_profile/' + filename + '/'
     siter = 'iter_{}'.format(iter)
     fname = dir + siter
     if not os.path.exists(dir):
@@ -25,7 +25,7 @@ def plot_bound_profile(
     plt.close(fig)
 
 
-def plot3D_bound_profile(x, y, bound, rho_best, bound_best, delta, iter):
+def plot3D_bound_profile(x, y, bound, rho_best, bound_best, iter, filename):
 
     fig = plt.figure(figsize=(8, 5))
     ax = plt.axes(projection='3d')
@@ -42,7 +42,7 @@ def plot3D_bound_profile(x, y, bound, rho_best, bound_best, delta, iter):
             markerfacecolor='r', marker='o', markersize=5)
     ax.legend(loc='upper right')
     # Save plot to given dir
-    dir = './bound_profile/test3d/delta_{}/'.format(delta)
+    dir = './bound_profile/' + filename + '/'
     siter = 'iter_{}'.format(iter)
     fname = dir + siter
     if not os.path.exists(dir):

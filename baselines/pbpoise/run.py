@@ -84,7 +84,6 @@ def train(env, policy, horizon, seed, bounded_policy,
                            seed=seed, verbose=True,
                            hidden_W_init=U.normc_initializer(1.0),
                            std_init=tf.constant_initializer(np.log(1.0)))
-
     try:
         affinity = len(os.sched_getaffinity(0))
     except:
@@ -117,15 +116,15 @@ def single_run(args):
     args_str = '%s_delta=%s_seed=%s' % (
         args.env.upper(), args.delta, args.seed)
 
-    if args.file_name == 'progress':
-        file_name = args_str + '_' + time_str
+    if args.filename == 'progress':
+        filename = args_str + '_' + time_str
     else:
-        file_name = args.file_name + '_' + args_str + '_' + time_str
+        filename = args.filename + '_' + args_str + '_' + time_str
 
     # Configure logger
     logger.configure(dir=args.logdir,
                      format_strs=['stdout', 'csv', 'tensorboard'],
-                     file_name=file_name)
+                     file_name=filename)
 
     # Learn
     train(env=args.env,
@@ -147,7 +146,8 @@ def single_run(args):
           line_search=args.line_search,
           grid_optimization=args.grid_optimization,
           truncated_mise=args.truncated_mise,
-          delta_t=args.delta_t)
+          delta_t=args.delta_t,
+          filename=filename)
 
 
 def multiple_runs(args):
@@ -171,7 +171,7 @@ def main(args):
     parser.add_argument('--env', type=str, default='LQG1D-v0')
     parser.add_argument('--horizon', type=int, default=20)
     parser.add_argument('--bound_type', type=str, default='max-renyi')
-    parser.add_argument('--file_name', type=str, default='progress')
+    parser.add_argument('--filename', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--gain_init', type=float, default=-0.1)  # LQG only
     parser.add_argument('--delta', type=float, default=0.2)
