@@ -4,6 +4,7 @@ if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
 import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
 import numpy as np
 import baselines.common.tf_util as U
 import tensorflow as tf
@@ -11,6 +12,7 @@ import time
 from baselines.common import colorize
 from contextlib import contextmanager
 from baselines import logger
+from plotting_tools import plot3D_bound_profile, plot_bound_profile, render
 
 
 @contextmanager
@@ -190,26 +192,6 @@ def line_search_parabola(den_mise, rho_init, alpha, natural_gradient,
     return rho_old, epsilon_old, delta_bound_old, i+1
 
 
-def plot_bound_profile(
-        rho_grid, bound, mise, bonus, point_x, point_y, delta, iter):
-    fig = plt.figure(figsize=(8, 5))
-    ax = fig.add_subplot(111)
-    ax.grid()
-    ax.plot(rho_grid, bound, label='bound', color='red', linewidth='2')
-    ax.plot(rho_grid, mise, label='mise', color='blue', linewidth='0.5')
-    ax.plot(rho_grid, bonus, label='bonus', color='green', linewidth='0.5')
-    ax.plot(point_x, point_y, 'o', color='orange')
-    ax.legend(loc='upper right')
-    # Save plot to given dir
-    dir = './bound_profile/test/delta_{}/'.format(delta)
-    siter = 'iter_{}'.format(iter)
-    fname = dir + siter
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    fig.savefig(fname)
-    plt.close(fig)
-
-
 def best_of_grid(policy, grid_size,
                  rho_init, old_rhos_list,
                  iters_so_far, mask_iters,
@@ -217,6 +199,8 @@ def best_of_grid(policy, grid_size,
                  delta_cst,
                  evaluate_behav, evaluate_bound,
                  evaluate_renyi, evaluate_roba):
+
+    threeDplot = False
 
     # Compute MISE's denominator and Renyi bound
     den_mise = np.zeros(mask_iters.shape).astype(np.float32)
@@ -233,8 +217,15 @@ def best_of_grid(policy, grid_size,
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
+    # gain_grid = np.zeros(shape=(grid_size, ))
+    logstd_grid = np.linspace(-20, 0, grid_size)
     if len(rho_init) == 2:
-        rho_grid = [[x, np.log(0.11)] for x in gain_grid]
+        threeDplot = True
+        x, y = np.meshgrid(gain_grid, logstd_grid)
+        X = x.reshape((np.prod(x.shape),))
+        Y = y.reshape((np.prod(y.shape),))
+        rho_grid = list(zip(X, Y))
+        # rho_grid = [[x, np.log(0.11)] for x in gain_grid]
     else:
         rho_grid = [[x] for x in gain_grid]
     # Evaluate the set of parameters and retain the best one
@@ -245,6 +236,7 @@ def best_of_grid(policy, grid_size,
     rho_best = rho_init
 
     for rho in rho_grid:
+        # rho = np.array(rho)
         set_parameters(rho)
         renyi_components_sum = 0
         for i in range(len(old_rhos_list)):
@@ -264,8 +256,13 @@ def best_of_grid(policy, grid_size,
             rho_best = rho
 
     # Plot the profile of the bound and its components
-    plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
-                       bound_best, delta_cst, iters_so_far)
+    if threeDplot:
+        bound = np.array(bound).reshape((grid_size, grid_size))
+        plot3D_bound_profile(x, y, bound, rho_best, bound_best,
+                             delta_cst, iters_so_far)
+    else:
+        plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
+                           bound_best, delta_cst, iters_so_far)
 
     # Calculate improvement
     set_parameters(rho_init)
@@ -281,14 +278,15 @@ def optimize_offline(evaluate_roba, rho_init, drho, old_rhos_list,
                      line_search, evaluate_natural_gradient=None,
                      gradient_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
 
-    # Compute MISE's denominator
+    # Compute MISE's denominator and Renyi bound
     den_mise = np.zeros(mask_iters.shape).astype(np.float32)
+    # renyi_components_sum = 0
     for i in range(len(old_rhos_list)):
         set_parameters_old(old_rhos_list[i])
         behav = evaluate_behav()
         den_mise = den_mise + np.exp(behav)
 
-    # Compute log of MISE's denominator
+    # Compute the log of MISE's denominator
     eps = 1e-24  # to avoid inf weights and nan bound
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
@@ -359,26 +357,6 @@ def optimize_offline(evaluate_roba, rho_init, drho, old_rhos_list,
 
     print('Max number of offline iterations reached.')
     return rho, improvement, den_mise_log, bound
-
-
-def render(env, pi, horizon):
-    """
-    Shows a test episode on the screen
-        env: environment
-        pi: policy
-        horizon: episode length
-    """
-    t = 0
-    ob = env.reset()
-    env.render()
-
-    done = False
-    while not done and t < horizon:
-        ac, _ = pi.act(True, ob)
-        ob, _, done, _ = env.step(ac)
-        time.sleep(0.1)
-        env.render()
-        t += 1
 
 
 def learn(make_env, make_policy, *,
@@ -583,6 +561,8 @@ def learn(make_env, make_policy, *,
     iters_so_far = 0
     tstart = time.time()
     rho = get_parameters()
+    theta = pi.resample()
+    all_eps['actor_params'][iters_so_far, :] = theta
     print('Optimization of the %s bound' % (bound))
     while True:
         iters_so_far += 1
@@ -603,9 +583,6 @@ def learn(make_env, make_policy, *,
 
         # Generate one trajectory
         with timed('sampling'):
-            # Sample actor's parameters from hyperpolicy and assign to actor
-            theta = pi.resample()
-            all_eps['actor_params'][iters_so_far-1, :] = theta
             # Sample a trajectory with the newly parametrized actor
             ret, disc_ret, ep_len = eval_trajectory(
                 env, pi, gamma, horizon, feature_fun)
@@ -706,6 +683,10 @@ def learn(make_env, make_policy, *,
             set_parameters(rho)
 
         with timed('summaries after'):
+            # Sample actor's parameters from hyperpolicy and assign to actor
+            theta = pi.resample()
+            all_eps['actor_params'][iters_so_far-1, :] = theta
+
             if env.spec.id == 'LQG1D-v0':
                 mu1_actor = pi.eval_actor_mean([[1]])[0][0]
                 mu1_higher = pi.eval_higher_mean([[1]])[0]
