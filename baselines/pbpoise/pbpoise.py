@@ -232,6 +232,7 @@ def best_of_grid(policy, grid_size,
     mise = []
     bonus = []
     bound_best = 0
+    renyi_bound_best = 0
     rho_best = rho_init
 
     for rho in rho_grid:
@@ -253,6 +254,7 @@ def best_of_grid(policy, grid_size,
         if bound_rho > bound_best:
             bound_best = bound_rho
             rho_best = rho
+            renyi_bound_best = renyi_bound
 
     # Plot the profile of the bound and its components
     if threeDplot:

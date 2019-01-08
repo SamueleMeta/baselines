@@ -99,8 +99,10 @@ class PeMlpPolicy(object):
                 tf.zeros(shape=[n_actor_weights]))  # bias init must stay zero
             self.higher_mean = tf.get_variable(
                 name='higher_mean', initializer=higher_mean_init)
-            self.higher_mean = higher_mean = tf.clip_by_value(
-                self.higher_mean, -1, 1, 'higher_mean_clipped')
+            # Keep the weights'domain compact
+            # self.higher_mean = higher_mean = tf.clip_by_value(
+            #     self.higher_mean, -1, 1, 'higher_mean_clipped')
+            higher_mean = self.higher_mean
             if diagonal:
                 self.higher_logstd = higher_logstd = \
                     tf.get_variable(
