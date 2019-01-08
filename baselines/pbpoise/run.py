@@ -185,10 +185,10 @@ def main(args):
     parser.add_argument('--line_search', type=str, default=None)  # 'parabola'
     parser.add_argument('--multiple_init', type=int, default=None)
     parser.add_argument('--grid_optimization', type=int, default=None)
+    parser.add_argument('--delta_t', type=str, default=None)
     add_bool_arg(parser, 'bounded_policy', default=True)
     add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'truncated_mise', default=True)
-    add_bool_arg(parser, 'delta_t', default=True)
     add_bool_arg(parser, 'experiment', default=False)
     args = parser.parse_args(args)
 

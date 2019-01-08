@@ -406,7 +406,7 @@ def learn(make_env, make_policy, *,
           line_search=None,
           grid_optimization=None,
           truncated_mise=True,
-          delta_t=True,
+          delta_t=None,
           filename=None):
     """
     Learns a policy from scratch
@@ -435,7 +435,7 @@ def learn(make_env, make_policy, *,
     var_list = \
         [v for v in all_var_list if v.name.split('/')[1].startswith('higher')]
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
-    n_params = sum(shapes)
+    d = sum(shapes)
 
     # Get all oldpi's learnable parameters
     all_var_list_old = oldpi.get_trainable_variables()
@@ -458,7 +458,7 @@ def learn(make_env, make_policy, *,
                                  name='mask_iters')
     losses_with_name = []
     # grad_ = tf.placeholder(dtype=tf,.float32,
-    #                            shape=(n_params, 1), name='grad')
+    #                            shape=(d, 1), name='grad')
 
     # Multiple importance weights (with balance heuristic)
     target_log_pdf = tf.reduce_sum(
@@ -518,11 +518,16 @@ def learn(make_env, make_policy, *,
         losses_with_name.append((mise, 'MISE'))
 
     # Bounds
-    if delta_t:
+    if delta_t == 'continuous':
         delta_cst = delta
-        delta = 6 * delta / ((np.pi * n_)**2 * (1 + n_**(n_params * 2)))
+        delta = 6 * delta / ((np.pi * n_)**2 * (1 + (d * n_**2)**d))
+    elif delta_t == 'discrete':
+        delta_cst = delta
+        delta = 3 * delta / ((np.pi * n_)**2 * grid_optimization)
+    elif delta_t is None:
+        delta_cst = delta
     else:
-        delta_cst = delta
+        raise NotImplementedError
     losses_with_name.append((delta, 'delta'))
 
     if bound_type == 'J':
