@@ -186,8 +186,11 @@ class PeMlpPolicy(object):
 
         #Fisher computation (diagonal case)
         mean_fisher_diag = tf.exp(-2*self.higher_logstd)
-        cov_fisher_diag = mean_fisher_diag*0 + 2
-        self._fisher_diag = tf.concat([mean_fisher_diag, cov_fisher_diag], axis=0)
+        if trainable_std:
+            cov_fisher_diag = mean_fisher_diag*0 + 2
+            self._fisher_diag = tf.concat([mean_fisher_diag, cov_fisher_diag], axis=0)
+        else:
+            self._fisher_diag = mean_fisher_diag
         self._get_fisher_diag = U.function([], [self._fisher_diag])
 
     #Black box usage

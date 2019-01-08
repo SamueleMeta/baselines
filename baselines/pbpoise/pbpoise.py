@@ -155,7 +155,7 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
         return epsilon_old**2 / (2 * (epsilon_old - delta_bound))
 
 
-def line_search_parabola(den_mise, rho_init, alpha, natural_gradient,
+def line_search_parabola(den_mise, rho_init, alpha, natural_grad,
                          set_parameters, evaluate_bound, drho,
                          iters_so_far, delta_bound_tol=1e-4,
                          max_line_search_ite=30):
@@ -167,7 +167,7 @@ def line_search_parabola(den_mise, rho_init, alpha, natural_gradient,
 
     for i in range(max_line_search_ite):
 
-        rho = rho_init + epsilon * alpha * natural_gradient
+        rho = rho_init + epsilon * alpha * natural_grad
         set_parameters(rho)
 
         bound = evaluate_bound(den_mise)
@@ -270,92 +270,121 @@ def best_of_grid(policy, grid_size,
     return rho_best, improvement, den_mise_log, renyi_bound
 
 
-def optimize_offline(evaluate_roba, rho_init, drho, old_rhos_list,
+def optimize_offline(evaluate_roba, pi,
+                     rho_init, drho, old_rhos_list,
                      iters_so_far, mask_iters,
-                     set_parameters, set_parameters_old, evaluate_behav,
-                     evaluate_bound, evaluate_gradient,
-                     line_search, evaluate_natural_gradient=None,
-                     gradient_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
+                     set_parameters, set_parameters_old,
+                     evaluate_behav, evaluate_renyi,
+                     evaluate_bound, evaluate_grad,
+                     line_search, evaluate_natural_grad=None,
+                     grad_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
 
     # Compute MISE's denominator and Renyi bound
     den_mise = np.zeros(mask_iters.shape).astype(np.float32)
-    # renyi_components_sum = 0
+    renyi_components_sum = 0
     for i in range(len(old_rhos_list)):
         set_parameters_old(old_rhos_list[i])
         behav = evaluate_behav()
         den_mise = den_mise + np.exp(behav)
+        renyi_component = evaluate_renyi()
+        renyi_components_sum += 1 / renyi_component
+    renyi_bound = 1 / renyi_components_sum
+    renyi_bound_old = renyi_bound
 
     # Compute the log of MISE's denominator
     eps = 1e-24  # to avoid inf weights and nan bound
     den_mise = (den_mise + eps) / iters_so_far
     den_mise_log = np.log(den_mise) * mask_iters
 
-    # Optimization loop
+    # Set optimization variables
     rho = rho_old = rho_init
     improvement = improvement_old = 0.
-    set_parameters(rho)
-    bound = evaluate_bound(den_mise_log)
+    num_line_search = 0
+
+    # Calculate initial bound
+    bound = evaluate_bound(den_mise_log, renyi_bound)
+    if np.isnan(bound):
+        print('Got NaN bound! Stopping!')
+        set_parameters(rho_old)
+        return rho, improvement, den_mise_log, bound
     bound_old = bound
     print('Initial bound after last sampling:', bound)
 
     # Print infos about optimization loop
     fmtstr = '%6i %10.3g %16i %18.3g %18.3g %18.3g %18.3g'
     titlestr = '%6s %10s  %18s %16s %18s %18s %18s'
-    print(titlestr % ('iter', 'step size', 'line searches', 'gradient norm',
+    print(titlestr % ('iter', 'step size', 'line searches', 'grad norm',
                       'delta rho', 'delta bound ite', 'delta bound tot'))
-    num_line_search = 0
+
+    # Optimization loop
     if max_offline_ite > 0:
         for i in range(max_offline_ite):
 
-            gradient = evaluate_gradient(den_mise_log)
-            # Sanity check for the gradient
-            if np.any(np.isnan(gradient)):
-                print('Got NaN gradient! Stopping!')
+            # Gradient
+            grad = evaluate_grad(den_mise_log, renyi_bound)
+            # Sanity check for the grad
+            if np.any(np.isnan(grad)):
+                print('Got NaN grad! Stopping!')
                 set_parameters(rho_old)
                 return rho_old, improvement, den_mise_log, bound_old
 
-            gradient_norm = np.sqrt(np.dot(gradient, gradient))
-            # Check that the gradient norm is not too small
-            if gradient_norm < gradient_tol:
-                print('stopping - gradient norm < gradient_tol')
+            # Natural gradient
+            if pi.diagonal:
+                natgrad = grad / (pi.eval_fisher() + 1e-24)
+            else:
+                raise NotImplementedError
+            assert np.dot(grad, natgrad) >= 0
+
+            grad_norm = np.sqrt(np.dot(grad, natgrad))
+            # Check that the grad norm is not too small
+            if grad_norm < grad_tol:
+                print('stopping - grad norm < grad_tol')
                 # print('rho', rho)
                 # print('rho_old', rho_old)
                 # print('rho_init', rho_init)
-                return rho_old, improvement_old, den_mise_log, bound_old
+                return rho, improvement, den_mise_log, bound, renyi_bound
 
-            # alpha = drho
-            alpha = drho / gradient_norm**2
             # Save old values
             rho_old = rho
             improvement_old = improvement
             # Make an optimization step
+            alpha = drho / grad_norm**2
             if line_search is not None:
                 rho, epsilon, delta_bound, num_line_search = \
-                    line_search(den_mise_log, rho, alpha, gradient,
+                    line_search(den_mise_log, rho, alpha, natgrad,
                                 set_parameters, evaluate_bound,
                                 iters_so_far, bound_tol)
                 set_parameters(rho)
                 delta_rho = np.array(rho) - np.array(rho_old)
             else:
-                delta_rho = alpha*gradient
+                delta_rho = alpha * natgrad
                 rho = rho + delta_rho
                 set_parameters(rho)
+                # Update bounds
+                renyi_components_sum = 0
+                for i in range(len(old_rhos_list)):
+                    set_parameters_old(old_rhos_list[i])
+                    renyi_component = evaluate_renyi()
+                    renyi_components_sum += 1 / renyi_component
+                renyi_bound = 1 / renyi_components_sum
                 # Sanity check for the bound
-                bound = evaluate_bound(den_mise_log)
+                bound = evaluate_bound(den_mise_log, renyi_bound)
                 if np.isnan(bound):
                     print('Got NaN bound! Stopping!')
                     set_parameters(rho_old)
-                    return rho_old, improvement_old, den_mise_log, bound_old
+                    return rho_old, improvement_old, den_mise_log, \
+                        renyi_bound_old, bound_old
                 delta_bound = bound - bound_old
 
             improvement = improvement + delta_bound
             bound_old = bound
+            renyi_bound_old = renyi_bound
 
-            print(fmtstr % (i+1, alpha, num_line_search, gradient_norm,
+            print(fmtstr % (i+1, alpha, num_line_search, grad_norm,
                             delta_rho[0], delta_bound, improvement))
 
     print('Max number of offline iterations reached.')
-    return rho, improvement, den_mise_log, bound
+    return rho, improvement, den_mise_log, renyi_bound, bound
 
 
 def learn(make_env, make_policy, *,
@@ -426,8 +455,8 @@ def learn(make_env, make_policy, *,
     mask_iters_ = tf.placeholder(dtype=tf.float32, shape=(max_iters),
                                  name='mask_iters')
     losses_with_name = []
-    # gradient_ = tf.placeholder(dtype=tf,.float32,
-    #                            shape=(n_params, 1), name='gradient')
+    # grad_ = tf.placeholder(dtype=tf,.float32,
+    #                            shape=(n_params, 1), name='grad')
 
     # Multiple importance weights (with balance heuristic)
     target_log_pdf = tf.reduce_sum(
@@ -464,16 +493,17 @@ def learn(make_env, make_policy, *,
                              (return_abs_max, 'ReturnAbsMax'),
                              (return_step_max, 'ReturnStepMax')])
 
+    # Exponentiated Renyi divergence between the target and one behavioral
+    renyi_component = pi.pd.renyi(oldpi.pd)
+    renyi_component = tf.cond(tf.is_nan(renyi_component),
+                              lambda: tf.constant(np.inf),
+                              lambda: renyi_component)
+    renyi_component = tf.cond(renyi_component < 0.,
+                              lambda: tf.constant(np.inf),
+                              lambda: renyi_component)
+    renyi_component = tf.exp(renyi_component)
+
     if truncated_mise:
-        # Exponentiated Renyi divergence between the target and one behavioral
-        renyi_component = pi.pd.renyi(oldpi.pd)
-        renyi_component = tf.cond(tf.is_nan(renyi_component),
-                                  lambda: tf.constant(np.inf),
-                                  lambda: renyi_component)
-        renyi_component = tf.cond(renyi_component < 0.,
-                                  lambda: tf.constant(np.inf),
-                                  lambda: renyi_component)
-        renyi_component = tf.exp(renyi_component)
         # Bound to d2(target || mixture of behaviorals)/n
         mn = tf.sqrt((n_**2 * renyi_bound_) / tf.log(1 / delta))
         mn_broadcasted = \
@@ -623,9 +653,9 @@ def learn(make_env, make_policy, *,
             args_bound = args + (den_mise_log, renyi_bound, )
             return compute_bound(*args_bound)
 
-        def evaluate_gradient(den_mise_log, renyi_bound):
-            args_gradient = args + (den_mise_log, renyi_bound, )
-            return compute_grad(*args_gradient)
+        def evaluate_grad(den_mise_log, renyi_bound):
+            args_grad = args + (den_mise_log, renyi_bound, )
+            return compute_grad(*args_grad)
 
         def evaluate_roba(den_mise_log, renyi_bound):
             args_roba = args + (den_mise_log, renyi_bound, )
@@ -646,13 +676,15 @@ def learn(make_env, make_policy, *,
                     rho_init = [np.arctanh(np.random.uniform(
                         pi.min_mean, pi.max_mean))]
                     rho_i, improvement_i, den_mise_log_i, bound_i = \
-                        optimize_offline(evaluate_roba, rho_init, drho,
+                        optimize_offline(evaluate_roba, pi,
+                                         rho_init, drho,
                                          old_rhos_list,
                                          iters_so_far,
                                          mask_iters, set_parameters,
                                          set_parameters_old,
-                                         evaluate_behav, evaluate_bound,
-                                         evaluate_gradient, line_search,
+                                         evaluate_behav, evaluate_renyi,
+                                         evaluate_bound,
+                                         evaluate_grad, line_search,
                                          max_offline_ite=max_offline_iters)
                     if bound_i > bound:
                         check = True
@@ -673,13 +705,15 @@ def learn(make_env, make_policy, *,
                                  filename)
             else:
                 rho, improvement, den_mise_log, renyi_bound, bound = \
-                    optimize_offline(evaluate_roba, rho, drho,
+                    optimize_offline(evaluate_roba, pi,
+                                     rho, drho,
                                      old_rhos_list,
                                      iters_so_far,
                                      mask_iters, set_parameters,
                                      set_parameters_old,
-                                     evaluate_behav, evaluate_bound,
-                                     evaluate_gradient, line_search,
+                                     evaluate_behav, evaluate_renyi,
+                                     evaluate_bound, evaluate_grad,
+                                     line_search,
                                      max_offline_ite=max_offline_iters)
             set_parameters(rho)
 

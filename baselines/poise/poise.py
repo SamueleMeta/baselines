@@ -140,7 +140,7 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
         return epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
 
 
-def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
+def line_search_parabola(den_mise, theta_init, alpha, natural_grad,
                          set_parameter, evaluate_bound, dtheta,
                          iters_so_far, delta_bound_tol=1e-4,
                          max_line_search_ite=30):
@@ -152,7 +152,7 @@ def line_search_parabola(den_mise, theta_init, alpha, natural_gradient,
 
     for i in range(max_line_search_ite):
 
-        theta = theta_init + epsilon * alpha * natural_gradient
+        theta = theta_init + epsilon * alpha * natural_grad
         set_parameter(theta)
 
         bound = evaluate_bound(den_mise)
@@ -269,9 +269,9 @@ def best_of_grid(policy, grid_size, theta_init,
 def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
                      iters_so_far, mask_iters,
                      set_parameter, set_parameter_old, evaluate_behav,
-                     evaluate_bound, evaluate_gradient,
-                     line_search, evaluate_natural_gradient=None,
-                     gradient_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
+                     evaluate_bound, evaluate_grad,
+                     line_search, evaluate_natural_grad=None,
+                     grad_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
 
     # Compute MISE's denominator
     den_mise = np.zeros(mask_iters.shape).astype(np.float32)
@@ -296,43 +296,43 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
     # Print infos about optimization loop
     fmtstr = '%6i %10.3g %16i %18.3g %18.3g %18.3g %18.3g'
     titlestr = '%6s %10s  %18s %16s %18s %18s %18s'
-    print(titlestr % ('iter', 'step size', 'line searches', 'gradient norm',
+    print(titlestr % ('iter', 'step size', 'line searches', 'grad norm',
                       'delta theta', 'delta bound ite', 'delta bound tot'))
     num_line_search = 0
     if max_offline_ite > 0:
         for i in range(max_offline_ite):
 
-            gradient = evaluate_gradient(den_mise_log)
-            # Sanity check for the gradient
-            if np.any(np.isnan(gradient)):
-                print('Got NaN gradient! Stopping!')
+            grad = evaluate_grad(den_mise_log)
+            # Sanity check for the grad
+            if np.any(np.isnan(grad)):
+                print('Got NaN grad! Stopping!')
                 set_parameter(theta_old)
                 return theta_old, improvement, den_mise_log, bound_old
 
-            gradient_norm = np.sqrt(np.dot(gradient, gradient))
-            # Check that the gradient norm is not too small
-            if gradient_norm < gradient_tol:
-                print('stopping - gradient norm < gradient_tol')
+            grad_norm = np.sqrt(np.dot(grad, grad))
+            # Check that the grad norm is not too small
+            if grad_norm < grad_tol:
+                print('stopping - grad norm < grad_tol')
                 # print('theta', theta)
                 # print('theta_old', theta_old)
                 # print('theta_init', theta_init)
                 return theta_old, improvement_old, den_mise_log, bound_old
 
             # alpha = dtheta
-            alpha = dtheta / gradient_norm ** 2
+            alpha = dtheta / grad_norm ** 2
             # Save old values
             theta_old = theta
             improvement_old = improvement
             # Make an optimization step
             if line_search is not None:
                 theta, epsilon, delta_bound, num_line_search = \
-                    line_search(den_mise_log, theta, alpha, gradient,
+                    line_search(den_mise_log, theta, alpha, grad,
                                 set_parameter, evaluate_bound,
                                 iters_so_far, bound_tol)
                 set_parameter(theta)
                 delta_theta = np.array(theta) - np.array(theta_old)
             else:
-                delta_theta = alpha*gradient
+                delta_theta = alpha*grad
                 theta = theta + delta_theta
                 set_parameter(theta)
                 # Sanity check for the bound
@@ -346,7 +346,7 @@ def optimize_offline(evaluate_roba, theta_init, dtheta, old_thetas_list,
             improvement = improvement + delta_bound
             bound_old = bound
 
-            print(fmtstr % (i+1, alpha, num_line_search, gradient_norm,
+            print(fmtstr % (i+1, alpha, num_line_search, grad_norm,
                             delta_theta[0], delta_bound, improvement))
 
     print('Max number of offline iterations reached.')
@@ -436,8 +436,8 @@ def learn(make_env, make_policy, *,
     rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
     disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples),
                                name='disc_rew')
-    gradient_ = tf.placeholder(dtype=tf.float32,
-                               shape=(n_params, 1), name='gradient')
+    grad_ = tf.placeholder(dtype=tf.float32,
+                               shape=(n_params, 1), name='grad')
     iter_number_ = tf.placeholder(dtype=tf.float32, name='iter_number')
 
     iter_number_int = tf.cast(iter_number_, dtype=tf.int32)
@@ -667,9 +667,9 @@ def learn(make_env, make_policy, *,
             args_bound = args + (den_mise_log,)
             return compute_bound(*args_bound)[0]
 
-        def evaluate_gradient(den_mise_log):
-            args_gradient = args + (den_mise_log,)
-            return compute_grad(*args_gradient)[0]
+        def evaluate_grad(den_mise_log):
+            args_grad = args + (den_mise_log,)
+            return compute_grad(*args_grad)[0]
 
         def evaluate_roba(den_mise_log):
             args_roba = args + (den_mise_log,)
@@ -689,7 +689,7 @@ def learn(make_env, make_policy, *,
                                          mask_iters, set_parameter,
                                          set_parameter_old,
                                          evaluate_behav, evaluate_bound,
-                                         evaluate_gradient, line_search,
+                                         evaluate_grad, line_search,
                                          max_offline_ite=max_offline_iters)
                     if bound_i > bound:
                         check = True
@@ -715,7 +715,7 @@ def learn(make_env, make_policy, *,
                                      mask_iters, set_parameter,
                                      set_parameter_old,
                                      evaluate_behav, evaluate_bound,
-                                     evaluate_gradient, line_search,
+                                     evaluate_grad, line_search,
                                      max_offline_ite=max_offline_iters)
             set_parameter(theta)
 

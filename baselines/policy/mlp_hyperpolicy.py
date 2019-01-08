@@ -97,8 +97,10 @@ class PeMlpPolicy(object):
                 tf.not_equal(self.flat_actor_weights, tf.constant(0, dtype=tf.float32)),
                 tf.random_normal(shape=[n_actor_weights.value], stddev=0.01),
                 tf.zeros(shape=[n_actor_weights]))  # bias init must stay zero
-            self.higher_mean = higher_mean = tf.get_variable(
+            self.higher_mean = tf.get_variable(
                 name='higher_mean', initializer=higher_mean_init)
+            self.higher_mean = higher_mean = tf.clip_by_value(
+                self.higher_mean, -1, 1, 'higher_mean_clipped')
             if diagonal:
                 self.higher_logstd = higher_logstd = \
                     tf.get_variable(
@@ -183,9 +185,12 @@ class PeMlpPolicy(object):
 
         # Fisher computation (diagonal case)
         mean_fisher_diag = tf.exp(-2*self.higher_logstd)
-        cov_fisher_diag = mean_fisher_diag*0 + 2
-        self._fisher_diag = tf.concat(
-            [mean_fisher_diag, cov_fisher_diag], axis=0)
+        if trainable_std:
+            cov_fisher_diag = mean_fisher_diag*0 + 2
+            self._fisher_diag = tf.concat(
+                [mean_fisher_diag, cov_fisher_diag], axis=0)
+        else:
+            self._fisher_diag = mean_fisher_diag
         self._get_fisher_diag = U.function([], [self._fisher_diag])
 
     # Black box usage
