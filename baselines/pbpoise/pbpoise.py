@@ -218,7 +218,7 @@ def best_of_grid(policy, grid_size,
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    logstd_grid = np.linspace(-20, 0, grid_size)
+    logstd_grid = np.linspace(-4, 0, grid_size)
     if len(rho_init) == 2:
         threeDplot = True
         x, y = np.meshgrid(gain_grid, logstd_grid)
