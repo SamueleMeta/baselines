@@ -175,7 +175,7 @@ def main(args):
     parser.add_argument('--filename', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--gain_init', type=float, default=-0.1)  # LQG only
-    parser.add_argument('--std_init', type=float, default=0.1)  # LQG only
+    parser.add_argument('--std_init', type=float, default=0.15)  # LQG only
     parser.add_argument('--delta', type=float, default=0.2)
     parser.add_argument('--drho', type=float, default=1)
     parser.add_argument('--njobs', type=int, default=-1)

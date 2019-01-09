@@ -597,7 +597,7 @@ def learn(make_env, make_policy, *,
     # Learning loop
     timesteps_so_far = 0
     iters_so_far = 0
-    renyi_components_sum = np.zeros(grid_optimization)
+    renyi_components_sum = np.zeros(grid_optimization**d)
     tstart = time.time()
     rho = get_parameters()
     theta = pi.resample()
