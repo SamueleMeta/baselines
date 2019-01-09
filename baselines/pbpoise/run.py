@@ -177,7 +177,7 @@ def multiple_runs(args):
 
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
-    for k in range(1, 3):
+    for k in range(1, 5):
         seed.append(k)
 
     # Parallelize single runs

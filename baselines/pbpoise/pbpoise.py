@@ -257,13 +257,13 @@ def best_of_grid(policy, grid_size,
             renyi_bound_best = renyi_bound
 
     # Plot the profile of the bound and its components
-    if threeDplot:
-        bound = np.array(bound).reshape((grid_size, grid_size))
-        plot3D_bound_profile(x, y, bound, rho_best, bound_best,
-                             iters_so_far, filename)
-    else:
-        plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
-                           bound_best, iters_so_far, filename)
+    # if threeDplot:
+    #     bound = np.array(bound).reshape((grid_size, grid_size))
+    #     plot3D_bound_profile(x, y, bound, rho_best, bound_best,
+    #                          iters_so_far, filename)
+    # else:
+    #     plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
+    #                        bound_best, iters_so_far, filename)
 
     # Calculate improvement
     set_parameters(rho_init)
