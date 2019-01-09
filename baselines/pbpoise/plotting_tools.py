@@ -69,3 +69,87 @@ def render(env, pi, horizon):
         time.sleep(0.1)
         env.render()
         t += 1
+
+
+##############################################################
+
+def best_of_grid(policy, grid_size,
+                 rho_init, old_rhos_list,
+                 iters_so_far, mask_iters,
+                 set_parameters, set_parameters_old,
+                 delta_cst,
+                 evaluate_behav, evaluate_bound,
+                 evaluate_renyi, evaluate_roba,
+                 filename):
+
+    threeDplot = False
+
+    # Compute MISE's denominator and Renyi bound
+    den_mise = np.zeros(mask_iters.shape).astype(np.float32)
+    # renyi_components_sum = 0
+    for i in range(len(old_rhos_list)):
+        set_parameters_old(old_rhos_list[i])
+        behav = evaluate_behav()
+        den_mise = den_mise + np.exp(behav)
+
+    # Compute the log of MISE's denominator
+    eps = 1e-24  # to avoid inf weights and nan bound
+    den_mise = (den_mise + eps) / iters_so_far
+    den_mise_log = np.log(den_mise) * mask_iters
+
+    # Calculate the grid of parameters to evaluate
+    gain_grid = np.linspace(-1, 1, grid_size)
+    logstd_grid = np.linspace(-4, 0, grid_size)
+    std_too = (len(rho_init) == 2)
+    if std_too:
+        threeDplot = True
+        x, y = np.meshgrid(gain_grid, logstd_grid)
+        X = x.reshape((np.prod(x.shape),))
+        Y = y.reshape((np.prod(y.shape),))
+        rho_grid = list(zip(X, Y))
+    else:
+        rho_grid = [[x] for x in gain_grid]
+    # Evaluate the set of parameters and retain the best one
+    bound = []
+    mise = []
+    bonus = []
+    bound_best = 0
+    renyi_bound_best = 0
+    rho_best = rho_init
+
+    for rho in rho_grid:
+        set_parameters(rho)
+        renyi_components_sum = 0
+        for i in range(len(old_rhos_list)):
+            set_parameters_old(old_rhos_list[i])
+            renyi_component = evaluate_renyi()
+            renyi_components_sum += 1 / renyi_component
+        renyi_bound = 1 / renyi_components_sum
+        bound_rho = evaluate_bound(den_mise_log, renyi_bound)
+        bound.append(bound_rho)
+        if not std_too:
+            # Evaluate bounds' components for plotting
+            mise_rho, bonus_rho = \
+                evaluate_roba(den_mise_log, renyi_bound)
+            mise.append(mise_rho)
+            bonus.append(bonus_rho)
+
+        if bound_rho > bound_best:
+            bound_best = bound_rho
+            rho_best = rho
+            renyi_bound_best = renyi_bound
+
+    # Plot the profile of the bound and its components
+    if threeDplot:
+        bound = np.array(bound).reshape((grid_size, grid_size))
+        plot3D_bound_profile(x, y, bound, rho_best, bound_best,
+                             iters_so_far, filename)
+    else:
+        plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
+                           bound_best, iters_so_far, filename)
+
+    # Calculate improvement
+    set_parameters(rho_init)
+    improvement = bound_best - evaluate_bound(den_mise_log, renyi_bound)
+
+    return rho_best, improvement, den_mise_log, renyi_bound_best

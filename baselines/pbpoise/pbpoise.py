@@ -196,7 +196,7 @@ def best_of_grid(policy, grid_size,
                  rho_init, old_rhos_list,
                  iters_so_far, mask_iters,
                  set_parameters, set_parameters_old,
-                 delta_cst,
+                 delta_cst, renyi_components_sum,
                  evaluate_behav, evaluate_bound,
                  evaluate_renyi, evaluate_roba,
                  filename):
@@ -219,7 +219,8 @@ def best_of_grid(policy, grid_size,
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
     logstd_grid = np.linspace(-4, 0, grid_size)
-    if len(rho_init) == 2:
+    std_too = (len(rho_init) == 2)
+    if std_too:
         threeDplot = True
         x, y = np.meshgrid(gain_grid, logstd_grid)
         X = x.reshape((np.prod(x.shape),))
@@ -235,21 +236,20 @@ def best_of_grid(policy, grid_size,
     renyi_bound_best = 0
     rho_best = rho_init
 
-    for rho in rho_grid:
-        # rho = np.array(rho)
+    for i, rho in enumerate(rho_grid):
         set_parameters(rho)
-        renyi_components_sum = 0
-        for i in range(len(old_rhos_list)):
-            set_parameters_old(old_rhos_list[i])
-            renyi_component = evaluate_renyi()
-            renyi_components_sum += 1 / renyi_component
-        renyi_bound = 1 / renyi_components_sum
+        set_parameters_old(old_rhos_list[-1])
+        renyi_component = evaluate_renyi()
+        renyi_components_sum[i] += 1 / renyi_component
+        renyi_bound = 1 / renyi_components_sum[i]
         bound_rho = evaluate_bound(den_mise_log, renyi_bound)
         bound.append(bound_rho)
-        mise_rho, bonus_rho = \
-            evaluate_roba(den_mise_log, renyi_bound)
-        mise.append(mise_rho)
-        bonus.append(bonus_rho)
+        if not std_too:
+            # Evaluate bounds' components for plotting
+            mise_rho, bonus_rho = \
+                evaluate_roba(den_mise_log, renyi_bound)
+            mise.append(mise_rho)
+            bonus.append(bonus_rho)
 
         if bound_rho > bound_best:
             bound_best = bound_rho
@@ -269,7 +269,8 @@ def best_of_grid(policy, grid_size,
     set_parameters(rho_init)
     improvement = bound_best - evaluate_bound(den_mise_log, renyi_bound)
 
-    return rho_best, improvement, den_mise_log, renyi_bound
+    return rho_best, improvement, den_mise_log, \
+        renyi_components_sum, renyi_bound_best
 
 
 def optimize_offline(evaluate_roba, pi,
@@ -596,6 +597,7 @@ def learn(make_env, make_policy, *,
     # Learning loop
     timesteps_so_far = 0
     iters_so_far = 0
+    renyi_components_sum = np.zeros(grid_optimization)
     tstart = time.time()
     rho = get_parameters()
     theta = pi.resample()
@@ -701,12 +703,13 @@ def learn(make_env, make_policy, *,
                 if not check:
                     den_mise_log = den_mise_log_i
             elif grid_optimization:
-                rho, improvement, den_mise_log, renyi_bound = \
+                rho, improvement, den_mise_log, \
+                    renyi_components_sum, renyi_bound = \
                     best_of_grid(pi, grid_optimization,
                                  rho, old_rhos_list,
                                  iters_so_far, mask_iters,
                                  set_parameters, set_parameters_old,
-                                 delta_cst,
+                                 delta_cst, renyi_components_sum,
                                  evaluate_behav, evaluate_bound,
                                  evaluate_renyi, evaluate_roba,
                                  filename)
