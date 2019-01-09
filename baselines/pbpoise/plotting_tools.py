@@ -1,4 +1,8 @@
 import os
+import matplotlib as mpl
+if os.environ.get('DISPLAY', '') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 import numpy as np
@@ -40,7 +44,6 @@ def plot3D_bound_profile(x, y, bound, rho_best, bound_best, iter, filename):
     # rho_best[1] = np.exp(rho_best[1])
     ax.plot([rho_best[0]], [rho_best[1]], [bound_best],
             markerfacecolor='r', marker='o', markersize=5)
-    ax.legend(loc='upper right')
     # Save plot to given dir
     dir = './bound_profile/' + filename + '/'
     siter = 'iter_{}'.format(iter)

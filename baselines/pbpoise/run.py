@@ -6,6 +6,7 @@
 # Common imports
 import sys, re, os, time, logging
 from collections import defaultdict
+import json
 
 # Framework imports
 import gym
@@ -21,6 +22,17 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # Self imports: algorithm
 from baselines.policy.mlp_hyperpolicy import PeMlpPolicy
 from baselines.pbpoise import pbpoise
+
+
+def args_to_file(args, dir, filename):
+
+    fout = dir + '/tb/' + filename + '/args.txt'
+    fo = open(fout, "w")
+    args_dict = vars(args)
+    for k, v in args_dict.items():
+        fo.write(str(k) + ' >>> ' + str(v) + '\n\n')
+    fo.close()
+    return
 
 
 def get_env_type(env_id):
@@ -103,10 +115,14 @@ def train(env, policy, horizon, seed, bounded_policy,
                   sampler=sampler, **alg_args)
 
 
-def single_run(args):
+def single_run(args, seed=None):
 
     # Import custom envs (must be imported here or wont work with multiple_run)
     import baselines.envs.lqg1d  # registered at import as gym env
+
+    # Manage call from multiple runs
+    if seed:
+        args.seed = seed
 
     # Log file name
     t = time.localtime(time.time())
@@ -125,6 +141,9 @@ def single_run(args):
     logger.configure(dir=args.logdir,
                      format_strs=['stdout', 'csv', 'tensorboard'],
                      file_name=filename)
+
+    # Print args to file in logdir
+    args_to_file(args, dir=args.logdir, filename=filename)
 
     # Learn
     train(env=args.env,
@@ -152,7 +171,21 @@ def single_run(args):
 
 
 def multiple_runs(args):
-    pass
+
+    # Import tools for parallelizing runs
+    from joblib import Parallel, delayed
+
+    seed = []
+    # for i in [n/10 for n in range(1, 8)]:
+    for k in range(1, 3):
+        seed.append(k)
+
+    # Parallelize single runs
+    n_jobs = len(seed)
+    Parallel(n_jobs=n_jobs)(delayed(single_run)(
+        args,
+        seed=seed[i]
+        ) for i in range(n_jobs))
 
 
 def main(args):
