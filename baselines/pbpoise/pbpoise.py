@@ -12,7 +12,7 @@ import time
 from baselines.common import colorize
 from contextlib import contextmanager
 from baselines import logger
-from plotting_tools import plot3D_bound_profile, plot_bound_profile, render
+from plotting_tools import plot3D_bound_profile, plot_bound_profile, render, plot_ess
 
 
 @contextmanager
@@ -232,6 +232,8 @@ def best_of_grid(policy, grid_size,
     bound = []
     mise = []
     bonus = []
+    ess_d2 = []
+    ess_miw = []
     bound_best = 0
     renyi_bound_best = 0
     rho_best = rho_init
@@ -246,10 +248,12 @@ def best_of_grid(policy, grid_size,
         bound.append(bound_rho)
         if not std_too:
             # Evaluate bounds' components for plotting
-            mise_rho, bonus_rho = \
+            mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
                 evaluate_roba(den_mise_log, renyi_bound)
             mise.append(mise_rho)
             bonus.append(bonus_rho)
+            ess_d2.append(ess_d2_rho)
+            ess_miw.append(ess_miw_rho)
 
         if bound_rho > bound_best:
             bound_best = bound_rho
@@ -264,6 +268,8 @@ def best_of_grid(policy, grid_size,
     # else:
     #     plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
     #                        bound_best, iters_so_far, filename)
+    plot_ess(gain_grid, ess_d2, iters_so_far, 'd2_' + filename)
+    plot_ess(gain_grid, ess_miw, iters_so_far, 'miw_' + filename)
 
     # Calculate improvement
     set_parameters(rho_init)
@@ -545,8 +551,16 @@ def learn(make_env, make_policy, *,
             bound = mise + exploration_bonus
     else:
         raise NotImplementedError
-
     losses_with_name.append((bound, 'Bound'))
+
+    # ESS estimation by d2
+    ess_d2 = n_ / renyi_bound_
+    # ESS estimation by miw norms
+    eps = 1e-18  # for eps<1e-18 miw_2=0 if weights are zero
+    miw_ess = (tf.exp(log_ratio) + eps) * mask_iters_
+    miw_1 = tf.linalg.norm(miw_ess, ord=1)
+    miw_2 = tf.linalg.norm(miw_ess, ord=2)
+    ess_miw = miw_1**2 / miw_2**2
 
     # Infos
     losses, loss_names = map(list, zip(*losses_with_name))
@@ -573,7 +587,8 @@ def learn(make_env, make_policy, *,
          mask_iters_, den_mise_log_, renyi_bound_], losses)
     compute_roba = U.function(
         [actor_params_, disc_ret_, ret_, n_,
-         mask_iters_, den_mise_log_, renyi_bound_], [mise, exploration_bonus])
+         mask_iters_, den_mise_log_, renyi_bound_],
+        [mise, exploration_bonus, ess_d2, ess_miw])
 
     # Set line search
     if line_search is not None:

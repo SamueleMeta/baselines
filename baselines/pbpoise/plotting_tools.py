@@ -54,6 +54,21 @@ def plot3D_bound_profile(x, y, bound, rho_best, bound_best, iter, filename):
     plt.close(fig)
 
 
+def plot_ess(rho_grid, ess, iter, filename):
+    fig = plt.figure(figsize=(8, 5))
+    ax = fig.add_subplot(111)
+    ax.grid()
+    ax.plot(rho_grid, ess, color='blue', linewidth='1')
+    # Save plot to given dir
+    dir = './bound_profile/' + filename + '/'
+    siter = 'iter_{}'.format(iter)
+    fname = dir + siter
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    fig.savefig(fname)
+    plt.close(fig)
+
+
 def render(env, pi, horizon):
     """
     Shows a test episode on the screen
