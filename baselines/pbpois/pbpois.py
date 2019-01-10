@@ -131,7 +131,7 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
 
     return rho_old, epsilon_old, delta_bound_old, i+1
 
-def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
+def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-9, bound_tol=1e-4, max_offline_ite=100, 
                      normalize=True, 
                      use_rmax=True,
                      use_renyi=True,
@@ -171,6 +171,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         #assert np.dot(grad, natgrad) >= 0
 
         grad_norm = np.sqrt(np.dot(grad, natgrad))
+        print(grad)
         if grad_norm < grad_tol:
             if verbose: print("stopping - gradient norm < gradient_tol")
             if verbose>1: print(rho)

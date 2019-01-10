@@ -38,7 +38,7 @@ def rllab_env_from_name(env):
     elif env == 'acrobot':
         from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
         return AcrobotEnv
-    elif env == 'inverted-double-pendulum':
+    elif env == 'inverted_double_pendulum':
         from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
         return InvertedPendulumEnv
     else:

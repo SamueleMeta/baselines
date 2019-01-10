@@ -24,7 +24,8 @@ class PeMlpPolicy(object):
 
     def _init(self, ob_space, ac_space, hid_layers=[],
               deterministic=True, diagonal=True,
-              use_bias=True, use_critic=False, 
+              use_bias=True, use_critic=False,
+              learn_std=True,
               seed=None, verbose=True):
         """Params:
             ob_space: task observation space
@@ -96,7 +97,8 @@ class PeMlpPolicy(object):
                 #Diagonal covariance matrix; all stds initialized to 0
                 self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
                                                                      shape=[n_actor_weights],
-                                               initializer=tf.initializers.constant(0.))
+                                               initializer=tf.initializers.constant(np.log(0.1)),
+                                               trainable=learn_std)
                 pdparam = tf.concat([higher_mean, higher_mean * 0. + 
                                    higher_logstd], axis=0)
                 self.pdtype = pdtype = DiagGaussianPdType(n_actor_weights.value) 
@@ -105,7 +107,8 @@ class PeMlpPolicy(object):
                 self.higher_logstd = higher_logstd = tf.get_variable(
                     name='higher_logstd',
                     shape=[n_actor_weights*(n_actor_weights + 1)//2],
-                    initializer=tf.initializers.constant(0.))
+                    initializer=tf.initializers.constant(0.),
+                    trainable=learn_std)
                 pdparam = tf.concat([higher_mean, 
                                     higher_logstd], axis=0)
                 self.pdtype = pdtype = CholeskyGaussianPdType(
@@ -187,7 +190,10 @@ class PeMlpPolicy(object):
         #Fisher computation (diagonal case)
         mean_fisher_diag = tf.exp(-2*self.higher_logstd)
         cov_fisher_diag = mean_fisher_diag*0 + 2
-        self._fisher_diag = tf.concat([mean_fisher_diag, cov_fisher_diag], axis=0)
+        if learn_std:
+            self._fisher_diag = tf.concat([mean_fisher_diag, cov_fisher_diag], axis=0)
+        else:
+            self._fisher_diag = mean_fisher_diag
         self._get_fisher_diag = U.function([], [self._fisher_diag])
         
     #Black box usage
@@ -236,6 +242,8 @@ class PeMlpPolicy(object):
             np.random.seed(seed)
 
     def freeze(self):
+        return self
+        """
         if not self.linear:
             return self
             
@@ -243,6 +251,7 @@ class PeMlpPolicy(object):
                                   self.ob_dim,
                                   self.ac_dim,
                                   self.use_bias)
+        """
 
     def act_with(self, ob, actor_params):
         self.set_actor_params(actor_params)
