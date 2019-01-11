@@ -46,24 +46,30 @@ def best_of_grid(policy, grid_size,
                  iters_so_far, mask_iters,
                  set_parameters, set_parameters_old,
                  delta_cst, renyi_components_sum,
-                 evaluate_behav, evaluate_bound,
-                 evaluate_renyi, evaluate_roba,
+                 evaluate_behav, den_mise,
+                 evaluate_behav_last_sample,
+                 evaluate_bound, evaluate_renyi, evaluate_roba,
                  filename):
 
     threeDplot = False
 
     # Compute MISE's denominator and Renyi bound
-    den_mise = np.zeros(mask_iters.shape).astype(np.float32)
-    # renyi_components_sum = 0
-    for i in range(len(old_rhos_list)):
+    # evaluate the last behav over all samples and add to the denominator
+    set_parameters_old(old_rhos_list[-1])
+    behav_t = evaluate_behav()
+    den_mise = (den_mise + np.exp(behav_t)) * mask_iters
+    # print(den_mise)
+    for i in range(len(old_rhos_list) - 1):
+        # evaluate all the behavs (except the last) over the last sample
         set_parameters_old(old_rhos_list[i])
-        behav = evaluate_behav()
-        den_mise = den_mise + np.exp(behav)
+        behav = evaluate_behav_last_sample()
+        # print('behhaaaaavvvv', np.exp(behav))
+        den_mise[iters_so_far-1] = den_mise[iters_so_far-1] + np.exp(behav)
 
     # Compute the log of MISE's denominator
     eps = 1e-24  # to avoid inf weights and nan bound
-    den_mise = (den_mise + eps) / iters_so_far
-    den_mise_log = np.log(den_mise) * mask_iters
+    den_mise_it = (den_mise + eps) / iters_so_far
+    den_mise_log = np.log(den_mise_it) * mask_iters
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
@@ -124,7 +130,7 @@ def best_of_grid(policy, grid_size,
     set_parameters(rho_init)
     improvement = bound_best - evaluate_bound(den_mise_log, renyi_bound)
 
-    return rho_best, improvement, den_mise_log, \
+    return rho_best, improvement, den_mise_log, den_mise, \
         renyi_components_sum, renyi_bound_best
 
 
@@ -292,6 +298,9 @@ def learn(make_env, make_policy, *,
     # My Placeholders
     actor_params_ = tf.placeholder(shape=[max_iters, pi._n_actor_weights],
                                    name='actor_params', dtype=tf.float32)
+    last_actor_param_ = tf.placeholder(shape=(pi._n_actor_weights),
+                                       name='last_actor_params',
+                                       dtype=tf.float32)
     den_mise_log_ = tf.placeholder(shape=[max_iters], dtype=tf.float32,
                                    name='den_mise')
     renyi_bound_ = tf.placeholder(dtype=tf.float32, name='renyi_bound')
@@ -311,6 +320,8 @@ def learn(make_env, make_policy, *,
         pi.pd.independent_logps(actor_params_), axis=1)
     behavioral_log_pdf = tf.reduce_sum(
         oldpi.pd.independent_logps(actor_params_), axis=1)
+    behavioral_log_pdf_last_sample = tf.reduce_sum(
+        oldpi.pd.independent_logps(last_actor_param_))
     log_ratio = target_log_pdf - den_mise_log_
     miw = tf.exp(log_ratio) * mask_iters_
 
@@ -417,8 +428,9 @@ def learn(make_env, make_policy, *,
     set_parameters_old = U.SetFromFlat(var_list_old)
 
     compute_behav = U.function(
-        [actor_params_, disc_ret_, n_, mask_iters_],
-        behavioral_log_pdf)
+        [actor_params_], behavioral_log_pdf)
+    compute_behav_last_sample = U.function(
+        [last_actor_param_], behavioral_log_pdf_last_sample)
     compute_renyi = U.function(
         [], renyi_component)
     compute_bound = U.function(
@@ -452,14 +464,12 @@ def learn(make_env, make_policy, *,
     # Learning loop
     timesteps_so_far = 0
     iters_so_far = 0
+    den_mise = np.zeros(mask_iters.shape).astype(np.float32)
     renyi_components_sum = np.zeros(grid_optimization**d)
     tstart = time.time()
     rho = get_parameters()
-    print(rho)
     theta = pi.resample()
-    print(theta)
     all_eps['actor_params'][iters_so_far, :] = theta
-    print('Optimization of the %s bound' % (bound))
     while True:
         iters_so_far += 1
         mask_iters[:iters_so_far] = 1
@@ -505,9 +515,11 @@ def learn(make_env, make_policy, *,
         # Tensor evaluations
 
         def evaluate_behav():
-            args_behav = all_eps['actor_params'], all_eps['disc_ret'], \
-                iters_so_far, mask_iters
-            return compute_behav(*args_behav)
+            return compute_behav(all_eps['actor_params'])
+
+        def evaluate_behav_last_sample():
+            args_behav_last = [all_eps['actor_params'][iters_so_far - 1]]
+            return compute_behav_last_sample(*args_behav_last)
 
         def evaluate_renyi_component():
             return compute_renyi()
@@ -562,15 +574,16 @@ def learn(make_env, make_policy, *,
                 if not check:
                     den_mise_log = den_mise_log_i
             elif grid_optimization > 0:
-                rho, improvement, den_mise_log, \
+                rho, improvement, den_mise_log, den_mise, \
                     renyi_components_sum, renyi_bound = \
                     best_of_grid(pi, grid_optimization,
                                  rho, old_rhos_list,
                                  iters_so_far, mask_iters,
                                  set_parameters, set_parameters_old,
                                  delta_cst, renyi_components_sum,
-                                 evaluate_behav, evaluate_bound,
-                                 evaluate_renyi, evaluate_roba,
+                                 evaluate_behav, den_mise,
+                                 evaluate_behav_last_sample,
+                                 evaluate_bound, evaluate_renyi, evaluate_roba,
                                  filename)
             else:
                 rho, improvement, den_mise_log, renyi_bound, bound = \
