@@ -276,9 +276,6 @@ def learn(make_env, make_policy, *,
     # Build the higher level target and behavioral policies
     pi = make_policy('pi', ob_space, ac_space)
     oldpi = make_policy('oldpi', ob_space, ac_space)
-    print('pi.ac_dim', pi.ac_dim)
-    print('pi.ob_dim', pi.ob_dim)
-    print('mean shape', pi.actor_mean.get_shape().as_list())
 
     # Get all pi's learnable parameters
     all_var_list = pi.get_trainable_variables()
@@ -336,13 +333,17 @@ def learn(make_env, make_policy, *,
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
     return_step_max = tf.reduce_max(tf.abs(ret_))
+    regret = n_ * 17.35 - tf.reduce_sum(ep_return)
+    regret_over_t = 17.35 - return_mean
 
     losses_with_name.extend([(return_mean, 'ReturnMean'),
                              (return_max, 'ReturnMax'),
                              (return_min, 'ReturnMin'),
                              (return_last, 'ReturnLastEpisode'),
                              (return_abs_max, 'ReturnAbsMax'),
-                             (return_step_max, 'ReturnStepMax')])
+                             (return_step_max, 'ReturnStepMax'),
+                             (regret, 'Regret'),
+                             (regret_over_t, 'Regret/t')])
 
     # Regret
 
