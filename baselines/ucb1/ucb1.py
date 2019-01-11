@@ -14,6 +14,7 @@ from baselines.common import colorize
 from contextlib import contextmanager
 from baselines import logger
 from collections import defaultdict
+from plotting_tools import plot3D_bound_profile, plot_bound_profile
 
 
 def eval_trajectory(env, pol, gamma, horizon, feature_fun):
@@ -38,7 +39,10 @@ def ucb1(make_env,
          max_iters,
          gamma,
          horizon,
-         feature_fun=None):
+         grid_size,
+         filename,
+         feature_fun=None,
+         plot_bound=False):
 
     # Build the environment
     env = make_env()
@@ -57,21 +61,14 @@ def ucb1(make_env,
     set_parameters = U.SetFromFlat(var_list)
     get_parameters = U.GetFlat(var_list)
 
-    # My Placeholders
-    ret_ = tf.placeholder(dtype=tf.float32, shape=(max_iters), name='ret')
-    disc_ret_ = tf.placeholder(dtype=tf.float32, shape=(max_iters),
-                               name='disc_ret')
-    n_ = tf.placeholder(dtype=tf.float32, name='iter_number')
-    n_int = tf.cast(n_, dtype=tf.int32)
-    mask_iters_ = tf.placeholder(dtype=tf.float32, shape=(max_iters),
-                                 name='mask_iters')
-
-    # Calculate the grid of parameters to evaluate
+    # Generate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
     logstd_grid = np.linspace(-4, 0, grid_size)
-    std_too = (len(rho_init) == 2)
+    rho = get_parameters()
+    std_too = (len(rho) == 2)
     if std_too:
-        threeDplot = True
+        if plot_bound:
+            threeDplot = True
         x, y = np.meshgrid(gain_grid, logstd_grid)
         X = x.reshape((np.prod(x.shape),))
         Y = y.reshape((np.prod(y.shape),))
@@ -79,6 +76,7 @@ def ucb1(make_env,
     else:
         rho_grid = [[x] for x in gain_grid]
 
+    # initialize loop variables
     n_selections = np.zeros(len(rho_grid))
     ret_sums = np.zeros(len(rho_grid))
     for rho in rho_grid:
@@ -86,6 +84,8 @@ def ucb1(make_env,
         ret_sums[str(rho)] = 0
     regret = 0
     iter = 0
+
+    # Learning loop
     while True:
         iter += 1
 
@@ -120,7 +120,7 @@ def ucb1(make_env,
                 i_best = i
         # Sample actor's parameters from chosen arm
         set_parameters(rho_best)
-        theta = pi.resample()
+        _ = pi.resample()
         # Store parameters of both the hyperpolicy and the actor
         if env.spec.id == 'LQG1D-v0':
             mu1_actor = pi.eval_actor_mean([[1]])[0][0]
@@ -136,3 +136,13 @@ def ucb1(make_env,
         regret += (17.35 - disc_ret)
         logger.record_tabular("Regret", regret)
         n_selections[i_best] += 1
+
+        # Plot the profile of the bound and its components
+        if plot_bound:
+            if threeDplot:
+                ub = np.array(ub).reshape((grid_size, grid_size))
+                plot3D_bound_profile(x, y, ub, rho_best, ub_best,
+                                     iter, filename)
+            else:
+                plot_bound_profile(gain_grid, ub, average_ret, bonus, rho_best,
+                                   ub_best, iter, filename)
