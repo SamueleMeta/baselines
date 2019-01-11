@@ -95,7 +95,9 @@ def train(env, policy, horizon, seed, bounded_policy,
                            use_bias=False, use_critic=False,
                            seed=seed, verbose=True,
                            hidden_W_init=U.normc_initializer(1.0),
-                           std_init=tf.constant_initializer(np.log(std_init)))
+                           higher_mean_init=tf.constant_initializer(gain_init),
+                           higher_logstd_init=tf.constant_initializer(
+                               np.log(std_init)))
     try:
         affinity = len(os.sched_getaffinity(0))
     except:
@@ -163,11 +165,11 @@ def single_run(args, seed=None):
           max_offline_iters=args.max_offline_iters,
           max_iters=args.max_iters,
           render_after=args.render_after,
-          line_search=args.line_search,
           grid_optimization=args.grid_optimization,
           truncated_mise=args.truncated_mise,
           delta_t=args.delta_t,
-          filename=filename)
+          filename=filename,
+          find_optimal_arm=args.find_optimal_arm)
 
 
 def multiple_runs(args):
@@ -217,14 +219,14 @@ def main(args):
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--line_search', type=str, default=None)  # 'parabola'
     parser.add_argument('--multiple_init', type=int, default=None)
-    parser.add_argument('--grid_optimization', type=int, default=None)
+    parser.add_argument('--grid_optimization', type=int, default=0)
     parser.add_argument('--delta_t', type=str, default=None)
     add_bool_arg(parser, 'bounded_policy', default=True)
     add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'truncated_mise', default=True)
     add_bool_arg(parser, 'experiment', default=False)
+    add_bool_arg(parser, 'find_optimal_arm', default=False)
     args = parser.parse_args(args)
 
     if args.experiment:

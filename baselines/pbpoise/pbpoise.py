@@ -24,115 +24,6 @@ def timed(msg):
         'done in %.3f seconds' % (time.time() - tstart), color='magenta'))
 
 
-def traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True):
-    """
-    Generates a dataset of trajectories
-        pi: policy
-        env: environment
-        n_episodes: batch size
-        horizon: max episode length
-        stochastic: activates policy stochasticity
-    """
-    # Initialize state variables
-    t = 0
-    ac = env.action_space.sample()
-    new = True
-    ob = env.reset()
-    cur_ep_ret = 0
-    cur_ep_len = 0
-
-    # Initialize history arrays
-    ep_rets = []
-    ep_lens = []
-    obs = np.array([ob for _ in range(horizon * n_episodes)])
-    rews = np.zeros(horizon * n_episodes, 'float32')
-    vpreds = np.zeros(horizon * n_episodes, 'float32')
-    news = np.zeros(horizon * n_episodes, 'int32')
-    acs = np.array([ac for _ in range(horizon * n_episodes)])
-    prevacs = acs.copy()
-    mask = np.ones(horizon * n_episodes, 'float32')
-
-    # Collect trajectories
-    i = 0
-    j = 0
-    while True:
-        prevac = ac
-        ac, vpred = pi.act(stochastic, ob)
-        if i == n_episodes:
-            yield {"ob": obs, "rew": rews, "vpred": vpreds, "new": news,
-                   "ac": acs, "prevac": prevacs, "nextvpred": vpred*(1 - new),
-                   "ep_rets": ep_rets, "ep_lens": ep_lens, "mask": mask}
-            _, vpred = pi.act(stochastic, ob)
-
-            # Reset episode
-            ep_rets = []
-            ep_lens = []
-            mask = np.ones(horizon * n_episodes, 'float32')
-            i = 0
-            t = 0
-
-        # Update history arrays
-        obs[t] = ob
-        vpreds[t] = vpred
-        news[t] = new
-        acs[t] = ac
-        prevacs[t] = prevac
-        # Transition
-        ob, rew, new, _ = env.step(ac)
-        rews[t] = rew
-        cur_ep_ret += rew
-        cur_ep_len += 1
-        j += 1
-
-        # Next episode
-        if new or j == horizon:
-            new = True
-            env.done = True
-            ep_rets.append(cur_ep_ret)
-            ep_lens.append(cur_ep_len)
-            cur_ep_ret = 0
-            cur_ep_len = 0
-            ob = env.reset()
-            next_t = (i+1) * horizon
-            mask[t+1:next_t] = 0.
-            acs[t+1:next_t] = acs[t]
-            obs[t+1:next_t] = obs[t]
-            t = next_t - 1
-            i += 1
-            j = 0
-
-        # Next step
-        t += 1
-
-
-def add_disc_rew(seg, gamma):
-    """
-    Adds discounted rewards and returns to the dataset
-        seg: the dataset
-        gamma: discount factor
-    """
-    new = np.append(seg['new'], 1)
-    rew = seg['rew']
-    n_ep = len(seg['ep_rets'])
-    n_samp = len(rew)
-    seg['ep_disc_rets'] = ep_disc_ret = np.empty(n_ep, 'float32')
-    seg['disc_rew'] = disc_rew = np.empty(n_samp, 'float32')
-    discounter = 0
-    ret = 0.
-    i = 0
-    for t in range(n_samp):
-        disc_rew[t] = rew[t] * gamma ** discounter
-        ret += disc_rew[t]
-
-        if new[t + 1]:
-            discounter = 0
-            ep_disc_ret[i] = ret
-            i += 1
-            ret = 0.
-        else:
-            discounter += 1
-
-
 def eval_trajectory(env, pol, gamma, horizon, feature_fun):
     ret = disc_ret = 0
     t = 0
@@ -142,54 +33,12 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
         s = feature_fun(ob) if feature_fun else ob
         a = pol.act(s)
         ob, r, done, _ = env.step(a)
+        # ob = np.reshape(ob, newshape=s.shape)
         ret += r
         disc_ret += gamma**t * r
         t += 1
 
     return ret, disc_ret, t
-
-def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
-    if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
-        return epsilon_old * max_increase
-    else:
-        return epsilon_old**2 / (2 * (epsilon_old - delta_bound))
-
-
-def line_search_parabola(den_mise, rho_init, alpha, natural_grad,
-                         set_parameters, evaluate_bound, drho,
-                         iters_so_far, delta_bound_tol=1e-4,
-                         max_line_search_ite=30):
-    epsilon = 1.
-    epsilon_old = 0.
-    delta_bound_old = -np.inf
-    bound_init = evaluate_bound(den_mise)
-    rho_old = rho_init
-
-    for i in range(max_line_search_ite):
-
-        rho = rho_init + epsilon * alpha * natural_grad
-        set_parameters(rho)
-
-        bound = evaluate_bound(den_mise)
-
-        if np.isnan(bound):
-            print('Got NaN bound value: rolling back!')
-            return rho_old, epsilon_old, 0, i + 1
-
-        delta_bound = bound - bound_init
-
-        epsilon_old = epsilon
-        epsilon = update_epsilon(delta_bound, epsilon_old)
-        if delta_bound <= delta_bound_old + delta_bound_tol:
-            if delta_bound_old < 0.:
-                return rho_init, 0., 0., i+1
-            else:
-                return rho_old, epsilon_old, delta_bound_old, i+1
-
-        delta_bound_old = delta_bound
-        rho_old = rho
-
-    return rho_old, epsilon_old, delta_bound_old, i+1
 
 
 def best_of_grid(policy, grid_size,
@@ -268,8 +117,8 @@ def best_of_grid(policy, grid_size,
     # else:
     #     plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
     #                        bound_best, iters_so_far, filename)
-    plot_ess(gain_grid, ess_d2, iters_so_far, 'd2_' + filename)
-    plot_ess(gain_grid, ess_miw, iters_so_far, 'miw_' + filename)
+    # plot_ess(gain_grid, ess_d2, iters_so_far, 'd2_' + filename)
+    # plot_ess(gain_grid, ess_miw, iters_so_far, 'miw_' + filename)
 
     # Calculate improvement
     set_parameters(rho_init)
@@ -285,7 +134,7 @@ def optimize_offline(evaluate_roba, pi,
                      set_parameters, set_parameters_old,
                      evaluate_behav, evaluate_renyi,
                      evaluate_bound, evaluate_grad,
-                     line_search, evaluate_natural_grad=None,
+                     evaluate_natural_grad=None,
                      grad_tol=1e-4, bound_tol=1e-10, max_offline_ite=10):
 
     # Compute MISE's denominator and Renyi bound
@@ -308,7 +157,6 @@ def optimize_offline(evaluate_roba, pi,
     # Set optimization variables
     rho = rho_old = rho_init
     improvement = improvement_old = 0.
-    num_line_search = 0
 
     # Calculate initial bound
     bound = evaluate_bound(den_mise_log, renyi_bound)
@@ -320,9 +168,9 @@ def optimize_offline(evaluate_roba, pi,
     print('Initial bound after last sampling:', bound)
 
     # Print infos about optimization loop
-    fmtstr = '%6i %10.3g %16i %18.3g %18.3g %18.3g %18.3g'
+    fmtstr = '%6i %10.3g  %18.3g %18.3g %18.3g %18.3g'
     titlestr = '%6s %10s  %18s %16s %18s %18s %18s'
-    print(titlestr % ('iter', 'step size', 'line searches', 'grad norm',
+    print(titlestr % ('iter', 'step size', 'grad norm',
                       'delta rho', 'delta bound ite', 'delta bound tot'))
 
     # Optimization loop
@@ -358,38 +206,30 @@ def optimize_offline(evaluate_roba, pi,
             improvement_old = improvement
             # Make an optimization step
             alpha = drho / grad_norm**2
-            if line_search is not None:
-                rho, epsilon, delta_bound, num_line_search = \
-                    line_search(den_mise_log, rho, alpha, natgrad,
-                                set_parameters, evaluate_bound,
-                                iters_so_far, bound_tol)
-                set_parameters(rho)
-                delta_rho = np.array(rho) - np.array(rho_old)
-            else:
-                delta_rho = alpha * natgrad
-                rho = rho + delta_rho
-                set_parameters(rho)
-                # Update bounds
-                renyi_components_sum = 0
-                for i in range(len(old_rhos_list)):
-                    set_parameters_old(old_rhos_list[i])
-                    renyi_component = evaluate_renyi()
-                    renyi_components_sum += 1 / renyi_component
-                renyi_bound = 1 / renyi_components_sum
-                # Sanity check for the bound
-                bound = evaluate_bound(den_mise_log, renyi_bound)
-                if np.isnan(bound):
-                    print('Got NaN bound! Stopping!')
-                    set_parameters(rho_old)
-                    return rho_old, improvement_old, den_mise_log, \
-                        renyi_bound_old, bound_old
+            delta_rho = alpha * natgrad
+            rho = rho + delta_rho
+            set_parameters(rho)
+            # Update bounds
+            renyi_components_sum = 0
+            for i in range(len(old_rhos_list)):
+                set_parameters_old(old_rhos_list[i])
+                renyi_component = evaluate_renyi()
+                renyi_components_sum += 1 / renyi_component
+            renyi_bound = 1 / renyi_components_sum
+            # Sanity check for the bound
+            bound = evaluate_bound(den_mise_log, renyi_bound)
+            if np.isnan(bound):
+                print('Got NaN bound! Stopping!')
+                set_parameters(rho_old)
+                return rho_old, improvement_old, den_mise_log, \
+                    renyi_bound_old, bound_old
                 delta_bound = bound - bound_old
 
             improvement = improvement + delta_bound
             bound_old = bound
             renyi_bound_old = renyi_bound
 
-            print(fmtstr % (i+1, alpha, num_line_search, grad_norm,
+            print(fmtstr % (i+1, alpha, grad_norm,
                             delta_rho[0], delta_bound, improvement))
 
     print('Max number of offline iterations reached.')
@@ -410,11 +250,11 @@ def learn(make_env, make_policy, *,
           max_offline_iters=10,
           save_weights=False,
           render_after=None,
-          line_search=None,
           grid_optimization=None,
           truncated_mise=True,
           delta_t=None,
-          filename=None):
+          filename=None,
+          find_optimal_arm=False):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -436,6 +276,9 @@ def learn(make_env, make_policy, *,
     # Build the higher level target and behavioral policies
     pi = make_policy('pi', ob_space, ac_space)
     oldpi = make_policy('oldpi', ob_space, ac_space)
+    print('pi.ac_dim', pi.ac_dim)
+    print('pi.ob_dim', pi.ob_dim)
+    print('mean shape', pi.actor_mean.get_shape().as_list())
 
     # Get all pi's learnable parameters
     all_var_list = pi.get_trainable_variables()
@@ -443,7 +286,6 @@ def learn(make_env, make_policy, *,
         [v for v in all_var_list if v.name.split('/')[1].startswith('higher')]
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
     d = sum(shapes)
-
     # Get all oldpi's learnable parameters
     all_var_list_old = oldpi.get_trainable_variables()
     var_list_old = \
@@ -502,6 +344,8 @@ def learn(make_env, make_policy, *,
                              (return_abs_max, 'ReturnAbsMax'),
                              (return_step_max, 'ReturnStepMax')])
 
+    # Regret
+
     # Exponentiated Renyi divergence between the target and one behavioral
     renyi_component = pi.pd.renyi(oldpi.pd)
     renyi_component = tf.cond(tf.is_nan(renyi_component),
@@ -533,6 +377,7 @@ def learn(make_env, make_policy, *,
         delta = 3 * delta / ((np.pi * n_)**2 * grid_optimization)
     elif delta_t is None:
         delta_cst = delta
+        delta = tf.constant(delta)
     else:
         raise NotImplementedError
     losses_with_name.append((delta, 'delta'))
@@ -582,6 +427,9 @@ def learn(make_env, make_policy, *,
         [actor_params_, disc_ret_, ret_, n_,
          mask_iters_, den_mise_log_, renyi_bound_],
         U.flatgrad(bound, var_list))
+    compute_return_mean = U.function(
+        [actor_params_, disc_ret_, ret_, n_,
+         mask_iters_], return_mean)
     compute_losses = U.function(
         [actor_params_, disc_ret_, ret_, n_,
          mask_iters_, den_mise_log_, renyi_bound_], losses)
@@ -589,15 +437,6 @@ def learn(make_env, make_policy, *,
         [actor_params_, disc_ret_, ret_, n_,
          mask_iters_, den_mise_log_, renyi_bound_],
         [mise, exploration_bonus, ess_d2, ess_miw])
-
-    # Set line search
-    if line_search is not None:
-        s = str(line_search)
-        if s == "parabola" or s == "parabolic":
-            print('Step size optimization through parabolic line search.')
-            line_search = line_search_parabola
-        else:
-            raise ValueError("{} l.s. not implemented".format(line_search))
 
     # Tf initialization
     U.initialize()
@@ -615,7 +454,9 @@ def learn(make_env, make_policy, *,
     renyi_components_sum = np.zeros(grid_optimization**d)
     tstart = time.time()
     rho = get_parameters()
+    print(rho)
     theta = pi.resample()
+    print(theta)
     all_eps['actor_params'][iters_so_far, :] = theta
     print('Optimization of the %s bound' % (bound))
     while True:
@@ -693,7 +534,9 @@ def learn(make_env, make_policy, *,
             raise NotImplementedError
 
         with timed("Optimization"):
-            if multiple_init:
+            if find_optimal_arm:
+                pass
+            elif multiple_init:
                 bound = improvement = 0
                 check = False
                 for i in range(multiple_init):
@@ -708,7 +551,7 @@ def learn(make_env, make_policy, *,
                                          set_parameters_old,
                                          evaluate_behav, evaluate_renyi,
                                          evaluate_bound,
-                                         evaluate_grad, line_search,
+                                         evaluate_grad,
                                          max_offline_ite=max_offline_iters)
                     if bound_i > bound:
                         check = True
@@ -717,7 +560,7 @@ def learn(make_env, make_policy, *,
                         den_mise_log = den_mise_log_i
                 if not check:
                     den_mise_log = den_mise_log_i
-            elif grid_optimization:
+            elif grid_optimization > 0:
                 rho, improvement, den_mise_log, \
                     renyi_components_sum, renyi_bound = \
                     best_of_grid(pi, grid_optimization,
@@ -738,7 +581,6 @@ def learn(make_env, make_policy, *,
                                      set_parameters_old,
                                      evaluate_behav, evaluate_renyi,
                                      evaluate_bound, evaluate_grad,
-                                     line_search,
                                      max_offline_ite=max_offline_iters)
             set_parameters(rho)
 
@@ -754,10 +596,14 @@ def learn(make_env, make_policy, *,
                 logger.record_tabular("LQGmu1_actor", mu1_actor)
                 logger.record_tabular("LQGmu1_higher", mu1_higher)
                 logger.record_tabular("LQGsigma_higher", sigma)
-            args_losses = args + (den_mise_log, renyi_bound, )
-            meanlosses = np.array(compute_losses(*args_losses))
-            for (lossname, lossval) in zip(loss_names, meanlosses):
-                logger.record_tabular(lossname, lossval)
+            if find_optimal_arm:
+                ret_mean = compute_return_mean(*args)
+                logger.record_tabular('ReturnMean', ret_mean)
+            else:
+                args_losses = args + (den_mise_log, renyi_bound, )
+                meanlosses = np.array(compute_losses(*args_losses))
+                for (lossname, lossval) in zip(loss_names, meanlosses):
+                    logger.record_tabular(lossname, lossval)
 
         # Print all info in a table
         logger.dump_tabular()

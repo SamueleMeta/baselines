@@ -30,7 +30,8 @@ class PeMlpPolicy(object):
               use_bias=True, use_critic=False,
               seed=None, verbose=True,
               hidden_W_init=U.normc_initializer(1.0),
-              std_init=tf.constant_initializer(np.log(0.11))):
+              higher_mean_init=None,
+              higher_logstd_init=tf.constant_initializer(np.log(0.11))):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -92,13 +93,18 @@ class PeMlpPolicy(object):
 
         # Higher order policy (Gaussian)
         with tf.variable_scope('higher'):
-            # Initial means sampled from a normal distribution N(0,1)
-            higher_mean_init = tf.where(
-                tf.not_equal(self.flat_actor_weights, tf.constant(0, dtype=tf.float32)),
-                tf.random_normal(shape=[n_actor_weights.value], stddev=0.01),
-                tf.zeros(shape=[n_actor_weights]))  # bias init must stay zero
+            if higher_mean_init is None:
+                # Initial means sampled from a normal distribution N(0,1)
+                higher_mean_init = tf.where(
+                    tf.not_equal(self.flat_actor_weights,
+                                 tf.constant(0, dtype=tf.float32)),
+                    tf.random_normal(shape=[n_actor_weights.value],
+                                     stddev=0.01),
+                    tf.zeros(shape=[n_actor_weights]))  # bias init always zero
             self.higher_mean = tf.get_variable(
-                name='higher_mean', initializer=higher_mean_init)
+                name='higher_mean',
+                initializer=higher_mean_init,
+                shape=self.flat_actor_weights.get_shape())
             # Keep the weights'domain compact
             # self.higher_mean = higher_mean = tf.clip_by_value(
             #     self.higher_mean, -1, 1, 'higher_mean_clipped')
@@ -108,7 +114,7 @@ class PeMlpPolicy(object):
                     tf.get_variable(
                         name='higher_logstd',
                         shape=[n_actor_weights],
-                        initializer=std_init,
+                        initializer=higher_logstd_init,
                         trainable=trainable_std)
                 pdparam = tf.concat([higher_mean,
                                      higher_mean * 0. + higher_logstd],
