@@ -16,36 +16,6 @@ from baselines import logger
 from collections import defaultdict
 
 
-
-N = 10000
-d = 10
-ads_selected = []
-numbers_of_selections = [0] * d
-sums_of_reward = [0] * d
-total_reward = 0
-
-for n in range(0, N):
-    ad = 0
-    max_upper_bound = 0
-    for i in range(0, d):
-        if (numbers_of_selections[i] > 0):
-            average_reward = sums_of_reward[i] / numbers_of_selections[i]
-            delta_i = math.sqrt(2 * math.log(n+1) / numbers_of_selections[i])
-            upper_bound = average_reward + delta_i
-        else:
-            upper_bound = 1e400
-        if upper_bound > max_upper_bound:
-            max_upper_bound = upper_bound
-            ad = i
-    ads_selected.append(ad)
-    numbers_of_selections[ad] += 1
-    reward = dataset.values[n, ad]
-    sums_of_reward[ad] += reward
-    total_reward += reward
-
-#################################################
-
-
 def eval_trajectory(env, pol, gamma, horizon, feature_fun):
     ret = disc_ret = 0
     t = 0
@@ -109,8 +79,12 @@ def ucb1(make_env,
     else:
         rho_grid = [[x] for x in gain_grid]
 
-    n_selections = defaultdict()
-    ret_sums = defaultdict()
+    n_selections = np.zeros(len(rho_grid))
+    ret_sums = np.zeros(len(rho_grid))
+    for rho in rho_grid:
+        n_selections[str(rho)] = 0
+        ret_sums[str(rho)] = 0
+    regret = 0
     iter = 0
     while True:
         iter += 1
@@ -123,37 +97,42 @@ def ucb1(make_env,
         # Learning iteration
         logger.log('********** Iteration %i ************' % iter)
 
-        max_ub = 0
-        ub =[]
+        ub = []
+        ub_best = 0
+        i_best = 0
         average_ret = []
         bonus = []
-        for rho in rho_grid:
+        for i, rho in enumerate(rho_grid):
             if n_selections[i] > 0:
-                average_ret_rho = ret_sums[rho] / n_selections[rho]
-                bonus_rho = np.sqrt(2 * np.log(iter+1) / n_selections[i])
+                average_ret_rho = ret_sums[i] / n_selections[i]
+                bonus_rho = np.sqrt(2 * np.log(iter) / n_selections[i])
                 ub_rho = average_ret + bonus
                 ub.append(ub_rho)
             if not std_too:
                 average_ret.append(average_ret_rho)
                 bonus.append(bonus_rho)
             else:
-                ub_rho = (1e100)
+                ub_rho = 1e100
                 ub.append(ub_rho)
-            if ub_rho > max_ub:
-                max_ub = ub_rho
+            if ub_rho > ub_best:
+                ub_best = ub_rho
                 rho_best = rho
-            # Sample actor's parameters from chosen arm
-            set_parameters(rho_best)
-            theta = pi.resample()
-            # Store parameters of both the hyperpolicy and the actor
-            if env.spec.id == 'LQG1D-v0':
-                mu1_actor = pi.eval_actor_mean([[1]])[0][0]
-                mu1_higher = pi.eval_higher_mean([[1]])[0]
-                sigma = pi.eval_higher_std()[0]
-                logger.record_tabular("LQGmu1_actor", mu1_actor)
-                logger.record_tabular("LQGmu1_higher", mu1_higher)
-                logger.record_tabular("LQGsigma_higher", sigma)
-            # Sample a trajectory with the newly parametrized actor
-            _, disc_ret, _ = eval_trajectory(
-                env, pi, gamma, horizon, feature_fun)
-            n_selections[i] += 1
+                i_best = i
+        # Sample actor's parameters from chosen arm
+        set_parameters(rho_best)
+        theta = pi.resample()
+        # Store parameters of both the hyperpolicy and the actor
+        if env.spec.id == 'LQG1D-v0':
+            mu1_actor = pi.eval_actor_mean([[1]])[0][0]
+            mu1_higher = pi.eval_higher_mean([[1]])[0]
+            sigma = pi.eval_higher_std()[0]
+            logger.record_tabular("LQGmu1_actor", mu1_actor)
+            logger.record_tabular("LQGmu1_higher", mu1_higher)
+            logger.record_tabular("LQGsigma_higher", sigma)
+        # Sample a trajectory with the newly parametrized actor
+        _, disc_ret, _ = eval_trajectory(
+            env, pi, gamma, horizon, feature_fun)
+        ret_sums[i_best] += disc_ret
+        regret += (17.35 - disc_ret)
+        logger.record_tabular("Regret", regret)
+        n_selections[i_best] += 1
