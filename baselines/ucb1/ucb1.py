@@ -34,13 +34,13 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
     return ret, disc_ret, t
 
 
-def ucb1(make_env,
+def learn(make_env,
          make_policy,
-         max_iters,
-         gamma,
          horizon,
-         grid_size,
-         filename,
+         gamma=0.99,
+         max_iters=1000,
+         filename=None,
+         grid_size=100,
          feature_fun=None,
          plot_bound=False):
 

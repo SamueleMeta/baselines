@@ -21,7 +21,7 @@ from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # Self imports: algorithm
 from baselines.policy.mlp_hyperpolicy import PeMlpPolicy
-from baselines.pbpoise import pbpoise
+from baselines.ucb1 import ucb1
 
 
 def args_to_file(args, dir, filename):
@@ -110,7 +110,7 @@ def train(env, policy, horizon, seed,
     gym.logger.setLevel(logging.WARN)
 
     # Learn
-    pbpoise.learn(make_env, make_policy, horizon=horizon, **alg_args)
+    ucb1.learn(make_env, make_policy, horizon=horizon, **alg_args)
 
 
 def single_run(args, seed=None):
@@ -127,8 +127,8 @@ def single_run(args, seed=None):
     tt = int(str(time.time())[-5:])
     time_str = '%s-%s-%s_%s%s%s_%s' % (
         t.tm_hour, t.tm_min, t.tm_sec, t.tm_mday, t.tm_mon, t.tm_year, tt)
-    args_str = '%s_delta=%s_seed=%s' % (
-        args.env.upper(), args.delta, args.seed)
+    args_str = 'ucb1_%s_seed=%s' % (
+        args.env.upper(), args.seed)
     if args.filename == 'progress':
         filename = args_str + '_' + time_str
     else:
@@ -150,8 +150,6 @@ def single_run(args, seed=None):
           trainable_std=args.trainable_std,
           gain_init=args.gain_init,  # LQG only
           std_init=args.std_init,  # LQG only
-          delta=args.delta,
-          gamma=args.gamma,
           max_iters=args.max_iters,
           grid_size=args.grid_size,
           filename=filename)

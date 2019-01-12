@@ -480,7 +480,7 @@ def learn(make_env, make_policy, *,
                 render(env, pi, horizon)
 
         # Exit loop in the end
-        if iters_so_far >= max_iters:
+        if iters_so_far - 1 >= max_iters:
             print('Finished...')
             break
 
