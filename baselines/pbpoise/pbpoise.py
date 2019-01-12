@@ -71,7 +71,7 @@ def best_of_grid(policy, grid_size,
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    logstd_grid = np.linspace(-4, 0, grid_size)
+    logstd_grid = np.linspace(-10, 0, grid_size / 5)
     std_too = (len(rho_init) == 2)
     if std_too:
         x, y = np.meshgrid(gain_grid, logstd_grid)
@@ -98,6 +98,10 @@ def best_of_grid(policy, grid_size,
         renyi_bound = 1 / renyi_components_sum[i]
         bound_rho = evaluate_bound(den_mise_log, renyi_bound)
         bound.append(bound_rho)
+        mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
+            evaluate_roba(den_mise_log, renyi_bound)
+        mise.append(mise_rho)
+        bonus.append(bonus_rho)
         if not std_too:
             # Evaluate bounds' components for plotting
             mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
@@ -116,7 +120,8 @@ def best_of_grid(policy, grid_size,
     if plot_bound_profile:
         if std_too:
             bound = np.array(bound).reshape((grid_size, grid_size))
-            plot3D_bound_profile(x, y, bound, rho_best, bound_best,
+            mise = np.array(mise).reshape((grid_size, grid_size))
+            plot3D_bound_profile(x, y, mise, rho_best, bound_best,
                                  iters_so_far, filename)
         else:
             plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
@@ -345,8 +350,8 @@ def learn(make_env, make_policy, *,
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
     return_step_max = tf.reduce_max(tf.abs(ret_))
-    regret = n_ * 17.36 - tf.reduce_sum(ep_return)
-    regret_over_t = 17.36 - return_mean
+    regret = n_ * 17.4 - tf.reduce_sum(ep_return)
+    regret_over_t = 17.4 - return_mean
 
     losses_with_name.extend([(return_mean, 'ReturnMean'),
                              (return_max, 'ReturnMax'),
@@ -393,7 +398,7 @@ def learn(make_env, make_policy, *,
         delta = tf.constant(delta)
     else:
         raise NotImplementedError
-    losses_with_name.append((delta, 'delta'))
+    losses_with_name.append((delta, 'Delta'))
 
     if bound_type == 'J':
         bound = mise
@@ -471,6 +476,7 @@ def learn(make_env, make_policy, *,
     rho = get_parameters()
     theta = pi.resample()
     all_eps['actor_params'][iters_so_far, :] = theta
+    print('theta', theta)
     while True:
         iters_so_far += 1
         mask_iters[:iters_so_far] = 1

@@ -63,7 +63,7 @@ def learn(make_env,
 
     # Generate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    logstd_grid = np.linspace(-4, 0, grid_size)
+    logstd_grid = np.linspace(-4, 0, grid_size / 5)
     rho = get_parameters()
     std_too = (len(rho) == 2)
     if std_too:
@@ -85,6 +85,7 @@ def learn(make_env,
     iter = 0
 
     # Learning loop
+    tstart = time.time()
     while True:
         iter += 1
 
@@ -126,8 +127,8 @@ def learn(make_env,
         # Sample a trajectory with the newly parametrized actor
         _, disc_ret, _ = eval_trajectory(
             env, pi, gamma, horizon, feature_fun)
-        ret_sums[i_best] += disc_ret / 17.44
-        regret += (17.36 - disc_ret)
+        ret_sums[i_best] += disc_ret / 17.4
+        regret += (17.4 - disc_ret)
         n_selections[i_best] += 1
 
         # Store info about variables of interest
@@ -143,9 +144,8 @@ def learn(make_env,
         logger.record_tabular("Regret", regret)
         logger.record_tabular("Regret/t", regret / iter)
         logger.record_tabular("Iteration", iter)
+        logger.record_tabular("TimeElapsed", time.time() - tstart)
 
-        print(n_selections[-1])
-        print(bonus[-1])
 
         # Plot the profile of the bound and its components
         if plot_bound:
