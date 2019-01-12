@@ -49,9 +49,7 @@ def best_of_grid(policy, grid_size,
                  evaluate_behav, den_mise,
                  evaluate_behav_last_sample,
                  evaluate_bound, evaluate_renyi, evaluate_roba,
-                 filename):
-
-    threeDplot = False
+                 filename, plot_bound_profile, plot_ess_profile):
 
     # Compute MISE's denominator and Renyi bound
     # evaluate the last behav over all samples and add to the denominator
@@ -76,7 +74,6 @@ def best_of_grid(policy, grid_size,
     logstd_grid = np.linspace(-4, 0, grid_size)
     std_too = (len(rho_init) == 2)
     if std_too:
-        threeDplot = True
         x, y = np.meshgrid(gain_grid, logstd_grid)
         X = x.reshape((np.prod(x.shape),))
         Y = y.reshape((np.prod(y.shape),))
@@ -116,15 +113,17 @@ def best_of_grid(policy, grid_size,
             renyi_bound_best = renyi_bound
 
     # Plot the profile of the bound and its components
-    # if threeDplot:
-    #     bound = np.array(bound).reshape((grid_size, grid_size))
-    #     plot3D_bound_profile(x, y, bound, rho_best, bound_best,
-    #                          iters_so_far, filename)
-    # else:
-    #     plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
-    #                        bound_best, iters_so_far, filename)
-    # plot_ess(gain_grid, ess_d2, iters_so_far, 'd2_' + filename)
-    # plot_ess(gain_grid, ess_miw, iters_so_far, 'miw_' + filename)
+    if plot_bound_profile:
+        if std_too:
+            bound = np.array(bound).reshape((grid_size, grid_size))
+            plot3D_bound_profile(x, y, bound, rho_best, bound_best,
+                                 iters_so_far, filename)
+        else:
+            plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
+                               bound_best, iters_so_far, filename)
+    if plot_ess_profile:
+        plot_ess(gain_grid, ess_d2, iters_so_far, 'd2_' + filename)
+        plot_ess(gain_grid, ess_miw, iters_so_far, 'miw_' + filename)
 
     # Calculate improvement
     set_parameters(rho_init)
@@ -260,7 +259,9 @@ def learn(make_env, make_policy, *,
           truncated_mise=True,
           delta_t=None,
           filename=None,
-          find_optimal_arm=False):
+          find_optimal_arm=False,
+          plot_bound_profile=False,
+          plot_ess_profile=False):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -584,7 +585,8 @@ def learn(make_env, make_policy, *,
                                  evaluate_behav, den_mise,
                                  evaluate_behav_last_sample,
                                  evaluate_bound, evaluate_renyi, evaluate_roba,
-                                 filename)
+                                 filename, plot_bound_profile,
+                                 plot_ess_profile)
             else:
                 rho, improvement, den_mise_log, renyi_bound, bound = \
                     optimize_offline(evaluate_roba, pi,
@@ -600,8 +602,9 @@ def learn(make_env, make_policy, *,
 
         with timed('summaries after'):
             # Sample actor's parameters from hyperpolicy and assign to actor
-            theta = pi.resample()
-            all_eps['actor_params'][iters_so_far, :] = theta
+            if iters_so_far < max_iters:
+                theta = pi.resample()
+                all_eps['actor_params'][iters_so_far, :] = theta
 
             if env.spec.id == 'LQG1D-v0':
                 mu1_actor = pi.eval_actor_mean([[1]])[0][0]
