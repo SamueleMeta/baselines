@@ -9,22 +9,20 @@ import numpy as np
 import time
 
 
-def plot_bound_profile(rho_grid, bound, first_term, second_term,
+def plot_bound_profile(rho_grid, bound, mise, bonus,
                        point_x, point_y, iter, filename):
     fig = plt.figure(figsize=(8, 5))
     ax = fig.add_subplot(111)
     ax.grid()
     ax.plot(rho_grid, bound, label='bound', color='red', linewidth='2')
-    print('yeeeeeeeeeeeeeeee')
-    ax.plot(rho_grid, first_term, label='performance', color='blue', linewidth='0.5')
-    ax.plot(rho_grid, second_term, label='bonus', color='green', linewidth='0.5')
+    ax.plot(rho_grid, mise, label='mise', color='blue', linewidth='0.5')
+    ax.plot(rho_grid, bonus, label='bonus', color='green', linewidth='0.5')
     ax.plot(point_x, point_y, 'o', color='orange')
     ax.legend(loc='upper right')
     # Save plot to given dir
     dir = './bound_profile/' + filename + '/'
     siter = 'iter_{}'.format(iter)
     fname = dir + siter
-    print(fname)
     if not os.path.exists(dir):
         os.makedirs(dir)
     fig.savefig(fname)

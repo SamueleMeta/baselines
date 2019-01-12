@@ -52,7 +52,6 @@ class LQG1D(gym.Env):
         self.Q = np.array([0.9]).reshape((1, 1))
         self.R = np.array([0.9]).reshape((1, 1))
 
-
         self.max_cost = np.dot(self.max_pos,
                                np.dot(self.Q, self.max_pos)) + \
             np.dot(self.max_action, np.dot(self.R, self.max_action))
@@ -63,7 +62,8 @@ class LQG1D(gym.Env):
         self.action_space = spaces.Box(low=-self.max_action,
                                        high=self.max_action,
                                        shape=(1,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-high, high=high,dtype=np.float32)
+        self.observation_space = spaces.Box(low=-high, high=high,
+                                            dtype=np.float32)
 
         # initialize state
         # self.seed()
@@ -338,3 +338,4 @@ if __name__ == '__main__':
     K = env.computeOptimalK()
     J = env.computeJ(K, 1)
     print(K, J)
+    print('max_cost', env.max_cost)

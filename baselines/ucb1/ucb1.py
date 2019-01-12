@@ -67,8 +67,6 @@ def learn(make_env,
     rho = get_parameters()
     std_too = (len(rho) == 2)
     if std_too:
-        if plot_bound:
-            threeDplot = True
         x, y = np.meshgrid(gain_grid, logstd_grid)
         X = x.reshape((np.prod(x.shape),))
         Y = y.reshape((np.prod(y.shape),))
@@ -79,9 +77,10 @@ def learn(make_env,
     # initialize loop variables
     n_selections = np.zeros(len(rho_grid))
     ret_sums = np.zeros(len(rho_grid))
-    for rho in rho_grid:
-        n_selections[str(rho)] = 0
-        ret_sums[str(rho)] = 0
+    # for rho in rho_grid:
+    #     print(str(rho))
+    #     n_selections[str(rho)] = 0
+    #     ret_sums[str(rho)] = 0
     regret = 0
     iter = 0
 
@@ -90,7 +89,7 @@ def learn(make_env,
         iter += 1
 
         # Exit loop in the end
-        if iter >= max_iters:
+        if iter - 1 >= max_iters:
             print('Finished...')
             break
 
@@ -106,14 +105,16 @@ def learn(make_env,
             if n_selections[i] > 0:
                 average_ret_rho = ret_sums[i] / n_selections[i]
                 bonus_rho = np.sqrt(2 * np.log(iter) / n_selections[i])
-                ub_rho = average_ret + bonus
+                ub_rho = average_ret_rho + bonus_rho
                 ub.append(ub_rho)
-            if not std_too:
-                average_ret.append(average_ret_rho)
-                bonus.append(bonus_rho)
+                if not std_too:
+                    average_ret.append(average_ret_rho)
+                    bonus.append(bonus_rho)
             else:
                 ub_rho = 1e100
                 ub.append(ub_rho)
+                average_ret.append(0)
+                bonus.append(1e100)
             if ub_rho > ub_best:
                 ub_best = ub_rho
                 rho_best = rho
@@ -121,7 +122,15 @@ def learn(make_env,
         # Sample actor's parameters from chosen arm
         set_parameters(rho_best)
         _ = pi.resample()
-        # Store parameters of both the hyperpolicy and the actor
+
+        # Sample a trajectory with the newly parametrized actor
+        _, disc_ret, _ = eval_trajectory(
+            env, pi, gamma, horizon, feature_fun)
+        ret_sums[i_best] += disc_ret / 17.44
+        regret += (17.35 - disc_ret)
+        n_selections[i_best] += 1
+
+        # Store info about variables of interest
         if env.spec.id == 'LQG1D-v0':
             mu1_actor = pi.eval_actor_mean([[1]])[0][0]
             mu1_higher = pi.eval_higher_mean([[1]])[0]
@@ -129,20 +138,26 @@ def learn(make_env,
             logger.record_tabular("LQGmu1_actor", mu1_actor)
             logger.record_tabular("LQGmu1_higher", mu1_higher)
             logger.record_tabular("LQGsigma_higher", sigma)
-        # Sample a trajectory with the newly parametrized actor
-        _, disc_ret, _ = eval_trajectory(
-            env, pi, gamma, horizon, feature_fun)
-        ret_sums[i_best] += disc_ret
-        regret += (17.35 - disc_ret)
+        logger.record_tabular("ReturnLastEpisode", disc_ret)
+        logger.record_tabular("ReturnMean", sum(ret_sums) / iter)
         logger.record_tabular("Regret", regret)
-        n_selections[i_best] += 1
+        logger.record_tabular("Regret/t", regret / iter)
+        logger.record_tabular("Iteration", iter)
+
+        print(n_selections[-1])
+        print(bonus[-1])
 
         # Plot the profile of the bound and its components
         if plot_bound:
-            if threeDplot:
+            if std_too:
                 ub = np.array(ub).reshape((grid_size, grid_size))
                 plot3D_bound_profile(x, y, ub, rho_best, ub_best,
                                      iter, filename)
             else:
                 plot_bound_profile(gain_grid, ub, average_ret, bonus, rho_best,
                                    ub_best, iter, filename)
+        # Print all info in a table
+        logger.dump_tabular()
+
+    # Close environment in the end
+    env.close()

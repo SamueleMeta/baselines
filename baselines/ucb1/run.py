@@ -152,6 +152,7 @@ def single_run(args, seed=None):
           std_init=args.std_init,  # LQG only
           max_iters=args.max_iters,
           grid_size=args.grid_size,
+          plot_bound=args.plot_bound,
           filename=filename)
 
 
@@ -162,7 +163,7 @@ def multiple_runs(args):
 
     seed = []
     # for i in [n/10 for n in range(1, 8)]:
-    for k in range(1, 5):
+    for k in range(0, 30):
         seed.append(k)
 
     # Parallelize single runs
@@ -199,6 +200,7 @@ def main(args):
     parser.add_argument('--grid_size', type=int, default=100)
     add_bool_arg(parser, 'trainable_std', default=True)
     add_bool_arg(parser, 'experiment', default=False)
+    add_bool_arg(parser, 'plot_bound', default=False)
     args = parser.parse_args(args)
 
     if args.experiment:
