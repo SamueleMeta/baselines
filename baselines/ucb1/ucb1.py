@@ -127,7 +127,7 @@ def learn(make_env,
         _, disc_ret, _ = eval_trajectory(
             env, pi, gamma, horizon, feature_fun)
         ret_sums[i_best] += disc_ret / 17.44
-        regret += (17.35 - disc_ret)
+        regret += (17.36 - disc_ret)
         n_selections[i_best] += 1
 
         # Store info about variables of interest
