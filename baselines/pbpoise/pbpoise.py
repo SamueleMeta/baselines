@@ -120,9 +120,9 @@ def best_of_grid(policy, grid_size,
     # Plot the profile of the bound and its components
     if plot_bound_profile:
         if std_too:
-            bound = np.array(bound).reshape((grid_size, grid_size_std))
-            mise = np.array(mise).reshape((grid_size, grid_size))
-            plot3D_bound_profile(x, y, mise, rho_best, bound_best,
+            bound = np.array(bound).reshape((grid_size_std, grid_size))
+            # mise = np.array(mise).reshape((grid_size_std, grid_size))
+            plot3D_bound_profile(x, y, bound, rho_best, bound_best,
                                  iters_so_far, filename)
         else:
             plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
