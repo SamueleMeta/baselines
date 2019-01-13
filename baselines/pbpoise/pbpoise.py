@@ -71,7 +71,8 @@ def best_of_grid(policy, grid_size,
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    logstd_grid = np.linspace(-10, 0, grid_size / 5)
+    grid_size_std = int(grid_size / 5)
+    logstd_grid = np.linspace(-10, 0, grid_size_std)
     std_too = (len(rho_init) == 2)
     if std_too:
         x, y = np.meshgrid(gain_grid, logstd_grid)
@@ -119,7 +120,7 @@ def best_of_grid(policy, grid_size,
     # Plot the profile of the bound and its components
     if plot_bound_profile:
         if std_too:
-            bound = np.array(bound).reshape((grid_size, grid_size))
+            bound = np.array(bound).reshape((grid_size, grid_size_std))
             mise = np.array(mise).reshape((grid_size, grid_size))
             plot3D_bound_profile(x, y, mise, rho_best, bound_best,
                                  iters_so_far, filename)
