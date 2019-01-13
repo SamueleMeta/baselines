@@ -63,7 +63,7 @@ def learn(make_env,
 
     # Generate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    grid_size_std = int(grid_size / 5)
+    grid_size_std = int(grid_size)
     logstd_grid = np.linspace(-4, 0, grid_size_std)
     rho = get_parameters()
     std_too = (len(rho) == 2)
@@ -151,8 +151,6 @@ def learn(make_env,
         if plot_bound:
             if std_too:
                 ub = np.array(ub).reshape((grid_size_std, grid_size))
-                print('y_shape', y.shape)
-                print('ub_shape', ub.shape)
                 plot3D_bound_profile(x, y, ub, rho_best, ub_best,
                                      iter, filename)
             else:
