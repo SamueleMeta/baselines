@@ -45,7 +45,7 @@ class LQG1D(gym.Env):
         self.discrete_reward = discrete_reward
         self.max_pos = 4.0
         self.max_action = 4.0
-        self.start_state = [self.max_pos]  # always reset state to same value
+        self.start_state = np.random.uniform(-self.max_pos, self.max_pos)
         self.sigma_noise = 0.1
         self.A = np.array([1]).reshape((1, 1))
         self.B = np.array([1]).reshape((1, 1))

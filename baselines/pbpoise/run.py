@@ -180,8 +180,9 @@ def multiple_runs(args):
     from joblib import Parallel, delayed
 
     seed = []
+    seed_range = range(args.seed_min, args.seed_max)
     # for i in [n/10 for n in range(1, 8)]:
-    for k in range(0, 5):
+    for k in seed_range:
         seed.append(k)
 
     # Parallelize single runs
@@ -206,6 +207,8 @@ def main(args):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+    parser.add_argument('--seed_min', type=int, default=0)
+    parser.add_argument('--seed_max', type=int, default=5)
     parser.add_argument('--env', type=str, default='LQG1D-v0')
     parser.add_argument('--horizon', type=int, default=20)
     parser.add_argument('--bound_type', type=str, default='max-renyi')

@@ -30,19 +30,23 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
         ret += r
         disc_ret += gamma**t * r
         t += 1
+        # Rescale episodic return in [0, 1] (Hp: r takes values in [0, 1])
+        ret_rescaled = ret / horizon
+        max_disc_ret = (1 - gamma**(horizon + 1)) / (1 - gamma)  # r =1,1,...
+        disc_ret_rescaled = disc_ret / max_disc_ret
 
-    return ret, disc_ret, t
+    return ret_rescaled, disc_ret_rescaled, t
 
 
 def learn(make_env,
-         make_policy,
-         horizon,
-         gamma=0.99,
-         max_iters=1000,
-         filename=None,
-         grid_size=100,
-         feature_fun=None,
-         plot_bound=False):
+          make_policy,
+          horizon,
+          gamma=0.99,
+          max_iters=1000,
+          filename=None,
+          grid_size=100,
+          feature_fun=None,
+          plot_bound=False):
 
     # Build the environment
     env = make_env()
