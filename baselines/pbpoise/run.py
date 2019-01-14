@@ -181,7 +181,6 @@ def multiple_runs(args):
 
     seed = []
     seed_range = range(args.seed_min, args.seed_max)
-    # for i in [n/10 for n in range(1, 8)]:
     for k in seed_range:
         seed.append(k)
 
