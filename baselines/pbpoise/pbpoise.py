@@ -53,7 +53,7 @@ def best_of_grid(policy, grid_size,
                  evaluate_behav, den_mise,
                  evaluate_behav_last_sample,
                  evaluate_bound, evaluate_renyi, evaluate_roba,
-                 filename, plot_bound_profile, plot_ess_profile):
+                 filename, plot_bound, plot_ess_profile):
 
     # Compute MISE's denominator and Renyi bound
     # evaluate the last behav over all samples and add to the denominator
@@ -103,10 +103,6 @@ def best_of_grid(policy, grid_size,
         renyi_bound = 1 / renyi_components_sum[i]
         bound_rho = evaluate_bound(den_mise_log, renyi_bound)
         bound.append(bound_rho)
-        mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
-            evaluate_roba(den_mise_log, renyi_bound)
-        mise.append(mise_rho)
-        bonus.append(bonus_rho)
         if not std_too:
             # Evaluate bounds' components for plotting
             mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
@@ -115,14 +111,13 @@ def best_of_grid(policy, grid_size,
             bonus.append(bonus_rho)
             ess_d2.append(ess_d2_rho)
             ess_miw.append(ess_miw_rho)
-
         if bound_rho > bound_best:
             bound_best = bound_rho
             rho_best = rho
             renyi_bound_best = renyi_bound
 
     # Plot the profile of the bound and its components
-    if plot_bound_profile:
+    if plot_bound:
         if std_too:
             bound = np.array(bound).reshape((grid_size_std, grid_size))
             # mise = np.array(mise).reshape((grid_size_std, grid_size))
@@ -270,7 +265,7 @@ def learn(make_env, make_policy, *,
           delta_t=None,
           filename=None,
           find_optimal_arm=False,
-          plot_bound_profile=False,
+          plot_bound=False,
           plot_ess_profile=False):
     """
     Learns a policy from scratch
@@ -393,12 +388,15 @@ def learn(make_env, make_policy, *,
 
     # Bounds
     if delta_t == 'continuous':
+        k = 2
+        tau = tf.ceil(n_**(1 / k))
         delta_cst = delta
-        delta = 6 * delta / ((np.pi * n_)**2 * (1 + (d * n_**2)**d))
+        delta = 6 * delta / ((np.pi * n_)**2 * (1 + tau**d))
     elif delta_t == 'discrete':
         delta_cst = delta
         delta = 3 * delta / ((np.pi * n_)**2 * grid_optimization)
     elif delta_t is None:
+        grid_size = grid_optimization
         delta_cst = delta
         delta = tf.constant(delta)
     else:
@@ -586,9 +584,11 @@ def learn(make_env, make_policy, *,
                 if not check:
                     den_mise_log = den_mise_log_i
             elif grid_optimization > 0:
+                grid_size = int(np.ceil(iters_so_far**(1 / k)))
+                logger.record_tabular("GridSize", grid_size)
                 rho, improvement, den_mise_log, den_mise, \
                     renyi_components_sum, renyi_bound = \
-                    best_of_grid(pi, grid_optimization,
+                    best_of_grid(pi, grid_size,
                                  rho, old_rhos_list,
                                  iters_so_far, mask_iters,
                                  set_parameters, set_parameters_old,
@@ -596,7 +596,7 @@ def learn(make_env, make_policy, *,
                                  evaluate_behav, den_mise,
                                  evaluate_behav_last_sample,
                                  evaluate_bound, evaluate_renyi, evaluate_roba,
-                                 filename, plot_bound_profile,
+                                 filename, plot_bound,
                                  plot_ess_profile)
             else:
                 rho, improvement, den_mise_log, renyi_bound, bound = \

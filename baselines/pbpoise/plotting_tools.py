@@ -15,7 +15,6 @@ def plot_bound_profile(rho_grid, bound, first_term, second_term,
     ax = fig.add_subplot(111)
     ax.grid()
     ax.plot(rho_grid, bound, label='bound', color='red', linewidth='2')
-    print('yeeeeeeeeeeeeeeee')
     ax.plot(rho_grid, first_term, label='performance', color='blue', linewidth='0.5')
     ax.plot(rho_grid, second_term, label='bonus', color='green', linewidth='0.5')
     ax.plot(point_x, point_y, 'o', color='orange')
@@ -24,7 +23,6 @@ def plot_bound_profile(rho_grid, bound, first_term, second_term,
     dir = './bound_profile/' + filename + '/'
     siter = 'iter_{}'.format(iter)
     fname = dir + siter
-    print(fname)
     if not os.path.exists(dir):
         os.makedirs(dir)
     fig.savefig(fname)

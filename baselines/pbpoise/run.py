@@ -170,7 +170,7 @@ def single_run(args, seed=None):
           delta_t=args.delta_t,
           filename=filename,
           find_optimal_arm=args.find_optimal_arm,
-          plot_bound_profile=args.plot_bound_profile,
+          plot_bound=args.plot_bound,
           plot_ess_profile=args.plot_ess_profile,)
 
 
@@ -231,7 +231,7 @@ def main(args):
     add_bool_arg(parser, 'truncated_mise', default=True)
     add_bool_arg(parser, 'experiment', default=False)
     add_bool_arg(parser, 'find_optimal_arm', default=False)
-    add_bool_arg(parser, 'plot_bound_profile', default=False)
+    add_bool_arg(parser, 'plot_bound', default=False)
     add_bool_arg(parser, 'plot_ess_profile', default=False)
     args = parser.parse_args(args)
 
