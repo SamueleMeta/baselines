@@ -132,8 +132,8 @@ def learn(make_env,
         # Sample a trajectory with the newly parametrized actor
         _, disc_ret, _ = eval_trajectory(
             env, pi, gamma, horizon, feature_fun)
-        ret_sums[i_best] += disc_ret / 17.4
-        regret += (17.4 - disc_ret)
+        ret_sums[i_best] += disc_ret
+        regret += (0.96512 - disc_ret)
         n_selections[i_best] += 1
 
         # Store info about variables of interest

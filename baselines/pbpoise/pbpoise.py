@@ -355,8 +355,8 @@ def learn(make_env, make_policy, *,
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
     return_step_max = tf.reduce_max(tf.abs(ret_))
-    regret = n_ * 17.4 - tf.reduce_sum(ep_return)
-    regret_over_t = 17.4 - return_mean
+    regret = n_ * 0.96512 - tf.reduce_sum(ep_return)
+    regret_over_t = 0.96512 - return_mean
 
     losses_with_name.extend([(return_mean, 'ReturnMean'),
                              (return_max, 'ReturnMax'),
