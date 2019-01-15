@@ -597,7 +597,8 @@ def learn(make_env, make_policy, *,
                 if not check:
                     den_mise_log = den_mise_log_i
             elif grid_optimization > 0:
-                grid_size = int(np.ceil(iters_so_far**(1 / k)))
+                if delta_t == 'continuous':
+                    grid_size = int(np.ceil(iters_so_far**(1 / k)))
                 logger.record_tabular("GridSize", grid_size)
                 rho, improvement, den_mise_log, den_mise, \
                     renyi_components_sum, renyi_bound = \
