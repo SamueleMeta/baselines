@@ -103,7 +103,6 @@ def best_of_grid(policy, grid_size,
             renyi_components_sum[i] += 1 / renyi_component
             renyi_bound = 1 / renyi_components_sum[i]
         else:
-            print('enter the void')
             renyi_bound_den = 0
             for old_rho in old_rhos_list:
                 set_parameters_old(old_rho)
