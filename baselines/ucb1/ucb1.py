@@ -4,16 +4,10 @@ import matplotlib as mpl
 if os.environ.get('DISPLAY', '') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
 import numpy as np
 import baselines.common.tf_util as U
-import tensorflow as tf
 import time
-from baselines.common import colorize
-from contextlib import contextmanager
 from baselines import logger
-from collections import defaultdict
 from plotting_tools import plot3D_bound_profile, plot_bound_profile
 
 
@@ -53,7 +47,7 @@ def learn(make_env,
     ob_space = env.observation_space
     ac_space = env.action_space
 
-    # Build the higher level target and behavioral policies
+    # Build the higher level policy
     pi = make_policy('pi', ob_space, ac_space)
 
     # Get all pi's learnable parameters
@@ -82,10 +76,6 @@ def learn(make_env,
     # initialize loop variables
     n_selections = np.zeros(len(rho_grid))
     ret_sums = np.zeros(len(rho_grid))
-    # for rho in rho_grid:
-    #     print(str(rho))
-    #     n_selections[str(rho)] = 0
-    #     ret_sums[str(rho)] = 0
     regret = 0
     iter = 0
 
