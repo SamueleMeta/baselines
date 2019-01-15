@@ -405,7 +405,6 @@ def learn(make_env, make_policy, *,
         delta_cst = delta
         delta = 3 * delta / ((np.pi * n_)**2 * grid_optimization)
     elif delta_t is None:
-        grid_size = grid_optimization
         delta_cst = delta
         delta = tf.constant(delta)
     else:
@@ -598,11 +597,11 @@ def learn(make_env, make_policy, *,
                     den_mise_log = den_mise_log_i
             elif grid_optimization > 0:
                 if delta_t == 'continuous':
-                    grid_size = int(np.ceil(iters_so_far**(1 / k)))
-                logger.record_tabular("GridSize", grid_size)
+                    grid_optimization = int(np.ceil(iters_so_far**(1 / k)))
+                logger.record_tabular("GridSize", grid_optimization)
                 rho, improvement, den_mise_log, den_mise, \
                     renyi_components_sum, renyi_bound = \
-                    best_of_grid(pi, grid_size,
+                    best_of_grid(pi, grid_optimization,
                                  rho, old_rhos_list,
                                  iters_so_far, mask_iters,
                                  set_parameters, set_parameters_old,
