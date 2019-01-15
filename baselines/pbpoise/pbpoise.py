@@ -97,10 +97,19 @@ def best_of_grid(policy, grid_size,
 
     for i, rho in enumerate(rho_grid):
         set_parameters(rho)
-        set_parameters_old(old_rhos_list[-1])
-        renyi_component = evaluate_renyi()
-        renyi_components_sum[i] += 1 / renyi_component
-        renyi_bound = 1 / renyi_components_sum[i]
+        if renyi_components_sum is not None:
+            set_parameters_old(old_rhos_list[-1])
+            renyi_component = evaluate_renyi()
+            renyi_components_sum[i] += 1 / renyi_component
+            renyi_bound = 1 / renyi_components_sum[i]
+        else:
+            print('enter the void')
+            renyi_bound_den = 0
+            for old_rho in old_rhos_list:
+                set_parameters_old(old_rho)
+                renyi_component = evaluate_renyi()
+                renyi_bound_den += 1 / renyi_component
+            renyi_bound = 1 / renyi_bound_den
         bound_rho = evaluate_bound(den_mise_log, renyi_bound)
         bound.append(bound_rho)
         if not std_too:
@@ -470,16 +479,20 @@ def learn(make_env, make_policy, *,
     all_eps['disc_ret'] = np.zeros(max_iters)
     all_eps['ret'] = np.zeros(max_iters)
     mask_iters = np.zeros(max_iters)
-    # Learning loop
+    # Set learning loop variables
+    den_mise = np.zeros(mask_iters.shape).astype(np.float32)
+    if delta_t == 'continuous':
+        renyi_components_sum = None
+    else:
+        renyi_components_sum = np.zeros(grid_optimization**d)
     timesteps_so_far = 0
     iters_so_far = 0
-    den_mise = np.zeros(mask_iters.shape).astype(np.float32)
-    renyi_components_sum = np.zeros(grid_optimization**d)
     tstart = time.time()
+    # Sample actor's params before entering the learning loop
     rho = get_parameters()
     theta = pi.resample()
     all_eps['actor_params'][iters_so_far, :] = theta
-    print('theta', theta)
+    # Learning loop
     while True:
         iters_so_far += 1
         mask_iters[:iters_so_far] = 1
