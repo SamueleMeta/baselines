@@ -58,6 +58,7 @@ def train(env, policy, horizon, seed, bounded_policy,
     if env.startswith('rllab.'):
         # Get env name and class
         env_name = re.match('rllab.(\w+)', env).group(1)
+        print('env_name', env_name)
         env_rllab_class = rllab_env_from_name(env_name)
 
         # Define env maker

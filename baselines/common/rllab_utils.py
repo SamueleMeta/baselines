@@ -32,7 +32,7 @@ def rllab_env_from_name(env):
     elif env == 'mountain-car':
         from rllab.envs.box2d.mountain_car_env import MountainCarEnv
         return MountainCarEnv
-    elif env == 'inverted-pendulum':
+    elif env == 'inverted_pendulum':
         from rllab.envs.box2d.cartpole_swingup_env import CartpoleSwingupEnv as InvertedPendulumEnv
         return InvertedPendulumEnv
     elif env == 'acrobot':

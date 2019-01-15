@@ -400,6 +400,7 @@ def learn(make_env, make_policy, *,
         tau = tf.ceil(n_**(1 / k))
         delta_cst = delta
         delta = 6 * delta / ((np.pi * n_)**2 * (1 + tau**d))
+        grid_optimization = 1  # setting it >0 to trigger grid optimization
     elif delta_t == 'discrete':
         delta_cst = delta
         delta = 3 * delta / ((np.pi * n_)**2 * grid_optimization)
