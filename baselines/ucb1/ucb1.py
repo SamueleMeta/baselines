@@ -3,7 +3,7 @@ import numpy as np
 import baselines.common.tf_util as U
 import time
 from baselines import logger
-from plotting_tools import plot3D_bound_profile, plot_bound_profile
+from baselines.plotting_tools import plot3D_bound_profile, plot_bound_profile
 
 
 def eval_trajectory(env, pol, gamma, horizon, feature_fun):
@@ -56,11 +56,11 @@ def learn(make_env,
 
     # Generate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    grid_size_std = int(grid_size)
-    logstd_grid = np.linspace(-4, 0, grid_size_std)
     rho = get_parameters()
     std_too = (len(rho) == 2)
     if std_too:
+        grid_size_std = int(grid_size)
+        logstd_grid = np.linspace(-4, 0, grid_size_std)
         x, y = np.meshgrid(gain_grid, logstd_grid)
         X = x.reshape((np.prod(x.shape),))
         Y = y.reshape((np.prod(y.shape),))

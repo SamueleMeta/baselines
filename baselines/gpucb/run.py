@@ -21,7 +21,7 @@ from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 # Self imports: algorithm
 from baselines.policy.mlp_hyperpolicy import PeMlpPolicy
-from baselines.ucb1 import ucb1
+from baselines.gpucb import gpucb
 
 
 def args_to_file(args, dir, filename):
@@ -110,7 +110,7 @@ def train(env, policy, horizon, seed,
     gym.logger.setLevel(logging.WARN)
 
     # Learn
-    ucb1.learn(make_env, make_policy, horizon=horizon, **alg_args)
+    gpucb.learn(make_env, make_policy, horizon=horizon, **alg_args)
 
 
 def single_run(args, seed=None):
@@ -127,8 +127,8 @@ def single_run(args, seed=None):
     tt = int(str(time.time())[-5:])
     time_str = '%s-%s-%s_%s%s%s_%s' % (
         t.tm_hour, t.tm_min, t.tm_sec, t.tm_mday, t.tm_mon, t.tm_year, tt)
-    args_str = 'ucb1_%s_seed=%s' % (
-        args.env.upper(), args.seed)
+    args_str = 'gpucb_%s_delta_%s_seed=%s' % (
+        args.env.upper(), args.delta, args.seed)
     if args.filename == 'progress':
         filename = args_str + '_' + time_str
     else:
@@ -151,6 +151,8 @@ def single_run(args, seed=None):
           gain_init=args.gain_init,  # LQG only
           std_init=args.std_init,  # LQG only
           max_iters=args.max_iters,
+          delta=args.delta,
+          gamma=args.gamma,
           grid_size=args.grid_size,
           plot_bound=args.plot_bound,
           filename=filename)
@@ -198,6 +200,7 @@ def main(args):
     parser.add_argument('--std_init', type=float, default=0.15)  # LQG only
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=1000)
+    parser.add_argument('--delta', type=float, default=0.2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--grid_size', type=int, default=100)
     add_bool_arg(parser, 'trainable_std', default=True)

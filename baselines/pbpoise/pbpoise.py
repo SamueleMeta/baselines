@@ -75,10 +75,10 @@ def best_of_grid(policy, grid_size,
 
     # Calculate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    grid_size_std = int(grid_size)
-    logstd_grid = np.linspace(-4, 0, grid_size_std)
     std_too = (len(rho_init) == 2)
     if std_too:
+        grid_size_std = int(grid_size)
+        logstd_grid = np.linspace(-4, 0, grid_size_std)
         x, y = np.meshgrid(gain_grid, logstd_grid)
         X = x.reshape((np.prod(x.shape),))
         Y = y.reshape((np.prod(y.shape),))
