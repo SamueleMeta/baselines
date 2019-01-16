@@ -1,10 +1,4 @@
 import os
-import matplotlib as mpl
-if os.environ.get('DISPLAY', '') == '':
-    print('no display found. Using non-interactive Agg backend')
-    mpl.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
 import numpy as np
 import baselines.common.tf_util as U
 import tensorflow as tf
@@ -12,7 +6,8 @@ import time
 from baselines.common import colorize
 from contextlib import contextmanager
 from baselines import logger
-from plotting_tools import plot3D_bound_profile, plot_bound_profile, render, plot_ess
+from plotting_tools import plot3D_bound_profile, plot_bound_profile, \
+    render, plot_ess
 
 
 @contextmanager
