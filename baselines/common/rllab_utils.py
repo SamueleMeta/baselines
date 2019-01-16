@@ -11,16 +11,16 @@ def rllab_env_from_name(env):
     elif env == 'ant':
         from rllab.envs.mujoco.ant_env import AntEnv
         return AntEnv
-    elif env == 'half-cheetah':
+    elif env == 'half_cheetah':
         from rllab.envs.mujoco.half_cheetah_env import HalfCheetahEnv
         return HalfCheetahEnv
     elif env == 'hopper':
         from rllab.envs.mujoco.hopper_env import HopperEnv
         return HopperEnv
-    elif env == 'simple-humanoid':
+    elif env == 'simple_humanoid':
         from rllab.envs.mujoco.simple_humanoid_env import SimpleHumanoidEnv
         return SimpleHumanoidEnv
-    elif env == 'full-humanoid':
+    elif env == 'full_humanoid':
         from rllab.envs.mujoco.humanoid_env import HumanoidEnv
         return HumanoidEnv
     elif env == 'walker':
@@ -38,7 +38,7 @@ def rllab_env_from_name(env):
     elif env == 'acrobot':
         from rllab.envs.box2d.double_pendulum_env import DoublePendulumEnv as AcrobotEnv
         return AcrobotEnv
-    elif env == 'inverted-double-pendulum':
+    elif env == 'inverted_double_pendulum':
         from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
         return InvertedPendulumEnv
     else:

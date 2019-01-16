@@ -6,7 +6,7 @@ import time
 from baselines.common import colorize
 from contextlib import contextmanager
 from baselines import logger
-from plotting_tools import plot3D_bound_profile, plot_bound_profile, \
+from baselines.plotting_tools import plot3D_bound_profile, plot_bound_profile, \
     render, plot_ess
 
 
