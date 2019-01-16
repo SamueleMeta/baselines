@@ -1,12 +1,10 @@
 # coding: utf-8
-import os
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import pylab as plt
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 import baselines.common.tf_util as U
 import time
 from baselines import logger
+from plotting_tools import plot3D_bound_profile, plot_bound_profile
 
 
 def eval_trajectory(env, pol, gamma, horizon, feature_fun):
@@ -73,6 +71,7 @@ def learn(make_env,
 
     # Learning loop
     beta = 100
+    regret = 0
     mu = np.array([0. for _ in range(rho_grid.shape[0])])
     sigma = np.array([0.5 for _ in range(rho_grid.shape[0])])
     selected_rhos = []
@@ -100,82 +99,38 @@ def learn(make_env,
         _, disc_ret, _ = eval_trajectory(
             env, pi, gamma, horizon, feature_fun)
         selected_disc_rets.append(disc_ret)
+        regret += (0.96512 - disc_ret)
         # Create GP regressor and fit it to the arms' returns
         gp = GaussianProcessRegressor()
         gp.fit(selected_rhos, selected_disc_rets)
         mu, sigma = gp.predict(rho_grid, return_std=True)
 
+        # Store info about variables of interest
+        if env.spec.id == 'LQG1D-v0':
+            mu1_actor = pi.eval_actor_mean([[1]])[0][0]
+            mu1_higher = pi.eval_higher_mean([[1]])[0]
+            sigma = pi.eval_higher_std()[0]
+            logger.record_tabular("LQGmu1_actor", mu1_actor)
+            logger.record_tabular("LQGmu1_higher", mu1_higher)
+            logger.record_tabular("LQGsigma_higher", sigma)
+        logger.record_tabular("ReturnLastEpisode", disc_ret)
+        logger.record_tabular("ReturnMean", sum(selected_disc_rets) / iter)
+        logger.record_tabular("Regret", regret)
+        logger.record_tabular("Regret/t", regret / iter)
+        logger.record_tabular("Iteration", iter)
+        logger.record_tabular("TimeElapsed", time.time() - tstart)
 
-class GPUCB(object):
-    def __init__(self, meshgrid, environment, beta=100.):
-        '''
-        meshgrid: Output from np.methgrid.
-        e.g. np.meshgrid(np.arange(-1, 1, 0.1), np.arange(-1, 1, 0.1)) for
-        2D space with |x_i| < 1 constraint.
-        environment: Environment class which is equipped with sample() method
-        to return observed value.
-        beta (optional): Hyper-parameter to tune the exploration-exploitation
-        balance. If beta is large, it emphasizes the variance of the unexplored
-        solution (i.e. larger curiosity)
-        '''
-        self.meshgrid = np.array(meshgrid)
-        self.environment = environment
-        self.beta = beta
+        # Plot the profile of the bound and its components
+        if plot_bound:
+            if std_too:
+                ub = np.array(ub).reshape((grid_size_std, grid_size))
+                plot3D_bound_profile(x, y, ub, rho_best, ub_best,
+                                     iter, filename)
+            else:
+                plot_bound_profile(gain_grid, ub, average_ret, bonus, rho_best,
+                                   ub_best, iter, filename)
+        # Print all info in a table
+        logger.dump_tabular()
 
-        self.X_grid = self.meshgrid.reshape(self.meshgrid.shape[0], -1).T
-        self.mu = np.array([0. for _ in range(self.X_grid.shape[0])])
-        self.sigma = np.array([0.5 for _ in range(self.X_grid.shape[0])])
-        self.X = []
-        self.T = []
-
-    def argmax_ucb(self):
-        return np.argmax(self.mu + self.sigma * np.sqrt(self.beta))
-
-    def learn(self):
-        grid_idx = self.argmax_ucb()
-        self.sample(self.X_grid[grid_idx])
-        gp = GaussianProcessRegressor()
-        gp.fit(self.X, self.T)
-        self.mu, self.sigma = gp.predict(self.X_grid, return_std=True)
-        # print('self.X', self.X)
-        # print('self.T', self.T)
-        # print('self.mu', self.mu)
-        print('self.X_grid', self.X_grid.shape)
-
-    def sample(self, x):
-        t = self.environment.sample(x)
-        self.X.append(x)
-        self.T.append(t)
-
-    def plot(self):
-        fig = plt.figure()
-        ax = Axes3D(fig)
-        ax.plot_wireframe(self.meshgrid[0], self.meshgrid[1],
-                          self.mu.reshape(self.meshgrid[0].shape),
-                          alpha=0.5, color='g')
-        ax.plot_wireframe(self.meshgrid[0], self.meshgrid[1],
-                          self.environment.sample(self.meshgrid),
-                          alpha=0.5, color='b')
-        ax.scatter([x[0] for x in self.X],
-                   [x[1] for x in self.X],
-                   self.T, c='r', marker='o', alpha=1.0)
-        dir = './plots/'
-        fname = dir + 'fig_%02d.png' % len(self.X)
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        plt.savefig(fname)
-
-
-if __name__ == '__main__':
-    class DummyEnvironment(object):
-        def sample(self, x):
-            return np.sin(x[0]) + np.cos(x[1])
-
-    x = np.linspace(-1, 1, 4)
-    y = np.linspace(-1, 1, 4)
-    env = DummyEnvironment()
-    agent = GPUCB(np.meshgrid(x, y), env)
-    for i in range(10):
-        print('----------Iter{}---------'.format(i+1))
-        agent.learn()
-        # agent.plot()
+    # Close environment in the end
+    env.close()

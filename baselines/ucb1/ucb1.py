@@ -1,9 +1,4 @@
 # Implementing UCB
-import os
-import matplotlib as mpl
-if os.environ.get('DISPLAY', '') == '':
-    print('no display found. Using non-interactive Agg backend')
-    mpl.use('Agg')
 import numpy as np
 import baselines.common.tf_util as U
 import time
