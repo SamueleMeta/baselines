@@ -37,7 +37,8 @@ def learn(make_env,
           filename=None,
           grid_size=100,
           feature_fun=None,
-          plot_bound=False):
+          plot_bound=False,
+          trainable_std=False):
 
     # Build the environment
     env = make_env()
@@ -54,13 +55,10 @@ def learn(make_env,
 
     # TF functions
     set_parameters = U.SetFromFlat(var_list)
-    get_parameters = U.GetFlat(var_list)
 
     # Generate the grid of parameters to evaluate
     gain_grid = np.linspace(-1, 1, grid_size)
-    rho = get_parameters()
-    std_too = (len(rho) == 2)
-    if std_too:
+    if trainable_std:
         grid_size_std = int(grid_size)
         logstd_grid = np.linspace(-4, 0, grid_size_std)
         x, y = np.meshgrid(gain_grid, logstd_grid)
@@ -69,6 +67,7 @@ def learn(make_env,
         rho_grid = np.array(list(zip(X, Y)))
     else:
         rho_grid = np.array([[x] for x in gain_grid])
+    print('Total number of arms:', len(rho_grid))
 
     # Learning loop
     regret = 0
@@ -128,7 +127,7 @@ def learn(make_env,
 
         # Plot the profile of the bound and its components
         if plot_bound:
-            if std_too:
+            if trainable_std:
                 ub = np.array(ub).reshape((grid_size_std, grid_size))
                 plot3D_bound_profile(x, y, ub, rho_best, ub_best,
                                      iter, filename)

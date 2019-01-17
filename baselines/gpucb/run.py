@@ -51,8 +51,7 @@ def get_env_type(env_id):
     return env_type
 
 
-def train(env, policy, horizon, seed,
-          trainable_std, gain_init, std_init,
+def train(env, policy, horizon, seed, gain_init, std_init,
           **alg_args):
 
     if env.startswith('rllab.'):
@@ -91,7 +90,7 @@ def train(env, policy, horizon, seed,
     def make_policy(name, ob_space, ac_space):
         return PeMlpPolicy(name, ob_space, ac_space, hid_layers,
                            deterministic=True, diagonal=True,
-                           trainable_std=trainable_std,
+                           trainable_std=alg_args['trainable_std'],
                            use_bias=False, use_critic=False,
                            seed=seed, verbose=True,
                            hidden_W_init=U.normc_initializer(1.0),
@@ -147,7 +146,6 @@ def single_run(args, seed=None):
           policy=args.policy,
           horizon=args.horizon,
           seed=args.seed,
-          trainable_std=args.trainable_std,
           gain_init=args.gain_init,  # LQG only
           std_init=args.std_init,  # LQG only
           max_iters=args.max_iters,
@@ -155,7 +153,8 @@ def single_run(args, seed=None):
           gamma=args.gamma,
           grid_size=args.grid_size,
           plot_bound=args.plot_bound,
-          filename=filename)
+          filename=filename,
+          trainable_std=args.trainable_std)
 
 
 def multiple_runs(args):
@@ -203,7 +202,7 @@ def main(args):
     parser.add_argument('--delta', type=float, default=0.2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--grid_size', type=int, default=100)
-    add_bool_arg(parser, 'trainable_std', default=True)
+    add_bool_arg(parser, 'trainable_std', default=False)
     add_bool_arg(parser, 'experiment', default=False)
     add_bool_arg(parser, 'plot_bound', default=False)
     args = parser.parse_args(args)
