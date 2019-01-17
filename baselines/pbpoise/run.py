@@ -169,6 +169,7 @@ def single_run(args, seed=None):
           grid_optimization=args.grid_optimization,
           truncated_mise=args.truncated_mise,
           delta_t=args.delta_t,
+          k=args.k,
           filename=filename,
           find_optimal_arm=args.find_optimal_arm,
           plot_bound=args.plot_bound,
@@ -177,7 +178,6 @@ def single_run(args, seed=None):
 
 
 def multiple_runs(args):
-
     # Import tools for parallelizing runs
     from joblib import Parallel, delayed
 
@@ -228,6 +228,7 @@ def main(args):
     parser.add_argument('--multiple_init', type=int, default=None)
     parser.add_argument('--grid_optimization', type=int, default=0)
     parser.add_argument('--delta_t', type=str, default=None)
+    parser.add_argument('--k', type=int, default=2)  # must be>=2
     add_bool_arg(parser, 'bounded_policy', default=True)
     add_bool_arg(parser, 'trainable_std', default=False)
     add_bool_arg(parser, 'truncated_mise', default=True)

@@ -40,22 +40,26 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
     return ret_rescaled, disc_ret_rescaled, t
 
 
-def generate_grid(grid_size, grid_dimension, trainable_std, den=1,
-                  mu_min=-1, mu_max=+1, logstd_min=-4, logst_max=0):
+def generate_grid(grid_size, grid_dimension, trainable_std,
+                  mu_min=-2, mu_max=+2, logstd_min=-4, logst_max=0):
+    # mu1 = np.linspace(-1, 1, grid_size)
+    # mu2 = np.linspace(0, 4, grid_size)
+    # mu3 = np.linspace(-10, 0, grid_size)
+    # mu4 = np.linspace(-2, 2, grid_size)
+    # gain_xyz = [mu1, mu2, mu3, mu4]
     gain_xyz = np.linspace(mu_min, mu_max, grid_size)
     gain_xyz = [gain_xyz for i in range(grid_dimension)]
     if trainable_std:
-        grid_size_std = int(np.ceil(grid_size / den))
-        logstd_xyz = np.linspace(logstd_min, logst_max, grid_size_std)
+        logstd_xyz = np.linspace(logstd_min, logst_max, grid_size)
         logstd_xyz = [logstd_xyz for i in range(grid_dimension)]
         xyz = gain_xyz + logstd_xyz
         xyz = np.array(np.meshgrid(*xyz))
-        xyz = xyz.reshape(xyz.shape[0], (np.prod(xyz[0].shape)))
+        XYZ = xyz.reshape(xyz.shape[0], (np.prod(xyz[0].shape)))
     else:
         xyz = np.array(np.meshgrid(*gain_xyz))
-        xyz = xyz.reshape(len(xyz), (np.prod(xyz[0].shape)))
+        XYZ = xyz.reshape(len(xyz), (np.prod(xyz[0].shape)))
 
-    return list(zip(*xyz))
+    return list(zip(*XYZ)), gain_xyz, xyz
 
 
 def best_of_grid(policy, grid_size, grid_dimension,
@@ -87,7 +91,8 @@ def best_of_grid(policy, grid_size, grid_dimension,
     den_mise_log = np.log(den_mise_it) * mask_iters
 
     # Calculate the grid of parameters to evaluate
-    rho_grid = generate_grid(grid_size, grid_dimension, trainable_std)
+    rho_grid, gain_grid, xyz = \
+        generate_grid(grid_size, grid_dimension, trainable_std)
     logger.record_tabular("GridSize", len(rho_grid))
 
     # Evaluate the set of parameters and retain the best one
@@ -130,9 +135,9 @@ def best_of_grid(policy, grid_size, grid_dimension,
     # Plot the profile of the bound and its components
     if plot_bound:
         if trainable_std:
-            bound = np.array(bound).reshape((grid_size_std, grid_size))
+            bound = np.array(bound).reshape((grid_size, grid_size))
             # mise = np.array(mise).reshape((grid_size_std, grid_size))
-            plot3D_bound_profile(x, y, bound, rho_best, bound_best,
+            plot3D_bound_profile(xyz[0], xyz[1], bound, rho_best, bound_best,
                                  iters_so_far, filename)
         else:
             plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
@@ -270,6 +275,7 @@ def learn(env_name, make_env, make_policy, *,
           grid_optimization=None,
           truncated_mise=True,
           delta_t=None,
+          k=2,
           filename=None,
           find_optimal_arm=False,
           plot_bound=False,
@@ -396,7 +402,6 @@ def learn(env_name, make_env, make_policy, *,
 
     # Bounds
     if delta_t == 'continuous':
-        k = 2
         tau = tf.ceil(n_**(1 / k))
         delta_cst = delta
         delta = 6 * delta / ((np.pi * n_)**2 * (1 + tau**d))
