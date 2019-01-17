@@ -52,7 +52,7 @@ def get_env_type(env_id):
 
 
 def train(env, policy, horizon, seed, bounded_policy,
-          trainable_std, gain_init, std_init,
+          gain_init, std_init,
           njobs=1, **alg_args):
 
     if env.startswith('rllab.'):
@@ -82,6 +82,7 @@ def train(env, policy, horizon, seed, bounded_policy,
             def make_env():
                 env_rllab = gym.make(env)
                 return env_rllab
+        env_name = env.spec.id
 
     # Create the policy
     if policy == 'linear':
@@ -92,7 +93,7 @@ def train(env, policy, horizon, seed, bounded_policy,
     def make_policy(name, ob_space, ac_space):
         return PeMlpPolicy(name, ob_space, ac_space, hid_layers,
                            deterministic=True, diagonal=True,
-                           trainable_std=trainable_std,
+                           trainable_std=alg_args['trainable_std'],
                            use_bias=False, use_critic=False,
                            seed=seed, verbose=True,
                            hidden_W_init=U.normc_initializer(1.0),
@@ -114,7 +115,7 @@ def train(env, policy, horizon, seed, bounded_policy,
     sampler = None
 
     # Learn
-    pbpoise.learn(make_env, make_policy, horizon=horizon,
+    pbpoise.learn(env_name, make_env, make_policy, horizon=horizon,
                   sampler=sampler, **alg_args)
 
 
@@ -154,7 +155,6 @@ def single_run(args, seed=None):
           horizon=args.horizon,
           seed=args.seed,
           bounded_policy=args.bounded_policy,
-          trainable_std=args.trainable_std,
           gain_init=args.gain_init,  # LQG only
           std_init=args.std_init,  # LQG only
           multiple_init=args.multiple_init,
@@ -172,7 +172,8 @@ def single_run(args, seed=None):
           filename=filename,
           find_optimal_arm=args.find_optimal_arm,
           plot_bound=args.plot_bound,
-          plot_ess_profile=args.plot_ess_profile,)
+          plot_ess_profile=args.plot_ess_profile,
+          trainable_std=args.trainable_std)
 
 
 def multiple_runs(args):
@@ -228,7 +229,7 @@ def main(args):
     parser.add_argument('--grid_optimization', type=int, default=0)
     parser.add_argument('--delta_t', type=str, default=None)
     add_bool_arg(parser, 'bounded_policy', default=True)
-    add_bool_arg(parser, 'trainable_std', default=True)
+    add_bool_arg(parser, 'trainable_std', default=False)
     add_bool_arg(parser, 'truncated_mise', default=True)
     add_bool_arg(parser, 'experiment', default=False)
     add_bool_arg(parser, 'find_optimal_arm', default=False)

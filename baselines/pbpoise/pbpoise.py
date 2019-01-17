@@ -40,8 +40,26 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
     return ret_rescaled, disc_ret_rescaled, t
 
 
-def best_of_grid(policy, grid_size,
-                 rho_init, old_rhos_list,
+def generate_grid(grid_size, grid_dimension, trainable_std, den=1,
+                  mu_min=-1, mu_max=+1, logstd_min=-4, logst_max=0):
+    gain_xyz = np.linspace(mu_min, mu_max, grid_size)
+    gain_xyz = [gain_xyz for i in range(grid_dimension)]
+    if trainable_std:
+        grid_size_std = int(np.ceil(grid_size / den))
+        logstd_xyz = np.linspace(logstd_min, logst_max, grid_size_std)
+        logstd_xyz = [logstd_xyz for i in range(grid_dimension)]
+        xyz = gain_xyz + logstd_xyz
+        xyz = np.array(np.meshgrid(*xyz))
+        xyz = xyz.reshape(xyz.shape[0], (np.prod(xyz[0].shape)))
+    else:
+        xyz = np.array(np.meshgrid(*gain_xyz))
+        xyz = xyz.reshape(len(xyz), (np.prod(xyz[0].shape)))
+
+    return list(zip(*xyz))
+
+
+def best_of_grid(policy, grid_size, grid_dimension,
+                 trainable_std, rho_init, old_rhos_list,
                  iters_so_far, mask_iters,
                  set_parameters, set_parameters_old,
                  delta_cst, renyi_components_sum,
@@ -69,27 +87,13 @@ def best_of_grid(policy, grid_size,
     den_mise_log = np.log(den_mise_it) * mask_iters
 
     # Calculate the grid of parameters to evaluate
-    gain_grid = np.linspace(-1, 1, grid_size)
-    std_too = (len(rho_init) == 2)
-    if std_too:
-        grid_size_std = int(grid_size)
-        logstd_grid = np.linspace(-4, 0, grid_size_std)
-        x, y = np.meshgrid(gain_grid, logstd_grid)
-        X = x.reshape((np.prod(x.shape),))
-        Y = y.reshape((np.prod(y.shape),))
-        rho_grid = list(zip(X, Y))
-    else:
-        rho_grid = [[x] for x in gain_grid]
-    # Evaluate the set of parameters and retain the best one
-    bound = []
-    mise = []
-    bonus = []
-    ess_d2 = []
-    ess_miw = []
-    bound_best = 0
-    renyi_bound_best = 0
-    rho_best = rho_init
+    rho_grid = generate_grid(grid_size, grid_dimension, trainable_std)
+    logger.record_tabular("GridSize", len(rho_grid))
 
+    # Evaluate the set of parameters and retain the best one
+    bound = mise = bonus = ess_d2 = ess_miw = []
+    bound_best = renyi_bound_best = 0
+    rho_best = rho_init
     for i, rho in enumerate(rho_grid):
         set_parameters(rho)
         if renyi_components_sum is not None:
@@ -106,7 +110,7 @@ def best_of_grid(policy, grid_size,
             renyi_bound = 1 / renyi_bound_den
         bound_rho = evaluate_bound(den_mise_log, renyi_bound)
         bound.append(bound_rho)
-        if not std_too:
+        if not trainable_std:
             # Evaluate bounds' components for plotting
             mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
                 evaluate_roba(den_mise_log, renyi_bound)
@@ -119,9 +123,13 @@ def best_of_grid(policy, grid_size,
             rho_best = rho
             renyi_bound_best = renyi_bound
 
+    # Calculate improvement
+    set_parameters(rho_init)
+    improvement = bound_best - evaluate_bound(den_mise_log, renyi_bound)
+
     # Plot the profile of the bound and its components
     if plot_bound:
-        if std_too:
+        if trainable_std:
             bound = np.array(bound).reshape((grid_size_std, grid_size))
             # mise = np.array(mise).reshape((grid_size_std, grid_size))
             plot3D_bound_profile(x, y, bound, rho_best, bound_best,
@@ -132,10 +140,6 @@ def best_of_grid(policy, grid_size,
     if plot_ess_profile:
         plot_ess(gain_grid, ess_d2, iters_so_far, 'd2_' + filename)
         plot_ess(gain_grid, ess_miw, iters_so_far, 'miw_' + filename)
-
-    # Calculate improvement
-    set_parameters(rho_init)
-    improvement = bound_best - evaluate_bound(den_mise_log, renyi_bound)
 
     return rho_best, improvement, den_mise_log, den_mise, \
         renyi_components_sum, renyi_bound_best
@@ -249,7 +253,7 @@ def optimize_offline(evaluate_roba, pi,
     return rho, improvement, den_mise_log, renyi_bound, bound
 
 
-def learn(make_env, make_policy, *,
+def learn(env_name, make_env, make_policy, *,
           max_iters,
           horizon,
           drho,
@@ -269,7 +273,8 @@ def learn(make_env, make_policy, *,
           filename=None,
           find_optimal_arm=False,
           plot_bound=False,
-          plot_ess_profile=False):
+          plot_ess_profile=False,
+          trainable_std=False):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -486,6 +491,9 @@ def learn(make_env, make_policy, *,
     rho = get_parameters()
     theta = pi.resample()
     all_eps['actor_params'][iters_so_far, :] = theta
+    # Establish grid dimension if needed
+    if grid_optimization > 0:
+        grid_dimension = ob_space.shape[0]
     # Learning loop
     while True:
         iters_so_far += 1
@@ -593,10 +601,10 @@ def learn(make_env, make_policy, *,
             elif grid_optimization > 0:
                 if delta_t == 'continuous':
                     grid_optimization = int(np.ceil(iters_so_far**(1 / k)))
-                logger.record_tabular("GridSize", grid_optimization)
                 rho, improvement, den_mise_log, den_mise, \
                     renyi_components_sum, renyi_bound = \
                     best_of_grid(pi, grid_optimization,
+                                 grid_dimension, trainable_std,
                                  rho, old_rhos_list,
                                  iters_so_far, mask_iters,
                                  set_parameters, set_parameters_old,
@@ -625,7 +633,7 @@ def learn(make_env, make_policy, *,
                 theta = pi.resample()
                 all_eps['actor_params'][iters_so_far, :] = theta
 
-            if env.spec.id == 'LQG1D-v0':
+            if env_name == 'LQG1D-v0':
                 mu1_actor = pi.eval_actor_mean([[1]])[0][0]
                 mu1_higher = pi.eval_higher_mean([[1]])[0]
                 sigma = pi.eval_higher_std()[0]
