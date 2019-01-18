@@ -83,7 +83,7 @@ def train(env, policy, horizon, seed, bounded_policy,
             def make_env():
                 env_rllab = gym.make(env)
                 return env_rllab
-        env_name = env.spec.id
+        env_name = make_env().spec.id
 
     # Create the policy
     if policy == 'linear':

@@ -69,6 +69,32 @@ def plot_ess(rho_grid, ess, iter, filename):
     plt.close(fig)
 
 
+def how_many_arms(k, total=False):
+    x = range(1, 5000)
+    y = np.power(x, (1 / k))
+    y = np.ceil(y)
+    if total:
+        y = np.power(np.ceil(y), 4)
+    fig = plt.figure(figsize=(8, 5))
+    ax = fig.add_subplot(111)
+    ax.grid()
+    ax.plot(x, y)
+    if total:
+        ax.set_title('Total arms_k={}'.format(k))
+        fname = 'total_arms_'
+    else:
+        ax.set_title('Arms per dimension_k={}'.format(k))
+        fname = 'arms_per_dim_'.format(k)
+    # Save plot to given dir
+    dir = './how_many_k/'
+    siter = fname + 'k_{}'.format(k)
+    fname = dir + siter
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    fig.savefig(fname)
+    plt.close(fig)
+
+
 def render(env, pi, horizon):
     """
     Shows a test episode on the screen

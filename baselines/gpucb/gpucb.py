@@ -113,7 +113,7 @@ def learn(make_env,
         # Store info about variables of interest
         if env.spec.id == 'LQG1D-v0':
             mu1_actor = pi.eval_actor_mean([[1]])[0][0]
-            mu1_higher = pi.eval_higher_mean([[1]])[0]
+            mu1_higher = pi.eval_higher_mean()[0]
             sigma_higher = pi.eval_higher_std()[0]
             logger.record_tabular("LQGmu1_actor", mu1_actor)
             logger.record_tabular("LQGmu1_higher", mu1_higher)

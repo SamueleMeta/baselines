@@ -238,8 +238,8 @@ class PeMlpPolicy(object):
     def eval_actor_mean(self, ob):
         return self._get_actor_mean(ob)[0]
 
-    def eval_higher_mean(self, ob):
-        return self._get_higher_mean(ob)[0]
+    def eval_higher_mean(self):
+        return self._get_higher_mean()[0]
 
     def eval_higher_std(self):
         return self._get_higher_std()[0]

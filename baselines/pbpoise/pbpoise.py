@@ -33,11 +33,11 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
         disc_ret += gamma**t * r
         t += 1
         # Rescale episodic return in [0, 1] (Hp: r takes values in [0, 1])
-        ret_rescaled = ret / horizon
-        max_disc_ret = (1 - gamma**(horizon + 1)) / (1 - gamma)  # r =1,1,...
-        disc_ret_rescaled = disc_ret / max_disc_ret
+        # ret_rescaled = ret / horizon
+        # max_disc_ret = (1 - gamma**(horizon + 1)) / (1 - gamma)  # r =1,1,...
+        # disc_ret_rescaled = disc_ret / max_disc_ret
 
-    return ret_rescaled, disc_ret_rescaled, t
+    return ret, disc_ret, t
 
 
 def generate_grid(grid_size, grid_dimension, trainable_std,
@@ -641,11 +641,24 @@ def learn(env_name, make_env, make_policy, *,
 
             if env_name == 'LQG1D-v0':
                 mu1_actor = pi.eval_actor_mean([[1]])[0][0]
-                mu1_higher = pi.eval_higher_mean([[1]])[0]
+                mu1_higher = pi.eval_higher_mean()[0]
                 sigma = pi.eval_higher_std()[0]
                 logger.record_tabular("LQGmu1_actor", mu1_actor)
                 logger.record_tabular("LQGmu1_higher", mu1_higher)
                 logger.record_tabular("LQGsigma_higher", sigma)
+            elif env_name == 'inverted_pendulum':
+                ac1 = pi.eval_actor_mean([[1, 1, 1, 1]])[0][0]
+                mu1_higher = pi.eval_higher_mean()
+                sigma = pi.eval_higher_std()
+                logger.record_tabular("ActionIn[1111]", ac1)  # optimum ~-4.69
+                logger.record_tabular("InvPendulum_mu0_higher", mu1_higher[0])
+                logger.record_tabular("InvPendulum_mu1_higher", mu1_higher[1])
+                logger.record_tabular("InvPendulum_mu2_higher", mu1_higher[2])
+                logger.record_tabular("InvPendulum_mu3_higher", mu1_higher[3])
+                logger.record_tabular("InvPendulum_std0_higher", sigma[0])
+                logger.record_tabular("InvPendulum_std1_higher", sigma[1])
+                logger.record_tabular("InvPendulum_std2_higher", sigma[2])
+                logger.record_tabular("InvPendulum_std3_higher", sigma[3])
             if find_optimal_arm:
                 ret_mean = compute_return_mean(*args)
                 logger.record_tabular('ReturnMean', ret_mean)
