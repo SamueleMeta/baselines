@@ -7,6 +7,7 @@
 import sys, re, os, time, logging
 from collections import defaultdict
 import json
+sys.path.append('/home/alberto/rllab/rllab')
 
 # Framework imports
 import gym
