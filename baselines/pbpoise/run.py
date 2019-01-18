@@ -52,7 +52,7 @@ def get_env_type(env_id):
 
 
 def train(env, policy, horizon, seed, bounded_policy,
-          gain_init, std_init,
+          mu_init, std_init,
           njobs=1, **alg_args):
 
     if env.startswith('rllab.'):
@@ -97,7 +97,7 @@ def train(env, policy, horizon, seed, bounded_policy,
                            use_bias=False, use_critic=False,
                            seed=seed, verbose=True,
                            hidden_W_init=U.normc_initializer(1.0),
-                           higher_mean_init=tf.constant_initializer(gain_init),
+                           higher_mean_init=tf.constant_initializer(mu_init),
                            higher_logstd_init=tf.constant_initializer(
                                np.log(std_init)))
     try:
@@ -155,7 +155,7 @@ def single_run(args, seed=None):
           horizon=args.horizon,
           seed=args.seed,
           bounded_policy=args.bounded_policy,
-          gain_init=args.gain_init,  # LQG only
+          mu_init=args.mu_init,  # LQG only
           std_init=args.std_init,  # LQG only
           multiple_init=args.multiple_init,
           njobs=args.njobs,
@@ -215,7 +215,7 @@ def main(args):
     parser.add_argument('--bound_type', type=str, default='max-renyi')
     parser.add_argument('--filename', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
-    parser.add_argument('--gain_init', type=float, default=-0.1)  # LQG only
+    parser.add_argument('--mu_init', type=float, default=-0.1)  # LQG only
     parser.add_argument('--std_init', type=float, default=0.15)  # LQG only
     parser.add_argument('--delta', type=float, default=0.2)
     parser.add_argument('--drho', type=float, default=1)

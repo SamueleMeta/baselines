@@ -62,7 +62,7 @@ def generate_grid(grid_size, grid_dimension, trainable_std,
     return list(zip(*XYZ)), gain_xyz, xyz
 
 
-def best_of_grid(policy, grid_size, grid_dimension,
+def best_of_grid(policy, grid_size_1d, grid_dimension,
                  trainable_std, rho_init, old_rhos_list,
                  iters_so_far, mask_iters,
                  set_parameters, set_parameters_old,
@@ -92,7 +92,7 @@ def best_of_grid(policy, grid_size, grid_dimension,
 
     # Calculate the grid of parameters to evaluate
     rho_grid, gain_grid, xyz = \
-        generate_grid(grid_size, grid_dimension, trainable_std)
+        generate_grid(grid_size_1d, grid_dimension, trainable_std)
     logger.record_tabular("GridSize", len(rho_grid))
 
     # Evaluate the set of parameters and retain the best one
@@ -135,7 +135,7 @@ def best_of_grid(policy, grid_size, grid_dimension,
     # Plot the profile of the bound and its components
     if plot_bound:
         if trainable_std:
-            bound = np.array(bound).reshape((grid_size, grid_size))
+            bound = np.array(bound).reshape((grid_size_1d, grid_size_1d))
             # mise = np.array(mise).reshape((grid_size_std, grid_size))
             plot3D_bound_profile(xyz[0], xyz[1], bound, rho_best, bound_best,
                                  iters_so_far, filename)
@@ -293,6 +293,7 @@ def learn(env_name, make_env, make_policy, *,
 
     # Print options
     np.set_printoptions(precision=3)
+    losses_with_name = []
 
     # Build the environment
     env = make_env()
@@ -302,6 +303,7 @@ def learn(env_name, make_env, make_policy, *,
     # Build the higher level target and behavioral policies
     pi = make_policy('pi', ob_space, ac_space)
     oldpi = make_policy('oldpi', ob_space, ac_space)
+    logger.record_tabular('NumTrainableParams', int(pi._n_higher_params))
 
     # Get all pi's learnable parameters
     all_var_list = pi.get_trainable_variables()
@@ -331,7 +333,6 @@ def learn(env_name, make_env, make_policy, *,
     n_int = tf.cast(n_, dtype=tf.int32)
     mask_iters_ = tf.placeholder(dtype=tf.float32, shape=(max_iters),
                                  name='mask_iters')
-    losses_with_name = []
     # grad_ = tf.placeholder(dtype=tf,.float32,
     #                            shape=(d, 1), name='grad')
 
@@ -605,10 +606,10 @@ def learn(env_name, make_env, make_policy, *,
                     den_mise_log = den_mise_log_i
             elif grid_optimization > 0:
                 if delta_t == 'continuous':
-                    grid_optimization = int(np.ceil(iters_so_far**(1 / k)))
+                    grid_size_1d = int(np.ceil(iters_so_far**(1 / k)))
                 rho, improvement, den_mise_log, den_mise, \
                     renyi_components_sum, renyi_bound = \
-                    best_of_grid(pi, grid_optimization,
+                    best_of_grid(pi, grid_size_1d,
                                  grid_dimension, trainable_std,
                                  rho, old_rhos_list,
                                  iters_so_far, mask_iters,
