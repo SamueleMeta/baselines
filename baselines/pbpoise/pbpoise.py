@@ -19,7 +19,7 @@ def timed(msg):
         'done in %.3f seconds' % (time.time() - tstart), color='magenta'))
 
 
-def eval_trajectory(env, pol, gamma, horizon, feature_fun):
+def eval_trajectory(env, pol, gamma, horizon, feature_fun, rescale_ep_return):
     ret = disc_ret = 0
     t = 0
     ob = env.reset()
@@ -28,20 +28,25 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
         s = feature_fun(ob) if feature_fun else ob
         a = pol.act(s)
         ob, r, done, _ = env.step(a)
-        # ob = np.reshape(ob, newshape=s.shape)
+        ob = np.reshape(ob, newshape=s.shape)
         ret += r
         disc_ret += gamma**t * r
         t += 1
-        # Rescale episodic return in [0, 1] (Hp: r takes values in [0, 1])
-        # ret_rescaled = ret / horizon
-        # max_disc_ret = (1 - gamma**(horizon + 1)) / (1 - gamma)  # r =1,1,...
-        # disc_ret_rescaled = disc_ret / max_disc_ret
+        if rescale_ep_return:
+            if env.spec.id == 'LQG1D-v0':
+                # Rescale episodic return in [0, 1]
+                # (Hp: r takes values in [0, 1])
+                ret = ret / horizon
+                max_disc_ret = (1 - gamma**(horizon + 1)) / (1 - gamma)
+                disc_ret = disc_ret / max_disc_ret
+            else:
+                raise NotImplementedError
 
     return ret, disc_ret, t
 
 
 def generate_grid(grid_size, grid_dimension, trainable_std,
-                  mu_min=-2, mu_max=+2, logstd_min=-4, logst_max=0):
+                  mu_min=0, mu_max=4, logstd_min=-4, logst_max=0):
     # mu1 = np.linspace(-1, 1, grid_size)
     # mu2 = np.linspace(0, 4, grid_size)
     # mu3 = np.linspace(-10, 0, grid_size)
@@ -280,7 +285,8 @@ def learn(env_name, make_env, make_policy, *,
           find_optimal_arm=False,
           plot_bound=False,
           plot_ess_profile=False,
-          trainable_std=False):
+          trainable_std=False,
+          rescale_ep_return=False):
     """
     Learns a policy from scratch
         make_env: environment maker
@@ -378,7 +384,6 @@ def learn(env_name, make_env, make_policy, *,
                              (regret_over_t, 'Regret/t')])
 
     # Regret
-
     # Exponentiated Renyi divergence between the target and one behavioral
     renyi_component = pi.pd.renyi(oldpi.pd)
     renyi_component = tf.cond(tf.is_nan(renyi_component),
@@ -522,7 +527,7 @@ def learn(env_name, make_env, make_policy, *,
         with timed('sampling'):
             # Sample a trajectory with the newly parametrized actor
             ret, disc_ret, ep_len = eval_trajectory(
-                env, pi, gamma, horizon, feature_fun)
+                env, pi, gamma, horizon, feature_fun, rescale_ep_return)
             all_eps['ret'][iters_so_far-1] = ret
             all_eps['disc_ret'][iters_so_far-1] = disc_ret
             timesteps_so_far += ep_len
@@ -659,6 +664,15 @@ def learn(env_name, make_env, make_policy, *,
                 logger.record_tabular("InvPendulum_std1_higher", sigma[1])
                 logger.record_tabular("InvPendulum_std2_higher", sigma[2])
                 logger.record_tabular("InvPendulum_std3_higher", sigma[3])
+            elif env_name == 'MountainCarContinuous-v0':
+                ac1 = pi.eval_actor_mean([[1, 1]])[0][0]
+                mu1_higher = pi.eval_higher_mean()
+                sigma = pi.eval_higher_std()
+                logger.record_tabular("ActionIn[1111]", ac1)  # optimum ~-4.69
+                logger.record_tabular("MountainCar_mu0_higher", mu1_higher[0])
+                logger.record_tabular("MountainCar_mu1_higher", mu1_higher[1])
+                logger.record_tabular("MountainCar_std0_higher", sigma[0])
+                logger.record_tabular("MountainCar_std1_higher", sigma[1])
             if find_optimal_arm:
                 ret_mean = compute_return_mean(*args)
                 logger.record_tabular('ReturnMean', ret_mean)

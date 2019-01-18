@@ -175,7 +175,8 @@ def single_run(args, seed=None):
           find_optimal_arm=args.find_optimal_arm,
           plot_bound=args.plot_bound,
           plot_ess_profile=args.plot_ess_profile,
-          trainable_std=args.trainable_std)
+          trainable_std=args.trainable_std,
+          rescale_ep_return=args.rescale_ep_return)
 
 
 def multiple_runs(args):
@@ -237,6 +238,7 @@ def main(args):
     add_bool_arg(parser, 'find_optimal_arm', default=False)
     add_bool_arg(parser, 'plot_bound', default=False)
     add_bool_arg(parser, 'plot_ess_profile', default=False)
+    add_bool_arg(parser, 'rescale_ep_return', default=False)
     args = parser.parse_args(args)
 
     if args.experiment:
