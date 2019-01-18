@@ -106,7 +106,7 @@ def learn(make_env,
         selected_disc_rets.append(disc_ret)
         regret += (0.96512 - disc_ret)
         # Create GP regressor and fit it to the arms' returns
-        gp = GaussianProcessRegressor()
+        gp = GaussianProcessRegressor(optimizer=None)
         gp.fit(selected_rhos, selected_disc_rets)
         ret_mu, ret_sigma = gp.predict(rho_grid, return_std=True)
 
