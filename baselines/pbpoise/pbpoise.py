@@ -170,7 +170,7 @@ def learn(env_name, make_env, seed, make_policy, *,
           max_offline_iters=10,
           save_weights=False,
           render_after=None,
-          grid_optimization=None,
+          grid_size_1d=None,
           truncated_mise=True,
           delta_t=None,
           k=2,
@@ -306,11 +306,11 @@ def learn(env_name, make_env, seed, make_policy, *,
         tau = tf.ceil(n_**(1 / k))
         delta_cst = delta
         delta = 6 * delta / ((np.pi * n_)**2 * (1 + tau**d))
-        grid_optimization = 1  # setting it >0 to trigger grid optimization
     elif delta_t == 'discrete':
         delta_cst = delta
-        delta = 3 * delta / ((np.pi * n_)**2 * grid_optimization)
+        delta = 3 * delta / ((np.pi * n_)**2 * grid_size_1d)
     elif delta_t is None:
+        grid_size_1d = 100  # ToDo correggiiiiiiiiiiiiiiii
         delta_cst = delta
         delta = tf.constant(delta)
     else:
@@ -389,7 +389,7 @@ def learn(env_name, make_env, seed, make_policy, *,
     if delta_t == 'continuous':
         renyi_components_sum = None
     else:
-        renyi_components_sum = np.zeros(grid_optimization**d)
+        renyi_components_sum = np.zeros(grid_size_1d**d)
     new_grid = True
     grid_size_1d_old = 0
     timesteps_so_far = 0
@@ -400,8 +400,7 @@ def learn(env_name, make_env, seed, make_policy, *,
     theta = pi.resample()
     all_eps['actor_params'][iters_so_far, :] = theta
     # Establish grid dimension if needed
-    if grid_optimization > 0:
-        grid_dimension = ob_space.shape[0]
+    grid_dimension = ob_space.shape[0]
     # Learning loop ###########################################################
     while True:
         iters_so_far += 1

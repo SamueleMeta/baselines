@@ -167,7 +167,7 @@ def single_run(args, seed=None):
           max_offline_iters=args.max_offline_iters,
           max_iters=args.max_iters,
           render_after=args.render_after,
-          grid_optimization=args.grid_optimization,
+          grid_size_1d=args.grid_size_1d,
           truncated_mise=args.truncated_mise,
           delta_t=args.delta_t,
           k=args.k,
@@ -228,7 +228,7 @@ def main(args):
     parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--multiple_init', type=int, default=None)
-    parser.add_argument('--grid_optimization', type=int, default=0)
+    parser.add_argument('--grid_size_1d', type=int, default=0)
     parser.add_argument('--delta_t', type=str, default=None)
     parser.add_argument('--k', type=int, default=2)  # must be>=2
     add_bool_arg(parser, 'bounded_policy', default=True)
