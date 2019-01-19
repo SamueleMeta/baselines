@@ -315,3 +315,132 @@ class PeMlpPolicy(object):
             raise NotImplementedError(
                 'Only diagonal covariance currently supported')
         return x/self.eval_fisher()
+
+    # Gradient computation
+    def eval_gradient(self, actor_params, rets, use_baseline=True,
+                      behavioral=None):
+        """
+        Compute PGPE policy gradient given a batch of episodes
+
+        Params:
+            actor_params: list of actor parameters (arrays), one per episode
+            rets: flat list of total [discounted] returns, one per episode
+            use_baseline: wether to employ a variance-minimizing baseline
+                (may be more efficient without)
+            behavioral: higher-order policy used to collect data (off-policy
+                case). If None, the present policy is assumed to be the
+                behavioral(on-policy case)
+
+        References:
+            Optimal baseline for PGPE: Zhao, Tingting, et al. "Analysis and
+            improvement of policy gradient estimation." Advances in Neural
+            Information Processing Systems. 2011.
+
+        """
+        assert rets and len(actor_params) == len(rets)
+        batch_size = len(rets)
+
+        if not behavioral:
+            # On policy
+            if not use_baseline:
+                # Without baseline (more efficient)
+                pgpe_times_n = np.ravel(
+                    self._get_pgpe_times_n(actor_params, rets)[0])
+                return pgpe_times_n/batch_size
+            else:
+                # With optimal baseline
+                rets = np.array(rets)
+                scores = np.zeros((batch_size, self._n_higher_params))
+                score_norms = np.zeros(batch_size)
+                for (theta, i) in zip(actor_params, range(batch_size)):
+                    scores[i] = self._get_score(theta)[0]
+                    score_norms[i] = self._get_score_norm(theta)[0]
+                b = np.sum(rets * score_norms**2) / np.sum(score_norms**2)
+                pgpe = np.mean(((rets - b).T * scores.T).T, axis=0)
+                return pgpe
+        else:
+            # Off-policy
+            if behavioral is not self._behavioral:
+                self._build_iw_graph(behavioral)
+                self._behavioral = behavioral
+            if not use_baseline:
+                # Without baseline (more efficient)
+                off_pgpe_times_n = np.ravel(
+                    self._get_off_pgpe_times_n(actor_params, rets)[0])
+                return off_pgpe_times_n/batch_size
+            else:
+                # With optimal baseline
+                rets = np.array(rets)
+                scores = np.zeros((batch_size, self._n_higher_params))
+                score_norms = np.zeros(batch_size)
+                for (theta, i) in zip(actor_params, range(batch_size)):
+                    scores[i] = self._get_score(theta)[0]
+                    score_norms[i] = self._get_score_norm(theta)[0]
+                iws = np.ravel(self._get_iws(actor_params)[0])
+                b = np.sum(rets * iws**2 * score_norms**2) / np.sum(
+                    iws**2 * score_norms**2)
+                pgpe = np.mean(((rets - b).T * scores.T).T, axis=0)
+                return pgpe
+
+    def eval_natural_gradient(self, actor_params, rets,
+                              use_baseline=True, behavioral=None):
+        """
+        Compute PGPE policy gradient given a batch of episodes
+
+        Params:
+            actor_params: list of actor parameters (arrays), one per episode
+            rets: flat list of total [discounted] returns, one per episode
+            use_baseline: wether to employ a variance-minimizing baseline
+                (may be more efficient without)
+            behavioral: higher-order policy used to collect data (off-policy
+                case). If None, the present policy is assumed to be the
+                behavioral(on-policy case)
+
+        References:
+            Optimal baseline for PGPE: Zhao, Tingting, et al. "Analysis and
+            improvement of policy gradient estimation." Advances in Neural
+            Information Processing Systems. 2011.
+
+        """
+        assert rets and len(actor_params) == len(rets)
+        batch_size = len(rets)
+        fisher = self.eval_fisher() + 1e-24
+
+        if not behavioral:
+            # On policy
+            if not use_baseline:
+                # Without baseline (more efficient)
+                pgpe_times_n = np.ravel(
+                    self._get_pgpe_times_n(actor_params, rets)[0])
+                grad = pgpe_times_n/batch_size
+                if self.diagonal:
+                    return grad/fisher
+                else:
+                    raise NotImplementedError  # TODO: full on w/o baseline
+            else:
+                # With optimal baseline
+                if self.diagonal:
+                    rets = np.array(rets)
+                    scores = np.zeros((batch_size, self._n_higher_params))
+                    score_norms = np.zeros(batch_size)
+                    for (theta, i) in zip(actor_params, range(batch_size)):
+                        scores[i] = self._get_score(theta)[0]
+                        score_norms[i] = np.linalg.norm(scores[i]/fisher)
+                    b = np.sum(rets * score_norms**2) / np.sum(score_norms**2)
+                    npgpe = np.mean(((rets - b).T * scores.T).T, axis=0)/fisher
+                    return npgpe
+                else:
+                    raise NotImplementedError  # TODO: full on with baseline
+        else:
+            # Off-policy
+            if behavioral is not self._behavioral:
+                self._build_iw_graph(behavioral)
+                self._behavioral = behavioral
+            if not use_baseline and self.diagonal:
+                # Without baseline (more efficient)
+                off_pgpe_times_n = np.ravel(
+                    self._get_off_pgpe_times_n(actor_params, rets)[0])
+                grad = off_pgpe_times_n/batch_size
+                return grad/fisher
+            else:
+                raise NotImplementedError  # TODO: full/diag off with baseline

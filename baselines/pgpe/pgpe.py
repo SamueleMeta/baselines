@@ -2,7 +2,11 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from baselines import logger
+"""
+Created on Wed Apr  4 18:13:18 2018
 
+@author: matteo
+"""
 """References
     PGPE: Sehnke, Frank, et al.
     "Policy gradients with parameter-based exploration for
