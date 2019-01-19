@@ -130,8 +130,8 @@ def single_run(args, seed=None):
     tt = int(str(time.time())[-5:])
     time_str = '%s-%s-%s_%s%s%s_%s' % (
         t.tm_hour, t.tm_min, t.tm_sec, t.tm_mday, t.tm_mon, t.tm_year, tt)
-    args_str = '%s__seed=%s' % (
-        args.env.upper(), args.seed)
+    args_str = '%s_step=%s_seed=%s' % (
+        args.env.upper(), args.step_size, args.seed)
 
     if args.filename == 'progress':
         filename = args_str + '_' + time_str
