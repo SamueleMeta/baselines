@@ -116,7 +116,7 @@ def train(env, policy, horizon, seed, bounded_policy,
     sampler = None
 
     # Learn
-    pbpoise.learn(env_name, make_env, make_policy, horizon=horizon,
+    pbpoise.learn(env_name, make_env, seed, make_policy, horizon=horizon,
                   sampler=sampler, **alg_args)
 
 
