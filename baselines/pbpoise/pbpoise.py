@@ -391,9 +391,8 @@ def learn(env_name, make_env, seed, make_policy, *,
     else:
         renyi_components_sum = np.zeros(grid_size_1d**d)
     new_grid = True
-    grid_size_1d_old = 0
-    timesteps_so_far = 0
-    iters_so_far = 0
+    grid_size_1d_old = iters_so_far = 0
+    lens = []
     tstart = time.time()
     # Sample actor's params before entering the learning loop
     rho = get_parameters()
@@ -426,15 +425,17 @@ def learn(env_name, make_env, seed, make_policy, *,
                 env, pi, gamma, horizon, feature_fun, rescale_ep_return)
             all_eps['ret'][iters_so_far-1] = ret
             all_eps['disc_ret'][iters_so_far-1] = disc_ret
-            timesteps_so_far += ep_len
-            # seg = sampler.collect(rho)
+            lens.append(ep_len)
 
         # Store the parameters of the behavioral hyperpolicy
         old_rhos_list.append(rho)
 
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
-            logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+            logger.record_tabular("NumTrajectories", iters_so_far)
+            logger.record_tabular("TimestepsSoFar", np.sum(lens))
+            logger.record_tabular('AvgEpLen', np.mean(lens))
+            logger.record_tabular('MinEpLen', np.min(lens))
             logger.record_tabular("TimeElapsed", time.time() - tstart)
 
         # Save policy parameters to disk
@@ -545,7 +546,7 @@ def learn(env_name, make_env, seed, make_policy, *,
                 ac1 = pi.eval_actor_mean([[1, 1, 1, 1]])[0][0]
                 mu1_higher = pi.eval_higher_mean()
                 sigma = pi.eval_higher_std()
-                logger.record_tabular("ActionIn[1111]", ac1)  # optimum ~-4.69
+                logger.record_tabular("ActionIn1", ac1)  # optimum ~-4.69
                 logger.record_tabular("InvPendulum_mu0_higher", mu1_higher[0])
                 logger.record_tabular("InvPendulum_mu1_higher", mu1_higher[1])
                 logger.record_tabular("InvPendulum_mu2_higher", mu1_higher[2])
@@ -558,7 +559,7 @@ def learn(env_name, make_env, seed, make_policy, *,
                 ac1 = pi.eval_actor_mean([[1, 1]])[0][0]
                 mu1_higher = pi.eval_higher_mean()
                 sigma = pi.eval_higher_std()
-                logger.record_tabular("ActionIn[1, 1]", ac1)  # optimum ~2.458
+                logger.record_tabular("ActionIn1", ac1)  # optimum ~2.458
                 logger.record_tabular("MountainCar_mu0_higher", mu1_higher[0])
                 logger.record_tabular("MountainCar_mu1_higher", mu1_higher[1])
                 logger.record_tabular("MountainCar_std0_higher", sigma[0])

@@ -84,13 +84,17 @@ def learn(make_env, seed, make_policy, *,
             print('Higher-order parameters:', rho)
             # print('Fisher diagonal:', pol.eval_fisher())
             # print('Renyi:', pol.renyi(pol))
+        logger.record_tabular('ReturnMean', np.mean(all_disc_rets))
+        logger.record_tabular('ReturnMax', np.max(all_disc_rets))
         logger.record_tabular('AvgRet', np.mean(rets))
         logger.record_tabular('J', np.mean(disc_rets))
         logger.record_tabular('VarJ', np.var(disc_rets, ddof=1)/batch_size)
         logger.record_tabular('BatchSize', batch_size)
         logger.record_tabular('AvgEpLen', np.mean(lens))
-        logger.record_tabular('ReturnMean', np.mean(all_disc_rets))
-        logger.record_tabular('ReturnMax', np.max(all_disc_rets))
+        logger.record_tabular('MinEpLen', np.min(lens))
+        logger.record_tabular('TimestepsSoFar', np.sum(lens))
+        logger.record_tabular('Iteration', it+1)
+        logger.record_tabular('NumTrajectories', n_trajectories)
 
         # Update higher-order policy
         grad = pol.eval_gradient(actor_params, disc_rets,
@@ -113,5 +117,4 @@ def learn(make_env, seed, make_policy, *,
         logger.record_tabular('StepSize', step_size_it)
         logger.record_tabular('NatGradInftyNorm', gradmaxnorm)
         logger.record_tabular('NatGrad2Norm', grad2norm)
-        logger.record_tabular('Iteration', it+1)
         logger.dump_tabular()

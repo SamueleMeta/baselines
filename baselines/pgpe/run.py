@@ -206,7 +206,7 @@ def main(args):
     parser.add_argument('--std_init', type=float, default=0.15)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
-    parser.add_argument('--max_iters', type=int, default=1000)
+    parser.add_argument('--max_iters', type=int, default=50)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--step_size', type=float, default=0.1)
