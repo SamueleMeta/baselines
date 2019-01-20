@@ -98,6 +98,8 @@ def best_of_grid(policy, grid_size_1d, grid_dimension,
     # Calculate the grid of parameters to evaluate
     rho_grid, gain_grid, xyz = \
         generate_grid(grid_size_1d, grid_dimension, trainable_std)
+    # print('rhooo', rho_grid)
+    # print('gain_grid', len(gain_grid[0]))
     logger.record_tabular("GridSize", len(rho_grid))
 
     # Evaluate the set of parameters and retain the best one
@@ -125,14 +127,14 @@ def best_of_grid(policy, grid_size_1d, grid_dimension,
             bound_best = bound_rho
             rho_best = rho
             renyi_bound_best = renyi_bound
-        if plot_bound and not trainable_std:
-            # Evaluate bounds' components for plotting
-            mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
-                evaluate_roba(den_mise_log, renyi_bound)
-            mise.append(mise_rho)
-            bonus.append(bonus_rho)
-            ess_d2.append(ess_d2_rho)
-            ess_miw.append(ess_miw_rho)
+        # if plot_bound and not trainable_std:
+        #     # Evaluate bounds' components for plotting
+        #     mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
+        #         evaluate_roba(den_mise_log, renyi_bound)
+        #     mise.append(mise_rho)
+        #     bonus.append(bonus_rho)
+        #     ess_d2.append(ess_d2_rho)
+        #     ess_miw.append(ess_miw_rho)
 
     # Calculate improvement
     set_parameters(rho_init)
@@ -140,14 +142,18 @@ def best_of_grid(policy, grid_size_1d, grid_dimension,
 
     # Plot the profile of the bound and its components
     if plot_bound:
-        if trainable_std:
-            bound = np.array(bound).reshape((grid_size_1d, grid_size_1d))
-            # mise = np.array(mise).reshape((grid_size_std, grid_size))
-            plot3D_bound_profile(xyz[0], xyz[1], bound, rho_best, bound_best,
-                                 iters_so_far, filename)
-        else:
-            plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
-                               bound_best, iters_so_far, filename)
+        bound = np.array(bound).reshape((grid_size_1d, grid_size_1d))
+        # mise = np.array(mise).reshape((grid_size_std, grid_size))
+        plot3D_bound_profile(gain_grid[0], gain_grid[1], bound, rho_best,
+                             bound_best, iters_so_far, filename)
+        # if trainable_std:
+        #     bound = np.array(bound).reshape((grid_size_1d, grid_size_1d))
+        #     # mise = np.array(mise).reshape((grid_size_std, grid_size))
+        #     plot3D_bound_profile(xyz[0], xyz[1], bound, rho_best, bound_best,
+        #                          iters_so_far, filename)
+        # else:
+        #     plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
+        #                        bound_best, iters_so_far, filename)
     if plot_ess_profile:
         plot_ess(gain_grid, ess_d2, iters_so_far, 'd2_' + filename)
         plot_ess(gain_grid, ess_miw, iters_so_far, 'miw_' + filename)
