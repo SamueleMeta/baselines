@@ -150,10 +150,6 @@ def best_of_grid(policy, grid_size_1d, mu_min, mu_max, grid_dimension,
     if plot_bound == 2:
         bound = np.array(bound).reshape((grid_size_1d, grid_size_1d))
         # mise = np.array(mise).reshape((grid_size_std, grid_size))
-        print('CheckItBraaaaaaaaahhh')
-        print(xyz[0])
-        print(xyz[1])
-        print(bound)
         plot3D_bound_profile(xyz[0], xyz[1], bound, rho_best,
                              bound_best, iters_so_far, filename)
     elif plot_bound == 1:
