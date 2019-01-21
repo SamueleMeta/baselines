@@ -168,6 +168,8 @@ def single_run(args, seed=None):
           max_iters=args.max_iters,
           render_after=args.render_after,
           grid_size_1d=args.grid_size_1d,
+          mu_min=args.mu_min,
+          mu_max=args.mu_max,
           truncated_mise=args.truncated_mise,
           delta_t=args.delta_t,
           k=args.k,
@@ -228,7 +230,10 @@ def main(args):
     parser.add_argument('--render_after', type=int, default=None)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--multiple_init', type=int, default=None)
+    parser.add_argument('--plot_bound', type=int, default=None)  # 1-2-->1D-2D
     parser.add_argument('--grid_size_1d', type=int, default=0)
+    parser.add_argument('--mu_min', type=int, default=-1)
+    parser.add_argument('--mu_max', type=int, default=1)
     parser.add_argument('--delta_t', type=str, default=None)
     parser.add_argument('--k', type=int, default=2)  # must be>=2
     add_bool_arg(parser, 'bounded_policy', default=True)
@@ -236,7 +241,6 @@ def main(args):
     add_bool_arg(parser, 'truncated_mise', default=True)
     add_bool_arg(parser, 'experiment', default=False)
     add_bool_arg(parser, 'find_optimal_arm', default=False)
-    add_bool_arg(parser, 'plot_bound', default=False)
     add_bool_arg(parser, 'plot_ess_profile', default=False)
     add_bool_arg(parser, 'rescale_ep_return', default=False)
     args = parser.parse_args(args)

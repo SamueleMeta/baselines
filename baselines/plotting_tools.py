@@ -36,8 +36,8 @@ def plot3D_bound_profile(x, y, bound, rho_best, bound_best, iter, filename):
     ax.grid()
     ax.plot_surface(x, y, bound, rstride=1, cstride=1,
                     cmap='viridis', edgecolor='none')
-    ax.set_xlabel('gain')
-    ax.set_ylabel('std')
+    ax.set_xlabel('1st param')
+    ax.set_ylabel('2nd param')
     ax.set_zlabel('bound')
     ax.invert_yaxis()
     # y = np.exp(y)

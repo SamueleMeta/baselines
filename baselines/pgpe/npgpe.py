@@ -66,8 +66,7 @@ def learn(make_env, seed, make_policy, *,
         rho = pol.eval_params()  # Higher-order-policy parameters
 
         # Batch of episodes
-        actor_params = []
-        rets, disc_rets, lens = [], [], []
+        actor_params, absrets, disc_rets, lens = [], [], [], []
         for ep in range(batch_size):
             theta = pol.resample()
             actor_params.append(theta)

@@ -67,7 +67,7 @@ def generate_grid(grid_size, grid_dimension, trainable_std,
     return list(zip(*XYZ)), gain_xyz, xyz
 
 
-def best_of_grid(policy, grid_size_1d, grid_dimension,
+def best_of_grid(policy, grid_size_1d, mu_min, mu_max, grid_dimension,
                  trainable_std, rho_init, old_rhos_list,
                  iters_so_far, mask_iters,
                  set_parameters, set_parameters_old,
@@ -97,14 +97,20 @@ def best_of_grid(policy, grid_size_1d, grid_dimension,
 
     # Calculate the grid of parameters to evaluate
     rho_grid, gain_grid, xyz = \
-        generate_grid(grid_size_1d, grid_dimension, trainable_std)
+        generate_grid(grid_size_1d, grid_dimension, trainable_std,
+                      mu_min=mu_min, mu_max=mu_max)
     # print('rhooo', rho_grid)
     # print('gain_grid', len(gain_grid[0]))
     logger.record_tabular("GridSize", len(rho_grid))
 
     # Evaluate the set of parameters and retain the best one
-    bound = mise = bonus = ess_d2 = ess_miw = []
-    bound_best = renyi_bound_best = 0
+    bound = []
+    mise = []
+    bonus = []
+    ess_d2 = []
+    ess_miw = []
+    bound_best = 0
+    renyi_bound_best = 0
     rho_best = rho_init
     for i, rho in enumerate(rho_grid):
         set_parameters(rho)
@@ -127,36 +133,34 @@ def best_of_grid(policy, grid_size_1d, grid_dimension,
             bound_best = bound_rho
             rho_best = rho
             renyi_bound_best = renyi_bound
-        # if plot_bound and not trainable_std:
-        #     # Evaluate bounds' components for plotting
-        #     mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
-        #         evaluate_roba(den_mise_log, renyi_bound)
-        #     mise.append(mise_rho)
-        #     bonus.append(bonus_rho)
-        #     ess_d2.append(ess_d2_rho)
-        #     ess_miw.append(ess_miw_rho)
+        if plot_bound == 1:
+            # Evaluate bounds' components for plotting
+            mise_rho, bonus_rho, ess_d2_rho, ess_miw_rho = \
+                evaluate_roba(den_mise_log, renyi_bound)
+            mise.append(mise_rho)
+            bonus.append(bonus_rho)
+            ess_d2.append(ess_d2_rho)
+            ess_miw.append(ess_miw_rho)
 
     # Calculate improvement
     set_parameters(rho_init)
     improvement = bound_best - evaluate_bound(den_mise_log, renyi_bound)
 
     # Plot the profile of the bound and its components
-    if plot_bound:
+    if plot_bound == 2:
         bound = np.array(bound).reshape((grid_size_1d, grid_size_1d))
         # mise = np.array(mise).reshape((grid_size_std, grid_size))
-        plot3D_bound_profile(gain_grid[0], gain_grid[1], bound, rho_best,
+        print('CheckItBraaaaaaaaahhh')
+        print(xyz[0])
+        print(xyz[1])
+        print(bound)
+        plot3D_bound_profile(xyz[0], xyz[1], bound, rho_best,
                              bound_best, iters_so_far, filename)
-        # if trainable_std:
-        #     bound = np.array(bound).reshape((grid_size_1d, grid_size_1d))
-        #     # mise = np.array(mise).reshape((grid_size_std, grid_size))
-        #     plot3D_bound_profile(xyz[0], xyz[1], bound, rho_best, bound_best,
-        #                          iters_so_far, filename)
-        # else:
-        #     plot_bound_profile(gain_grid, bound, mise, bonus, rho_best[0],
-        #                        bound_best, iters_so_far, filename)
-    if plot_ess_profile:
-        plot_ess(gain_grid, ess_d2, iters_so_far, 'd2_' + filename)
-        plot_ess(gain_grid, ess_miw, iters_so_far, 'miw_' + filename)
+    elif plot_bound == 1:
+        plot_bound_profile(gain_grid[0], bound, mise, bonus, rho_best[0],
+                           bound_best, iters_so_far, filename)
+        # plot_ess(gain_grid, ess_d2, iters_so_far, 'd2_' + filename)
+        # plot_ess(gain_grid, ess_miw, iters_so_far, 'miw_' + filename)
 
     return rho_best, improvement, den_mise_log, den_mise, \
         renyi_components_sum, renyi_bound_best
@@ -177,6 +181,8 @@ def learn(env_name, make_env, seed, make_policy, *,
           save_weights=False,
           render_after=None,
           grid_size_1d=None,
+          mu_min=None,
+          mu_max=None,
           truncated_mise=True,
           delta_t=None,
           k=2,
@@ -397,7 +403,8 @@ def learn(env_name, make_env, seed, make_policy, *,
     else:
         renyi_components_sum = np.zeros(grid_size_1d**d)
     new_grid = True
-    grid_size_1d_old = iters_so_far = 0
+    grid_size_1d_old = 0
+    iters_so_far = 0
     lens = []
     tstart = time.time()
     # Sample actor's params before entering the learning loop
@@ -489,7 +496,8 @@ def learn(env_name, make_env, seed, make_policy, *,
             if find_optimal_arm:
                 pass
             elif multiple_init:
-                bound = improvement = 0
+                bound = 0
+                improvement = 0
                 check = False
                 for i in range(multiple_init):
                     rho_init = [np.arctanh(np.random.uniform(
@@ -521,7 +529,7 @@ def learn(env_name, make_env, seed, make_policy, *,
                         grid_size_1d_old = grid_size_1d
                 rho, improvement, den_mise_log, den_mise, \
                     renyi_components_sum, renyi_bound = \
-                    best_of_grid(pi, grid_size_1d,
+                    best_of_grid(pi, grid_size_1d, mu_min, mu_max,
                                  grid_dimension, trainable_std,
                                  rho, old_rhos_list,
                                  iters_so_far, mask_iters,
@@ -620,7 +628,8 @@ def optimize_offline(evaluate_roba, pi,
 
     # Set optimization variables
     rho = rho_old = rho_init
-    improvement = improvement_old = 0.
+    improvement = 0
+    improvement_old = 0.
 
     # Calculate initial bound
     bound = evaluate_bound(den_mise_log, renyi_bound)
