@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from baselines import logger
+import baselines.common.tf_util as U
 
 """
 Created on Wed Apr  4 18:13:18 2018
@@ -58,6 +59,10 @@ def learn(make_env, seed, make_policy, *,
     ob_space = env.observation_space
     ac_space = env.action_space
     pol = make_policy('pol', ob_space, ac_space)
+    # Hard-set higher logst
+    higher_logstd_list = [pol.get_higher_logstd()]
+    set_higher_logstd = U.SetFromFlat(higher_logstd_list)
+    set_higher_logstd(np.log([0.15, 1.5]))
 
     # Learning iteration
     all_disc_rets = []
@@ -66,7 +71,7 @@ def learn(make_env, seed, make_policy, *,
         rho = pol.eval_params()  # Higher-order-policy parameters
 
         # Batch of episodes
-        actor_params, absrets, disc_rets, lens = [], [], [], []
+        actor_params, rets, disc_rets, lens = [], [], [], []
         for ep in range(batch_size):
             theta = pol.resample()
             actor_params.append(theta)
@@ -94,6 +99,16 @@ def learn(make_env, seed, make_policy, *,
         logger.record_tabular('TimestepsSoFar', np.sum(lens))
         logger.record_tabular('Iteration', it+1)
         logger.record_tabular('NumTrajectories', n_trajectories)
+
+        if env.spec.id == 'MountainCarContinuous-v0':
+            ac1 = pol.eval_actor_mean([[1, 1]])[0][0]
+            mu1_higher = pol.eval_higher_mean()
+            sigma = pol.eval_higher_std()
+            logger.record_tabular("ActionIn1", ac1)  # optimum ~2.458
+            logger.record_tabular("MountainCar_mu0_higher", mu1_higher[0])
+            logger.record_tabular("MountainCar_mu1_higher", mu1_higher[1])
+            logger.record_tabular("MountainCar_std0_higher", sigma[0])
+            logger.record_tabular("MountainCar_std1_higher", sigma[1])
 
         # Update higher-order policy
         grad = pol.eval_gradient(actor_params, disc_rets,

@@ -12,6 +12,7 @@ import json
 import gym
 import tensorflow as tf
 import numpy as np
+import random
 
 # Self imports: utils
 from baselines.common import set_global_seeds
@@ -105,11 +106,12 @@ def train(env, policy, horizon, seed, gain_init, std_init,
     sess.__enter__()
 
     set_global_seeds(seed)
+    random.seed(seed)
 
     gym.logger.setLevel(logging.WARN)
 
     # Learn
-    gpucb.learn(make_env, make_policy, horizon=horizon, **alg_args)
+    gpucb.learn(seed, make_env, make_policy, horizon=horizon, **alg_args)
 
 
 def single_run(args, seed=None):

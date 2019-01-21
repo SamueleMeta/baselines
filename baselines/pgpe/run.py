@@ -97,7 +97,7 @@ def train(env, policy, horizon, seed,
                            use_bias=False, use_critic=False,
                            seed=seed, verbose=True,
                            hidden_W_init=U.normc_initializer(1.0),
-                           higher_mean_init=tf.constant_initializer(mu_init),
+                           higher_mean_init=U.normc_initializer(1.0),
                            higher_logstd_init=tf.constant_initializer(
                                np.log(std_init)))
     try:

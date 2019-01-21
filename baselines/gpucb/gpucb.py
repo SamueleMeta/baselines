@@ -35,14 +35,14 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun, rescale_ep_return):
 
 
 def generate_grid(grid_size, grid_dimension, trainable_std,
-                  mu_min=0, mu_max=4, logstd_min=-4, logst_max=0):
-    # mu1 = np.linspace(-1, 1, grid_size)
-    # mu2 = np.linspace(0, 4, grid_size)
+                  mu_min=-2, mu_max=2, logstd_min=-4, logst_max=0):
+    mu1 = np.linspace(-1, 1, grid_size)
+    mu2 = np.linspace(-10, 10, grid_size)
     # mu3 = np.linspace(-10, 0, grid_size)
     # mu4 = np.linspace(-2, 2, grid_size)
-    # gain_xyz = [mu1, mu2, mu3, mu4]
-    gain_xyz = np.linspace(mu_min, mu_max, grid_size)
-    gain_xyz = [gain_xyz for i in range(grid_dimension)]
+    gain_xyz = [mu1, mu2]
+    # gain_xyz = np.linspace(mu_min, mu_max, grid_size)
+    # gain_xyz = [gain_xyz for i in range(grid_dimension)]
     if trainable_std:
         logstd_xyz = np.linspace(logstd_min, logst_max, grid_size)
         logstd_xyz = [logstd_xyz for i in range(grid_dimension)]
@@ -56,7 +56,7 @@ def generate_grid(grid_size, grid_dimension, trainable_std,
     return list(zip(*XYZ)), gain_xyz, xyz
 
 
-def learn(make_env,
+def learn(seed, make_env,
           make_policy,
           horizon,
           delta,
@@ -75,6 +75,7 @@ def learn(make_env,
     env = make_env()
     ob_space = env.observation_space
     ac_space = env.action_space
+    env.seed(seed)
 
     # Build the higher level policy
     pi = make_policy('pi', ob_space, ac_space)
@@ -83,9 +84,13 @@ def learn(make_env,
     all_var_list = pi.get_trainable_variables()
     var_list = \
         [v for v in all_var_list if v.name.split('/')[1].startswith('higher')]
+    # Get hyperpolicy's logstd
+    higher_logstd_list = [pi.get_higher_logstd()]
 
     # TF functions
     set_parameters = U.SetFromFlat(var_list)
+    set_higher_logstd = U.SetFromFlat(higher_logstd_list)
+    set_higher_logstd(np.log([0.15, 1.5]))
 
     # Calculate the grid of parameters to evaluate
     grid_dimension = ob_space.shape[0]
@@ -130,7 +135,7 @@ def learn(make_env,
             env, pi, gamma, horizon, feature_fun, rescale_ep_return)
         selected_disc_rets.append(disc_ret)
         lens.append(ep_len)
-        regret += (0.96512 - disc_ret)
+        regret += (5 - disc_ret)
         # Create GP regressor and fit it to the arms' returns
         gp = GaussianProcessRegressor()
         gp.fit(selected_rhos, selected_disc_rets)

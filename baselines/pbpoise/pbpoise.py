@@ -48,13 +48,13 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun, rescale_ep_return):
 
 def generate_grid(grid_size, grid_dimension, trainable_std,
                   mu_min=0, mu_max=4, logstd_min=-4, logst_max=0):
-    # mu1 = np.linspace(-1, 1, grid_size)
-    # mu2 = np.linspace(0, 4, grid_size)
+    mu1 = np.linspace(-1, 1, grid_size)
+    mu2 = np.linspace(-10, 10, grid_size)
     # mu3 = np.linspace(-10, 0, grid_size)
     # mu4 = np.linspace(-2, 2, grid_size)
-    # gain_xyz = [mu1, mu2, mu3, mu4]
-    gain_xyz = np.linspace(mu_min, mu_max, grid_size)
-    gain_xyz = [gain_xyz for i in range(grid_dimension)]
+    gain_xyz = [mu1, mu2]
+    # gain_xyz = np.linspace(mu_min, mu_max, grid_size)
+    # gain_xyz = [gain_xyz for i in range(grid_dimension)]
     if trainable_std:
         logstd_xyz = np.linspace(logstd_min, logst_max, grid_size)
         logstd_xyz = [logstd_xyz for i in range(grid_dimension)]
@@ -226,6 +226,8 @@ def learn(env_name, make_env, seed, make_policy, *,
     var_list_old = \
         [v for v in all_var_list_old
          if v.name.split('/')[1].startswith('higher')]
+    # Get hyperpolicy's logstd
+    higher_logstd_list = [pi.get_higher_logstd()]
 
     # My Placeholders
     actor_params_ = tf.placeholder(shape=[max_iters, pi._n_actor_weights],
@@ -275,8 +277,8 @@ def learn(env_name, make_env, seed, make_policy, *,
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
     return_step_max = tf.reduce_max(tf.abs(ret_))
-    regret = n_ * 0.96512 - tf.reduce_sum(ep_return)
-    regret_over_t = 0.96512 - return_mean
+    regret = n_ * 5 - tf.reduce_sum(ep_return)
+    regret_over_t = 5 - return_mean
 
     losses_with_name.extend([(return_mean, 'ReturnMean'),
                              (return_max, 'ReturnMax'),
@@ -358,6 +360,8 @@ def learn(env_name, make_env, seed, make_policy, *,
     set_parameters = U.SetFromFlat(var_list)
     get_parameters = U.GetFlat(var_list)
     set_parameters_old = U.SetFromFlat(var_list_old)
+    set_higher_logstd = U.SetFromFlat(higher_logstd_list)
+    set_higher_logstd(np.log([0.15, 0.15]))
 
     compute_behav = U.function(
         [actor_params_], behavioral_log_pdf)
@@ -405,7 +409,6 @@ def learn(env_name, make_env, seed, make_policy, *,
     lens = []
     tstart = time.time()
     # Sample actor's params before entering the learning loop
-    set_parameters([-0.23797838,  5.5880117])
     rho = get_parameters()
     theta = pi.resample()
     all_eps['actor_params'][iters_so_far, :] = theta

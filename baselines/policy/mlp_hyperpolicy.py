@@ -262,6 +262,9 @@ class PeMlpPolicy(object):
     def get_trainable_variables(self):
         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)
 
+    def get_higher_logstd(self):
+        return self.higher_logstd
+
     # Direct actor policy manipulation
     def draw_actor_params(self):
         """Sample params for an actor (without using them)"""
