@@ -33,6 +33,7 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun, rescale_ep_return):
         disc_ret += gamma**t * r
         t += 1
         if rescale_ep_return:
+            # Rescale episodic return in [0, 1]
             if env.spec.id == 'LQG1D-v0':
                 # Rescale episodic return in [0, 1]
                 # (Hp: r takes values in [0, 1])
@@ -404,6 +405,7 @@ def learn(env_name, make_env, seed, make_policy, *,
     lens = []
     tstart = time.time()
     # Sample actor's params before entering the learning loop
+    set_parameters([-0.23797838,  5.5880117])
     rho = get_parameters()
     theta = pi.resample()
     all_eps['actor_params'][iters_so_far, :] = theta
@@ -552,7 +554,7 @@ def learn(env_name, make_env, seed, make_policy, *,
                 logger.record_tabular("LQGmu1_actor", mu1_actor)
                 logger.record_tabular("LQGmu1_higher", mu1_higher)
                 logger.record_tabular("LQGsigma_higher", sigma)
-            elif env_name == 'inverted_pendulum':
+            elif env_name == 'inverted_pendulum':  # TODO make env.spec.id
                 ac1 = pi.eval_actor_mean([[1, 1, 1, 1]])[0][0]
                 mu1_higher = pi.eval_higher_mean()
                 sigma = pi.eval_higher_std()

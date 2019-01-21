@@ -151,10 +151,13 @@ def single_run(args, seed=None):
           max_iters=args.max_iters,
           delta=args.delta,
           gamma=args.gamma,
-          grid_size=args.grid_size,
+          grid_size_1d=args.grid_size_1d,
+          mu_min=args.mu_min,
+          mu_max=args.mu_max,
           plot_bound=args.plot_bound,
           filename=filename,
-          trainable_std=args.trainable_std)
+          trainable_std=args.trainable_std,
+          rescale_ep_return=args.rescale_ep_return)
 
 
 def multiple_runs(args):
@@ -192,19 +195,22 @@ def main(args):
     parser.add_argument('--seed_min', type=int, default=0)
     parser.add_argument('--seed_max', type=int, default=5)
     parser.add_argument('--env', type=str, default='LQG1D-v0')
-    parser.add_argument('--horizon', type=int, default=20)
+    parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--filename', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--gain_init', type=float, default=-0.1)  # LQG only
     parser.add_argument('--std_init', type=float, default=0.15)  # LQG only
     parser.add_argument('--policy', type=str, default='linear')
-    parser.add_argument('--max_iters', type=int, default=1000)
+    parser.add_argument('--max_iters', type=int, default=5000)
     parser.add_argument('--delta', type=float, default=0.2)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--grid_size', type=int, default=100)
+    parser.add_argument('--grid_size_1d', type=int, default=100)
+    parser.add_argument('--mu_min', type=int, default=-1)
+    parser.add_argument('--mu_max', type=int, default=1)
+    parser.add_argument('--plot_bound', type=int, default=None)
     add_bool_arg(parser, 'trainable_std', default=False)
     add_bool_arg(parser, 'experiment', default=False)
-    add_bool_arg(parser, 'plot_bound', default=False)
+    add_bool_arg(parser, 'rescale_ep_return', default=False)
     args = parser.parse_args(args)
 
     if args.experiment:
