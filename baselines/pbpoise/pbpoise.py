@@ -144,8 +144,9 @@ def best_of_grid(policy, grid_size_1d, mu_min, mu_max, grid_dimension,
             ess_miw.append(ess_miw_rho)
 
     # Calculate improvement
-    set_parameters(rho_init)
-    improvement = bound_best - evaluate_bound(den_mise_log, renyi_bound)
+    # set_parameters(rho_init)
+    # improvement = bound_best - evaluate_bound(den_mise_log, renyi_bound)
+    improvement = 0
 
     # Plot the profile of the bound and its components
     if plot_bound == 2:
