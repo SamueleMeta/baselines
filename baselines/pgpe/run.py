@@ -96,7 +96,7 @@ def train(env, policy, horizon, seed,
     else:
         higher_mean_init = U.normc_initializer(1.0)
     if std_init is not None:
-        higher_mean_init = tf.constant_initializer(np.log(std_init))
+        higher_logstd_init = tf.constant_initializer(np.log(std_init))
     else:
         higher_logstd_init = tf.constant(np.log([0.15, 1.5]).astype(np.float32))
         const_std_init = True
