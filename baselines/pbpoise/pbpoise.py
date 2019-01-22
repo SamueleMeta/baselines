@@ -114,6 +114,7 @@ def best_of_grid(policy, grid_size_1d, mu_min, mu_max, grid_dimension,
     renyi_bound_best = 0
     # print('rho_grid', rho_grid)
     for i, rho in enumerate(rho_grid):
+        print(rho)
         set_parameters(rho)
         if new_grid and delta_t == 'continuous':
             print('************Renyi Bound From Scratch******************')
