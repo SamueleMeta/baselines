@@ -137,7 +137,7 @@ def single_run(args, seed=None):
 
     # Configure logger
     logger.configure(dir=args.logdir,
-                     format_strs=['stdout', 'csv', 'tensorboard'],
+                     format_strs=['stdout', 'csv'],
                      file_name=filename)
 
     # Print args to file in logdir
