@@ -90,7 +90,7 @@ def learn(seed, make_env,
     # TF functions
     set_parameters = U.SetFromFlat(var_list)
     set_higher_logstd = U.SetFromFlat(higher_logstd_list)
-    set_higher_logstd(np.log([0.15, 1.5]))
+    # set_higher_logstd(np.log([0.15, 1.5]))
 
     # Calculate the grid of parameters to evaluate
     grid_dimension = ob_space.shape[0]

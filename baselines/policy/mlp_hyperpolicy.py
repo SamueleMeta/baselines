@@ -31,7 +31,8 @@ class PeMlpPolicy(object):
               seed=None, verbose=True,
               hidden_W_init=U.normc_initializer(1.0),
               higher_mean_init=None,
-              higher_logstd_init=tf.constant_initializer(np.log(0.11))):
+              higher_logstd_init=tf.constant_initializer(np.log(0.11)),
+              const_std_init=False):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -110,12 +111,19 @@ class PeMlpPolicy(object):
             #     self.higher_mean, -1, 1, 'higher_mean_clipped')
             higher_mean = self.higher_mean
             if diagonal:
-                self.higher_logstd = higher_logstd = \
-                    tf.get_variable(
-                        name='higher_logstd',
-                        shape=[n_actor_weights],
-                        initializer=higher_logstd_init,
-                        trainable=trainable_std)
+                if const_std_init:
+                    self.higher_logstd = higher_logstd = \
+                        tf.get_variable(
+                            name='higher_logstd',
+                            initializer=higher_logstd_init,
+                            trainable=trainable_std)
+                else:
+                    self.higher_logstd = higher_logstd = \
+                        tf.get_variable(
+                            name='higher_logstd',
+                            shape=[n_actor_weights],
+                            initializer=higher_logstd_init,
+                            trainable=trainable_std)
                 pdparam = tf.concat([higher_mean,
                                      higher_mean * 0. + higher_logstd],
                                     axis=0)

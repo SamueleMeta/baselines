@@ -62,7 +62,7 @@ def learn(make_env, seed, make_policy, *,
     # Hard-set higher logst
     higher_logstd_list = [pol.get_higher_logstd()]
     set_higher_logstd = U.SetFromFlat(higher_logstd_list)
-    set_higher_logstd(np.log([0.15, 1.5]))
+    # set_higher_logstd(np.log([0.15, 1.5]))
 
     # Learning iteration
     all_disc_rets = []

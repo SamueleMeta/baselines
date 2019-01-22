@@ -90,16 +90,27 @@ def train(env, policy, horizon, seed,
     else:
         raise NotImplementedError
 
+    const_std_init = False
+    if mu_init is not None:
+        higher_mean_init = tf.constant_initializer(mu_init)
+    else:
+        higher_mean_init = U.normc_initializer(1.0)
+    if std_init is not None:
+        higher_mean_init = tf.constant_initializer(np.log(std_init))
+    else:
+        higher_logstd_init = tf.constant(np.log([0.15, 1.5]).astype(np.float32))
+        const_std_init = True
+
     def make_policy(name, ob_space, ac_space):
-        return PeMlpPolicy(name, ob_space, ac_space, hid_layers,
-                           deterministic=True, diagonal=True,
-                           trainable_std=alg_args['trainable_std'],
-                           use_bias=False, use_critic=False,
-                           seed=seed, verbose=True,
-                           hidden_W_init=U.normc_initializer(1.0),
-                           higher_mean_init=U.normc_initializer(1.0),
-                           higher_logstd_init=tf.constant_initializer(
-                               np.log(std_init)))
+            return PeMlpPolicy(name, ob_space, ac_space, hid_layers,
+                               deterministic=True, diagonal=True,
+                               trainable_std=alg_args['trainable_std'],
+                               use_bias=False, use_critic=False,
+                               seed=seed, verbose=True,
+                               hidden_W_init=U.normc_initializer(1.0),
+                               higher_mean_init=higher_mean_init,
+                               higher_logstd_init=higher_logstd_init,
+                               const_std_init=const_std_init)
     try:
         affinity = len(os.sched_getaffinity(0))
     except:
@@ -202,8 +213,8 @@ def main(args):
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--filename', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
-    parser.add_argument('--mu_init', type=float, default=0.1)
-    parser.add_argument('--std_init', type=float, default=0.15)
+    parser.add_argument('--mu_init', type=float, default=None)
+    parser.add_argument('--std_init', type=float, default=None)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_iters', type=int, default=50)

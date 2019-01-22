@@ -112,7 +112,7 @@ def best_of_grid(policy, grid_size_1d, mu_min, mu_max, grid_dimension,
     ess_miw = []
     bound_best = 0
     renyi_bound_best = 0
-    rho_best = rho_init
+    # print('rho_grid', rho_grid)
     for i, rho in enumerate(rho_grid):
         set_parameters(rho)
         if new_grid and delta_t == 'continuous':
@@ -343,6 +343,8 @@ def learn(env_name, make_env, seed, make_policy, *,
             bound = mise + exploration_bonus
     else:
         raise NotImplementedError
+    losses_with_name.append((mise, 'BoundMISE'))
+    losses_with_name.append((exploration_bonus, 'BoundBonus'))
     losses_with_name.append((bound, 'Bound'))
 
     # ESS estimation by d2
@@ -362,7 +364,7 @@ def learn(env_name, make_env, seed, make_policy, *,
     get_parameters = U.GetFlat(var_list)
     set_parameters_old = U.SetFromFlat(var_list_old)
     set_higher_logstd = U.SetFromFlat(higher_logstd_list)
-    set_higher_logstd(np.log([0.15, 1.5]))
+    # set_higher_logstd(np.log([0.15, 0.2]))
 
     compute_behav = U.function(
         [actor_params_], behavioral_log_pdf)
