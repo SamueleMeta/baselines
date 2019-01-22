@@ -148,7 +148,7 @@ def single_run(args, seed=None):
                      file_name=filename)
 
     # Print args to file in logdir
-    args_to_file(args, dir=args.logdir, filename=filename)
+    # args_to_file(args, dir=args.logdir, filename=filename)
 
     # Learn
     train(env=args.env,
