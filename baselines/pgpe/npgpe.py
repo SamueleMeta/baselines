@@ -65,13 +65,13 @@ def learn(make_env, seed, make_policy, *,
     # set_higher_logstd(np.log([0.15, 1.5]))
 
     # Learning iteration
-    all_disc_rets = []
+    all_disc_rets, lens = [], []
     n_trajectories = 0
     for it in range(max_iters):
         rho = pol.eval_params()  # Higher-order-policy parameters
 
         # Batch of episodes
-        actor_params, rets, disc_rets, lens = [], [], [], []
+        actor_params, rets, disc_rets = [], [], []
         for ep in range(batch_size):
             theta = pol.resample()
             actor_params.append(theta)
