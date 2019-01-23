@@ -89,10 +89,11 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
                       observation_space,
                       action_space,
                       hid_layers,
-                      use_bias=True,
+                      use_bias=False,
                       seed=seed)
 
-    sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
+    # sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
+    sampler = None
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -115,7 +116,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
           horizon=horizon,
           max_iters=max_iters,
           verbose=1,
-          feature_fun=np.ravel,
+          feature_fun=None,
           iw_norm=iw_norm,
           bound = bound,
           max_offline_iters=max_offline_iters,
@@ -131,7 +132,7 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--env', type=str, default='cartpole')
-    parser.add_argument('--num_episodes', type=int, default=5000)
+    parser.add_argument('--num_episodes', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_norm', type=str, default='sn')
     parser.add_argument('--file_name', type=str, default='progress')

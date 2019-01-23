@@ -24,8 +24,8 @@ class PeMlpPolicy(object):
 
     def _init(self, ob_space, ac_space, hid_layers=[],
               deterministic=True, diagonal=True,
-              use_bias=True, use_critic=False,
-              seed=None, verbose=True):
+              use_bias=False, use_critic=False,
+              seed=None, verbose=True, trainable_std=False):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -94,11 +94,18 @@ class PeMlpPolicy(object):
 
             if diagonal:
                 #Diagonal covariance matrix; all stds initialized to 0
-                self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
-                                                                     shape=[n_actor_weights],
-                                               initializer=tf.initializers.constant(0.))
-                pdparam = tf.concat([higher_mean, higher_mean * 0. +
-                                   higher_logstd], axis=0)
+                if trainable_std:
+                    self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
+                                                                         shape=[n_actor_weights],
+                                                   initializer=tf.initializers.constant(0.))
+                else:
+                    self.higher_logstd = higher_logstd = tf.get_variable(name='higher_logstd',
+                                                                         trainable=False,
+                                                                         initializer=tf.constant(np.log([0.15, 1.5]).astype(np.float32)))
+
+                pdparam = tf.concat([higher_mean,
+                                     higher_mean * 0. + higher_logstd],
+                                    axis=0)
                 self.pdtype = pdtype = DiagGaussianPdType(n_actor_weights.value)
             else:
                 #Cholesky covariance matrix

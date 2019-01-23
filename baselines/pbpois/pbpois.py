@@ -34,6 +34,7 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
         s = feature_fun(ob) if feature_fun else ob
         a = pol.act(s)
         ob, r, done, _ = env.step(a)
+        ob = np.reshape(ob, newshape=s.shape)
         ret += r
         disc_ret += gamma**t * r
         t+=1
@@ -251,7 +252,7 @@ def learn(env_maker, pol_maker, sampler,
         raise NotImplementedError
 
     promise = -np.inf
-    actor_params, rets, disc_rets, lens = [], [], [], []
+    actor_params, rets, disc_rets, all_disc_rets, lens = [], [], [], [], []
     old_actor_params, old_rets, old_disc_rets, old_lens = [], [], [], []
 
     #Learning
@@ -274,13 +275,14 @@ def learn(env_maker, pol_maker, sampler,
                 disc_rets.extend(_disc_rets)
                 actor_params.extend(_actor_params)
             else:
-                frozen_pol = pol.freeze()
+                frozen_pol = pol
                 for ep in range(n_episodes):
                     theta = frozen_pol.resample()
                     actor_params.append(theta)
                     ret, disc_ret, ep_len = eval_trajectory(env, frozen_pol, gamma, horizon, feature_fun)
                     rets.append(ret)
                     disc_rets.append(disc_ret)
+                    all_disc_rets.append(disc_ret)
                     lens.append(ep_len)
         complete = len(rets)>=batch_size #Is the batch complete?
         #Normalize reward
@@ -366,6 +368,8 @@ def learn(env_maker, pol_maker, sampler,
             bound = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
                                                              normalize, use_rmax, use_renyi, delta)
 
+            #ForOPTIMISTBenchmarking
+            logger.record_tabular('ReturnMean', np.mean(all_disc_rets))
             #Data regarding the whole batch
             logger.record_tabular('BatchSize', batch_size)
             logger.record_tabular('IterType', iter_type)
