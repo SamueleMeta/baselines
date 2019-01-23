@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Apr  4 18:13:18 2018
 
-@author: matteo
-"""
 """References
     PGPE: Sehnke, Frank, et al. "Policy gradients with parameter-based exploration for
         control." International Conference on Artificial Neural Networks. Springer,
