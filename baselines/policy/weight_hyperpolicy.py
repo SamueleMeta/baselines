@@ -338,7 +338,7 @@ class PeMlpPolicy(object):
 
 
 
-    #Gradient computation
+    # Gradient computation
     def eval_gradient(self, actor_params, rets, use_baseline=True,
                       behavioral=None):
         """

@@ -37,11 +37,11 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
         ret += r
         disc_ret += gamma**t * r
         t+=1
-        
+
     return ret, disc_ret, t
 
 #BINARY line search
-def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad, 
+def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
                 normalize=True,
                 use_rmax=True,
                 use_renyi=True,
@@ -57,13 +57,13 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
     delta_bound_opt = 0.
     epsilon_opt = 0.
     epsilon = 1.
-    
+
     for i in range(max_search_ite):
         rho = rho_init + epsilon * natgrad * alpha
         newpol.set_params(rho)
         bound = newpol.eval_bound(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
-        delta_bound = bound - bound_init        
+        delta_bound = bound - bound_init
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
         if np.isnan(bound) or delta_bound <= delta_bound_opt:
@@ -82,17 +82,17 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
             epsilon = (low + high) / 2.
         if abs(old_epsilon - epsilon) < 1e-6:
             break
-    
+
     return rho_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
-def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad, 
+def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
                 normalize=True,
                 use_rmax=True,
                 use_renyi=True,
                 max_search_ite=30, rmax=None, delta=0.2):
     epsilon = 1.
     epsilon_old = 0.
-    max_increase=2. 
+    max_increase=2.
     delta_bound_tol=1e-4
     delta_bound_old = -np.inf
     bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
@@ -114,12 +114,12 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
         delta_bound = bound - bound_init
 
         epsilon_old = epsilon
-        
+
         if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
             epsilon = epsilon_old * max_increase
         else:
             epsilon = epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
-        
+
         if delta_bound <= delta_bound_old + delta_bound_tol:
             if delta_bound_old < 0.:
                 return rho_init, 0., 0., i+1
@@ -131,27 +131,27 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
 
     return rho_old, epsilon_old, delta_bound_old, i+1
 
-def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
-                     normalize=True, 
+def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100,
+                     normalize=True,
                      use_rmax=True,
                      use_renyi=True,
                      max_search_ite=30,
                      rmax=None, delta=0.2, use_parabola=False, verbose=True):
     improvement = 0.
     rho = pol.eval_params()
-    
-    
+
+
     fmtstr = "%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g"
     titlestr = "%6s %10s %10s %18s %18s %18s %18s"
-    if verbose: print(titlestr % ("iter", "epsilon", "step size", "num line search", 
+    if verbose: print(titlestr % ("iter", "epsilon", "step size", "num line search",
                       "gradient norm", "delta bound ite", "delta bound tot"))
-    
+
     natgrad = None
-    
+
     for i in range(max_offline_ite):
         #Candidate policy
         newpol.set_params(rho)
-        
+
         #Bound with gradient
         bound, grad = newpol.eval_bound_and_grad(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
@@ -160,11 +160,11 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
             return rho, improvement
         if np.isnan(bound):
             warnings.warn('Got NaN bound! Stopping!')
-            return rho, improvement     
+            return rho, improvement
 
-            
+
         #Natural gradient
-        if newpol.diagonal: 
+        if newpol.diagonal:
             natgrad = grad/(newpol.eval_fisher() + 1e-24)
         else:
             raise NotImplementedError
@@ -175,16 +175,16 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
             if verbose: print("stopping - gradient norm < gradient_tol")
             if verbose>1: print(rho)
             return rho, improvement
-        
+
         #Step size search
         alpha = 1. / grad_norm ** 2
         line_search = line_search_parabola if use_parabola else line_search_binary
-        rho, epsilon, delta_bound, num_line_search = line_search(pol, 
-                                                                 newpol, 
-                                                                 actor_params, 
-                                                                 rets, 
-                                                                 alpha, 
-                                                                 natgrad, 
+        rho, epsilon, delta_bound, num_line_search = line_search(pol,
+                                                                 newpol,
+                                                                 actor_params,
+                                                                 rets,
+                                                                 alpha,
+                                                                 natgrad,
                                                                  normalize=normalize,
                                                                  use_rmax=use_rmax,
                                                                  use_renyi=use_renyi,
@@ -198,24 +198,24 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
             if verbose: print("stopping - delta bound < bound_tol")
             if verbose>1: print(rho)
             return rho, improvement
-    
+
     return rho, improvement
 
 
 def learn(env_maker, pol_maker, sampler,
-          gamma, n_episodes, horizon, max_iters, 
-          feature_fun=None, 
-          iw_norm='sn', 
+          gamma, n_episodes, horizon, max_iters,
+          feature_fun=None,
+          iw_norm='sn',
           bound='max-ess',
-          max_offline_iters=100, 
+          max_offline_iters=100,
           max_search_ite=30,
-          verbose=True, 
+          verbose=True,
           save_weights=True,
           delta=0.2,
           center_return=False,
           line_search_type='parabola',
           adaptive_batch=False):
-    
+
     #Initialization
     env = env_maker()
     pol = pol_maker('pol', env.observation_space, env.action_space)
@@ -227,7 +227,7 @@ def learn(env_maker, pol_maker, sampler,
     episodes_so_far = 0
     timesteps_so_far = 0
     tstart = time.time()
-    
+
     if bound == 'std-d2':
         use_rmax = False
         use_renyi = True
@@ -240,18 +240,18 @@ def learn(env_maker, pol_maker, sampler,
     elif bound == 'std-ess':
         use_rmax = False
         use_renyi = False
-    else: 
+    else:
         raise NotImplementedError
-        
+
     if line_search_type == 'parabola':
         use_parabola = True
     elif line_search_type == 'binary':
         use_parabola = False
     else:
         raise NotImplementedError
-    
+
     promise = -np.inf
-    actor_params, rets, disc_rets, lens = [], [], [], []    
+    actor_params, rets, disc_rets, lens = [], [], [], []
     old_actor_params, old_rets, old_disc_rets, old_lens = [], [], [], []
 
     #Learning
@@ -260,9 +260,9 @@ def learn(env_maker, pol_maker, sampler,
         rho = pol.eval_params() #Higher-order-policy parameters
         if verbose>1:
             logger.log('Higher-order parameters: ', rho)
-        if save_weights: 
+        if save_weights:
             w_to_save = rho
-            
+
         #Add 100 trajectories to the batch
         with timed('Sampling', verbose):
             if sampler:
@@ -292,7 +292,7 @@ def learn(env_maker, pol_maker, sampler,
         perf = np.mean(norm_disc_rets)
         episodes_so_far+=n_episodes
         timesteps_so_far+=sum(lens[-n_episodes:])
-        
+
         with timed('summaries before'):
             logger.log("Performance (plain, undiscounted): ", np.mean(rets[-n_episodes:]))
             #Data regarding the episodes collected in this iteration
@@ -303,15 +303,15 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular("EpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
             logger.record_tabular("UndEpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
             logger.record_tabular("EpThisIter", n_episodes)
-            logger.record_tabular("EpisodesSoFar", episodes_so_far)
+            logger.record_tabular("NumTrajectories", episodes_so_far)
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("BatchSize", batch_size)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
-        
+
         if adaptive_batch and complete and perf<promise and batch_size<5*n_episodes:
             #The policy is rejected (unless batch size is already maximal)
             iter_type = 0
-            if verbose: logger.log('Rejecting policy (expected at least %f, got %f instead)!\nIncreasing batch_size' % 
+            if verbose: logger.log('Rejecting policy (expected at least %f, got %f instead)!\nIncreasing batch_size' %
                                    (promise, perf))
             batch_size+=n_episodes #Increase batch size
             newpol.set_params(old_rho) #Reset to last accepted policy
@@ -352,11 +352,11 @@ def learn(env_maker, pol_maker, sampler,
             iter_type = 2
             if verbose: logger.log('Must collect more data (have %d/%d)' % (len(rets), batch_size))
             newpol.set_params(rho) #Policy stays the same
-            
+
         #Save data
         if save_weights:
             logger.record_tabular('Weights', str(w_to_save))
-        
+
         with timed('summaries after'):
             unn_iws = newpol.eval_iws(actor_params, behavioral=pol, normalize=False)
             iws = unn_iws/np.sum(unn_iws)
@@ -365,7 +365,7 @@ def learn(env_maker, pol_maker, sampler,
             renyi = newpol.eval_renyi(pol)
             bound = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
                                                              normalize, use_rmax, use_renyi, delta)
-            
+
             #Data regarding the whole batch
             logger.record_tabular('BatchSize', batch_size)
             logger.record_tabular('IterType', iter_type)
@@ -401,9 +401,9 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('StdIW', np.std(unn_iws))
             logger.record_tabular('ESSClassic', ess)
             logger.record_tabular('ESSRenyi', batch_size/np.exp(renyi))
-                    
+
         logger.dump_tabular()
-        
+
         #Update behavioral
         pol.set_params(newpol.eval_params())
         if complete:
