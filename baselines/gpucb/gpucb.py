@@ -36,13 +36,13 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun, rescale_ep_return):
 
 def generate_grid(grid_size, grid_dimension, trainable_std,
                   mu_min=-2, mu_max=2, logstd_min=-4, logst_max=0):
-    mu1 = np.linspace(-1, 1, grid_size)
-    mu2 = np.linspace(-10, 10, grid_size)
+    # mu1 = np.linspace(-1, 1, grid_size)
+    # mu2 = np.linspace(-10, 10, grid_size)
     # mu3 = np.linspace(-10, 0, grid_size)
     # mu4 = np.linspace(-2, 2, grid_size)
-    gain_xyz = [mu1, mu2]
-    # gain_xyz = np.linspace(mu_min, mu_max, grid_size)
-    # gain_xyz = [gain_xyz for i in range(grid_dimension)]
+    # gain_xyz = [mu1, mu2]
+    gain_xyz = np.linspace(mu_min, mu_max, grid_size)
+    gain_xyz = [gain_xyz for i in range(grid_dimension)]
     if trainable_std:
         logstd_xyz = np.linspace(logstd_min, logst_max, grid_size)
         logstd_xyz = [logstd_xyz for i in range(grid_dimension)]
