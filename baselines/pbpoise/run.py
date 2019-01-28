@@ -65,7 +65,7 @@ def train(env, policy, horizon, seed, bounded_policy,
         # Define env maker
         def make_env():
             env_rllab = env_rllab_class()
-            _env = Rllab2GymWrapper(env_rllab)
+            _env = Rllab2GymWrapper(env_rllab, env_name)
             return _env
         # Used later
         env_type = 'rllab'

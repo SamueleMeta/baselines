@@ -551,35 +551,37 @@ def learn(env_name, make_env, seed, make_policy, *,
                 theta = pi.resample()
                 all_eps['actor_params'][iters_so_far, :] = theta
 
-            if env_name == 'LQG1D-v0':
-                mu1_actor = pi.eval_actor_mean([[1]])[0][0]
-                mu1_higher = pi.eval_higher_mean()[0]
-                sigma = pi.eval_higher_std()[0]
-                logger.record_tabular("LQGmu1_actor", mu1_actor)
-                logger.record_tabular("LQGmu1_higher", mu1_higher)
-                logger.record_tabular("LQGsigma_higher", sigma)
-            elif env_name == 'inverted_pendulum':  # TODO make env.spec.id
-                ac1 = pi.eval_actor_mean([[1, 1, 1, 1]])[0][0]
-                mu1_higher = pi.eval_higher_mean()
-                sigma = pi.eval_higher_std()
-                logger.record_tabular("ActionIn1", ac1)  # optimum ~-4.69
-                logger.record_tabular("InvPendulum_mu0_higher", mu1_higher[0])
-                logger.record_tabular("InvPendulum_mu1_higher", mu1_higher[1])
-                logger.record_tabular("InvPendulum_mu2_higher", mu1_higher[2])
-                logger.record_tabular("InvPendulum_mu3_higher", mu1_higher[3])
-                logger.record_tabular("InvPendulum_std0_higher", sigma[0])
-                logger.record_tabular("InvPendulum_std1_higher", sigma[1])
-                logger.record_tabular("InvPendulum_std2_higher", sigma[2])
-                logger.record_tabular("InvPendulum_std3_higher", sigma[3])
-            elif env_name == 'MountainCarContinuous-v0':
-                ac1 = pi.eval_actor_mean([[1, 1]])[0][0]
-                mu1_higher = pi.eval_higher_mean()
-                sigma = pi.eval_higher_std()
-                logger.record_tabular("ActionIn1", ac1)  # optimum ~2.458
-                logger.record_tabular("MountainCar_mu0_higher", mu1_higher[0])
-                logger.record_tabular("MountainCar_mu1_higher", mu1_higher[1])
-                logger.record_tabular("MountainCar_std0_higher", sigma[0])
-                logger.record_tabular("MountainCar_std1_higher", sigma[1])
+            if env.spec is not None:
+                if env.spec.id == 'LQG1D-v0':
+                    mu1_actor = pi.eval_actor_mean([[1]])[0][0]
+                    mu1_higher = pi.eval_higher_mean()[0]
+                    sigma = pi.eval_higher_std()[0]
+                    logger.record_tabular("LQGmu1_actor", mu1_actor)
+                    logger.record_tabular("LQGmu1_higher", mu1_higher)
+                    logger.record_tabular("LQGsigma_higher", sigma)
+                elif env.spec.id == 'MountainCarContinuous-v0':
+                    ac1 = pi.eval_actor_mean([[1, 1]])[0][0]
+                    mu1_higher = pi.eval_higher_mean()
+                    sigma = pi.eval_higher_std()
+                    logger.record_tabular("ActionIn1", ac1)
+                    logger.record_tabular("MountainCar_mu0_higher", mu1_higher[0])
+                    logger.record_tabular("MountainCar_mu1_higher", mu1_higher[1])
+                    logger.record_tabular("MountainCar_std0_higher", sigma[0])
+                    logger.record_tabular("MountainCar_std1_higher", sigma[1])
+            elif env.id is not None:
+                if env.id == 'inverted_pendulum':
+                    ac1 = pi.eval_actor_mean([[1, 1, 1, 1]])[0][0]
+                    mu1_higher = pi.eval_higher_mean()
+                    sigma = pi.eval_higher_std()
+                    logger.record_tabular("ActionIn1", ac1)
+                    logger.record_tabular("InvPendulum_mu0_higher", mu1_higher[0])
+                    logger.record_tabular("InvPendulum_mu1_higher", mu1_higher[1])
+                    logger.record_tabular("InvPendulum_mu2_higher", mu1_higher[2])
+                    logger.record_tabular("InvPendulum_mu3_higher", mu1_higher[3])
+                    logger.record_tabular("InvPendulum_std0_higher", sigma[0])
+                    logger.record_tabular("InvPendulum_std1_higher", sigma[1])
+                    logger.record_tabular("InvPendulum_std2_higher", sigma[2])
+                    logger.record_tabular("InvPendulum_std3_higher", sigma[3])
             if find_optimal_arm:
                 ret_mean = compute_return_mean(*args)
                 logger.record_tabular('ReturnMean', ret_mean)

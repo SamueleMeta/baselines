@@ -4,11 +4,6 @@ import numpy as np
 from baselines import logger
 import baselines.common.tf_util as U
 
-"""
-Created on Wed Apr  4 18:13:18 2018
-
-@author: matteo
-"""
 """References
     PGPE: Sehnke, Frank, et al. "Policy gradients with parameter-based exploration for
         control." International Conference on Artificial Neural Networks. Springer,
@@ -100,15 +95,30 @@ def learn(make_env, seed, make_policy, *,
         logger.record_tabular('Iteration', it+1)
         logger.record_tabular('NumTrajectories', n_trajectories)
 
-        if env.spec.id == 'MountainCarContinuous-v0':
-            ac1 = pol.eval_actor_mean([[1, 1]])[0][0]
-            mu1_higher = pol.eval_higher_mean()
-            sigma = pol.eval_higher_std()
-            logger.record_tabular("ActionIn1", ac1)  # optimum ~2.458
-            logger.record_tabular("MountainCar_mu0_higher", mu1_higher[0])
-            logger.record_tabular("MountainCar_mu1_higher", mu1_higher[1])
-            logger.record_tabular("MountainCar_std0_higher", sigma[0])
-            logger.record_tabular("MountainCar_std1_higher", sigma[1])
+        if env.spec is not None:
+            if env.spec.id == 'MountainCarContinuous-v0':
+                ac1 = pol.eval_actor_mean([[1, 1]])[0][0]
+                mu1_higher = pol.eval_higher_mean()
+                sigma = pol.eval_higher_std()
+                logger.record_tabular("ActionIn1", ac1)
+                logger.record_tabular("MountainCar_mu0_higher", mu1_higher[0])
+                logger.record_tabular("MountainCar_mu1_higher", mu1_higher[1])
+                logger.record_tabular("MountainCar_std0_higher", sigma[0])
+                logger.record_tabular("MountainCar_std1_higher", sigma[1])
+        elif env.id is not None:
+            if env.id == 'inverted_pendulum':
+                ac1 = pol.eval_actor_mean([[1, 1, 1, 1]])[0][0]
+                mu1_higher = pol.eval_higher_mean()
+                sigma = pol.eval_higher_std()
+                logger.record_tabular("ActionIn1", ac1)
+                logger.record_tabular("InvPendulum_mu0_higher", mu1_higher[0])
+                logger.record_tabular("InvPendulum_mu1_higher", mu1_higher[1])
+                logger.record_tabular("InvPendulum_mu2_higher", mu1_higher[2])
+                logger.record_tabular("InvPendulum_mu3_higher", mu1_higher[3])
+                logger.record_tabular("InvPendulum_std0_higher", sigma[0])
+                logger.record_tabular("InvPendulum_std1_higher", sigma[1])
+                logger.record_tabular("InvPendulum_std2_higher", sigma[2])
+                logger.record_tabular("InvPendulum_std3_higher", sigma[3])
 
         # Update higher-order policy
         grad = pol.eval_gradient(actor_params, disc_rets,
