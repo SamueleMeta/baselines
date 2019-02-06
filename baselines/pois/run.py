@@ -39,7 +39,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
+def train(env, policy, n_episodes, horizon, seed, njobs=1, save_weights=False, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -103,7 +103,7 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
     gym.logger.setLevel(logging.WARN)
 
     pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
-                sampler=sampler, **alg_args)
+                sampler=sampler, save_weights=save_weights, **alg_args)
 
     sampler.close()
 
@@ -130,6 +130,7 @@ def main():
     parser.add_argument('--clipping', type=bool, default=False)
     parser.add_argument('--entropy', type=str, default='none')
     parser.add_argument('--reward_clustering', type=str, default='none')
+    parser.add_argument('--save_weights', action='store_true', default=False, help='Save policy weights.')
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
@@ -142,6 +143,7 @@ def main():
           horizon=args.horizon,
           seed=args.seed,
           njobs=args.njobs,
+          save_weights=args.save_weights,
           max_iters=args.max_iters,
           iw_method=args.iw_method,
           iw_norm=args.iw_norm,
@@ -153,7 +155,7 @@ def main():
           center_return=args.center,
           clipping=args.clipping,
           entropy=args.entropy,
-          reward_clustering=args.reward_clustering)
+          reward_clustering=args.reward_clustering,)
 
 if __name__ == '__main__':
     main()

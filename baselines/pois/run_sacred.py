@@ -56,6 +56,7 @@ def custom_config():
     bound = 'max-d2'
     delta = 0.99
     njobs = -1
+    save_weights = False
     policy = 'nn'
     max_offline_iters = 10
     gamma = 1.0
@@ -96,7 +97,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
+def train(env, policy, n_episodes, horizon, seed, njobs=1, save_weights=False, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -160,7 +161,7 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, **alg_args):
     gym.logger.setLevel(logging.WARN)
 
     pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
-                sampler=sampler, **alg_args)
+                sampler=sampler, save_weights=save_weights, **alg_args)
 
     sampler.close()
 
@@ -177,6 +178,7 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural,
           horizon=horizon,
           seed=seed,
           njobs=njobs,
+          save_weights=save_weights,
           max_iters=max_iters,
           iw_method=iw_method,
           iw_norm=iw_norm,
