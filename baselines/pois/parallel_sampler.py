@@ -104,6 +104,7 @@ class Worker(Process):
         sess.__enter__()
 
         env = self.make_env()
+        print("Rendering:", env.metadata.get('render.modes', []))
         vd = VideoRecorder(env)
         workerseed = self.seed + 10000 * MPI.COMM_WORLD.Get_rank()
         set_all_seeds(workerseed)

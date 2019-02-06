@@ -100,7 +100,7 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, save_weights=False, *
 
     set_global_seeds(seed)
 
-    gym.logger.setLevel(logging.WARN)
+    gym.logger.setLevel(logging.DEBUG)
 
     pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
                 sampler=sampler, save_weights=save_weights, **alg_args)
