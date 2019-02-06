@@ -69,6 +69,7 @@ class Rllab2GymWrapper(gym.Env):
         self.metadata = {
             'render': {'modes': ['rgb_array']}
         }
+        print(rllab_env.metadata)
         self.seed()
         self.reset()
 
