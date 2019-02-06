@@ -40,7 +40,7 @@ def rllab_env_from_name(env):
         return AcrobotEnv
     elif env == 'inverted-double-pendulum':
         from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
-        return InvertedPendulumEnv
+        return InvertedDoublePendulumEnv
     else:
         raise Exception('Unrecognized rllab environment:', env)
 
