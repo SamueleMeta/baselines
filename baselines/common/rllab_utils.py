@@ -42,7 +42,7 @@ def rllab_env_from_name(env):
         from rllab.envs.mujoco.inverted_double_pendulum_env import InvertedDoublePendulumEnv
         return InvertedPendulumEnv
     else:
-        raise Exception('Unrecognized rllab environment.')
+        raise Exception('Unrecognized rllab environment:', env)
 
 def convert_rllab_space(space):
 
