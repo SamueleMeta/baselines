@@ -108,6 +108,8 @@ class Worker(Process):
         set_all_seeds(workerseed)
         env.seed(workerseed)
         vd = VideoRecorder(env)
+        print(vd.ansi_mode)
+        print(vd.last_frame)
 
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
         print('Worker %s - Running with seed %s' % (os.getpid(), workerseed))
