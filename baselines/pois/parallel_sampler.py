@@ -107,8 +107,6 @@ class Worker(Process):
         workerseed = self.seed + 10000 * MPI.COMM_WORLD.Get_rank()
         set_all_seeds(workerseed)
         env.seed(workerseed)
-        vd = VideoRecorder(env)
-        print(vd.path)
 
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
         print('Worker %s - Running with seed %s' % (os.getpid(), workerseed))
@@ -122,7 +120,6 @@ class Worker(Process):
                 pi.set_parameter(weights)
                 samples = self.traj_segment_generator(pi, env)
                 self.output.put((os.getpid(), samples))
-                vd.close()
             elif command == 'exit':
                 print('Worker %s - Exiting...' % os.getpid())
                 env.close()
