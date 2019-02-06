@@ -108,6 +108,7 @@ class Worker(Process):
         set_all_seeds(workerseed)
         env.seed(workerseed)
         vd = VideoRecorder(env)
+        print(env.metadata.get('render.modes', []))
         print(vd.ansi_mode)
         print(vd.last_frame)
 

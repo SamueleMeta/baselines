@@ -66,7 +66,9 @@ class Rllab2GymWrapper(gym.Env):
         self.rllab_env = normalize(rllab_env)
         self.observation_space = convert_rllab_space(rllab_env.observation_space)
         self.action_space = convert_rllab_space(rllab_env.action_space)
-        self.render = {'modes' : ['rgb_array', 'human']}
+        self.metadata = {
+            'render': {'modes': ['rgb_array']}
+        }
         self.seed()
         self.reset()
 
