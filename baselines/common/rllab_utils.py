@@ -78,4 +78,4 @@ class Rllab2GymWrapper(gym.Env):
         return new_state
 
     def seed(self, seed=0):
-        pass
+        self.seed(seed)
