@@ -19,8 +19,8 @@ class MlpPolicy(object):
             self._prepare_getsetters()
 
     def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, use_bias=True, use_critic=True,
-              seed=None, hidden_W_init=U.normc_initializer(0.0), hidden_b_init=tf.zeros_initializer(),
-                 output_W_init=U.normc_initializer(0.0), output_b_init=tf.zeros_initializer()):
+              seed=None, hidden_W_init=U.normc_initializer(1.0), hidden_b_init=tf.zeros_initializer(),
+                 output_W_init=U.normc_initializer(0.01), output_b_init=tf.zeros_initializer()):
         """Params:
             ob_space: task observation space
             ac_space : task action space
