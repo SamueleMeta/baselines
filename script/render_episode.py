@@ -45,7 +45,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def play_episode(env, policy, gamma):
+def play_episode(env, pi, gamma):
 
     ob = env.reset()
     done = False
