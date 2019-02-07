@@ -65,7 +65,7 @@ def play_episode(env, pi, gamma):
     print("Total timesteps:", timesteps)
     print("Total reward:", reward)
 
-def create_policy_and_env(args):
+def create_policy_and_env(env, seed, policy, policy_file):
     # Session
     sess = U.single_threaded_session()
     sess.__enter__()
@@ -149,6 +149,7 @@ def main():
 
     env, pi = create_policy_and_env(args)
     play_episode(env, pi, args.gamma)
+
 
 if __name__ == '__main__':
     main()
