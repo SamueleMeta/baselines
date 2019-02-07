@@ -273,10 +273,9 @@ def learn(env_name, make_env, seed, make_policy, *,
     ep_return = disc_ret_
     return_mean = tf.reduce_sum(ep_return) / n_
     return_last = ep_return[n_int - 1]
-    return_max = tf.reduce_max(ep_return)
-    return_min = tf.reduce_min(ep_return)
-    return_abs_max = tf.reduce_max(tf.abs(ep_return))
-    return_step_max = tf.reduce_max(tf.abs(ret_))
+    return_max = tf.reduce_max(ep_return[:n_int])
+    return_min = tf.reduce_min(ep_return[:n_int])
+    return_abs_max = tf.reduce_max(tf.abs(ep_return[:n_int]))
     regret = n_ * 5 - tf.reduce_sum(ep_return)
     regret_over_t = 5 - return_mean
 
@@ -285,7 +284,6 @@ def learn(env_name, make_env, seed, make_policy, *,
                              (return_min, 'ReturnMin'),
                              (return_last, 'ReturnLastEpisode'),
                              (return_abs_max, 'ReturnAbsMax'),
-                             (return_step_max, 'ReturnStepMax'),
                              (regret, 'Regret'),
                              (regret_over_t, 'Regret/t')])
 
