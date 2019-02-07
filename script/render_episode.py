@@ -142,7 +142,7 @@ def main():
     weights = pkl.load(open(args.policy_file, 'rb'))
     pi.set_param(weights)
 
-    play_episode(env, pi)
+    play_episode(env, pi, args.gamma)
 
 
 if __name__ == '__main__':
