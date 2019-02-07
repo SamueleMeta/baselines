@@ -55,6 +55,7 @@ def play_episode(env, pi, gamma):
     renders = []
     while not done:
         ac, vpred = pi.act(True, ob)
+        print("ACTION:", ac)
         ob, r, done, _ = env.step(ac)
         reward = r * disc
         disc *= gamma
