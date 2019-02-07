@@ -59,22 +59,13 @@ def play_episode(env, pi, gamma):
         disc *= gamma
         timesteps += 1
         print(ob)
-        r = env.render(mode='rgb_array')
+        r = env.render(mode='rgb_array', close=False)
         print(r)
     print("Finished episode.")
     print("Total timesteps:", timesteps)
     print("Total reward:", reward)
 
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--env', type=str, default='cartpole')
-    parser.add_argument('--policy', type=str, default='nn')
-    parser.add_argument('--policy_file', type=str, default=None)
-    parser.add_argument('--gamma', type=float, default=1.0)
-    args = parser.parse_args()
-
+def create_policy_and_env(args):
     # Session
     sess = U.single_threaded_session()
     sess.__enter__()
@@ -144,8 +135,20 @@ def main():
     weights = pkl.load(open(args.policy_file, 'rb'))
     pi.set_param(weights)
 
-    play_episode(env, pi, args.gamma)
+    return env, pi
 
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+    parser.add_argument('--env', type=str, default='cartpole')
+    parser.add_argument('--policy', type=str, default='nn')
+    parser.add_argument('--policy_file', type=str, default=None)
+    parser.add_argument('--gamma', type=float, default=1.0)
+    args = parser.parse_args()
+
+    env, pi = create_policy_and_env(args)
+    play_episode(env, pi, args.gamma)
 
 if __name__ == '__main__':
     main()
