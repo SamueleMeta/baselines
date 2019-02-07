@@ -79,3 +79,6 @@ class Rllab2GymWrapper(gym.Env):
 
     def seed(self, seed=0):
         pass
+
+    def render(self, mode='human')
+        return self.rllab_env.render()
