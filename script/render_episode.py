@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# noinspection PyUnresolvedReferences
 '''
     This file is intended to be used to render an episode for a given policy
     and a given environment.
@@ -7,16 +9,10 @@
     - Understand rendering in remote server
 
 '''
-
-#!/usr/bin/env python3
-# noinspection PyUnresolvedReferences
-'''
-    This script runs rllab or gym environments. To run RLLAB, use the format
-    rllab.<env_name> as env name, otherwise gym will be used.
-'''
 # Common imports
 import sys, re, os, time, logging
 from collections import defaultdict
+import pickle as pkl
 
 # Framework imports
 import gym
