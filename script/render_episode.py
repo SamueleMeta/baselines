@@ -70,7 +70,6 @@ def create_policy_and_env(env, seed, policy, policy_file):
     sess = U.single_threaded_session()
     sess.__enter__()
 
-    env = args.env
     # Create the environment
     if env.startswith('rllab.'):
         # Get env name and class
@@ -99,12 +98,11 @@ def create_policy_and_env(env, seed, policy, policy_file):
                 env_rllab = gym.make(env)
                 return env_rllab
     env = make_env()
-    env.seed(args.seed)
+    env.seed(seed)
     ob_space = env.observation_space
     ac_space = env.action_space
 
     # Make policy
-    policy = args.policy
     if policy == 'linear':
         hid_size = num_hid_layers = 0
     elif policy == 'nn':
@@ -132,7 +130,7 @@ def create_policy_and_env(env, seed, policy, policy_file):
     var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
     set_parameter = U.SetFromFlat(var_list)
 
-    weights = pkl.load(open(args.policy_file, 'rb'))
+    weights = pkl.load(open(policy_file, 'rb'))
     pi.set_param(weights)
 
     return env, pi
@@ -147,7 +145,7 @@ def main():
     parser.add_argument('--gamma', type=float, default=1.0)
     args = parser.parse_args()
 
-    env, pi = create_policy_and_env(args)
+    env, pi = create_policy_and_env(args.env, args.seed, args.policy, args.policy_file)
     play_episode(env, pi, args.gamma)
 
 
