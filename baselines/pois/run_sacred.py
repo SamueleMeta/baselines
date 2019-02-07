@@ -58,6 +58,7 @@ def custom_config():
     njobs = -1
     save_weights = False
     policy = 'nn'
+    policy_init = 'xavier'
     max_offline_iters = 10
     gamma = 1.0
     center = False
