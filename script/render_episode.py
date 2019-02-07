@@ -45,25 +45,23 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=False, **alg_args):
+def play_episode(env, policy, gamma):
 
-
-
-    try:
-        affinity = len(os.sched_getaffinity(0))
-    except:
-        affinity = njobs
-    sess = U.make_session(affinity)
-    sess.__enter__()
-
-    set_global_seeds(seed)
-
-    gym.logger.setLevel(logging.DEBUG)
-
-    pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
-                sampler=sampler, save_weights=save_weights, **alg_args)
-
-    sampler.close()
+    ob = env.reset()
+    done = False
+    reward = 0
+    disc = 1.0
+    timesteps = 0
+    while not done:
+        ac, vpred = pi.act(True, ob)
+        ob, r, done, _ = env.step(ac)
+        reward = r * disc
+        disc *= gamma
+        timesteps += 1
+        print(ob)
+    print("Finished episode.")
+    print("Total timesteps:", timesteps)
+    print("Total reward:", reward)
 
 def main():
     import argparse
@@ -144,7 +142,7 @@ def main():
     weights = pkl.load(open(args.policy_file, 'rb'))
     pi.set_param(weights)
 
-    print("Env and policy initialized.")
+    play_episode(env, pi)
 
 
 if __name__ == '__main__':
