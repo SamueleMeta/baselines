@@ -47,7 +47,7 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun, rescale_ep_return):
 
 
 def generate_grid(grid_size, grid_dimension, trainable_std,
-                  mu_min=0, mu_max=4, logstd_min=-4, logst_max=0):
+                  mu_min=-0.2, mu_max=0.2, logstd_min=-4, logst_max=0):
     # mu1 = np.linspace(-1, 1, grid_size)
     # mu2 = np.linspace(0, 20, grid_size)
     # mu3 = np.linspace(-10, 0, grid_size)
@@ -111,10 +111,11 @@ def best_of_grid(policy, grid_size_1d, mu_min, mu_max, grid_dimension,
     bound_best = 0
     renyi_bound_best = 0
     # print('rho_grid', rho_grid)
+    if new_grid and delta_t == 'continuous':
+        print(colorize('computing renyi bound from scratch', color='magenta'))
     for i, rho in enumerate(rho_grid):
         set_parameters(rho)
         if new_grid and delta_t == 'continuous':
-            print('************Renyi Bound From Scratch******************')
             for old_rho in old_rhos_list:
                 set_parameters_old(old_rho)
                 renyi_component = evaluate_renyi()
@@ -361,7 +362,7 @@ def learn(env_name, make_env, seed, make_policy, *,
     set_parameters = U.SetFromFlat(var_list)
     get_parameters = U.GetFlat(var_list)
     set_parameters_old = U.SetFromFlat(var_list_old)
-    set_higher_logstd = U.SetFromFlat(higher_logstd_list)
+    # set_higher_logstd = U.SetFromFlat(higher_logstd_list)
     # set_higher_logstd(np.log([0.15, 0.2]))
 
     compute_behav = U.function(

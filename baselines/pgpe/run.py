@@ -98,7 +98,7 @@ def train(env, policy, horizon, seed,
     if std_init is not None:
         higher_logstd_init = tf.constant_initializer(np.log(std_init))
     else:
-        higher_logstd_init = tf.constant_initializer(np.log(0.15))
+        higher_logstd_init = tf.constant_initializer(np.log(1e-2))
         # higher_logstd_init = tf.constant(np.log([0.15, 1.5]).astype(np.float32))
         # const_std_init = True
 
