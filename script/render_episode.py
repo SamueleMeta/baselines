@@ -148,6 +148,5 @@ def main():
     env, pi = create_policy_and_env(args.env, args.seed, args.policy, args.policy_file)
     play_episode(env, pi, args.gamma)
 
-
 if __name__ == '__main__':
     main()
