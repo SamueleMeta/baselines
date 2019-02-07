@@ -59,7 +59,8 @@ def play_episode(env, pi, gamma):
         disc *= gamma
         timesteps += 1
         print(ob)
-        env.render()
+        r = env.render(mode='rgb_array')
+        print(r)
     print("Finished episode.")
     print("Total timesteps:", timesteps)
     print("Total reward:", reward)
