@@ -97,7 +97,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, policy, n_episodes, horizon, seed, njobs=1, save_weights=False, **alg_args):
+def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=False, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -132,18 +132,25 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, save_weights=False, *
         hid_size = [100, 50, 25]
         num_hid_layers = 3
 
+    if policy_init == 'xavier':
+        policy_initializer = tf.contrib.layers.xavier_initializer()
+    elif policy_init == 'zeros':
+        policy_initializer = U.normc_initializer(0.0)
+    else:
+        raise Exception('Unrecognized policy initializer.')
+
     if policy == 'linear' or policy == 'nn':
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                              hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                             hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                             output_W_init=tf.contrib.layers.xavier_initializer())
+                             hidden_W_init=policy_initializer,
+                             output_W_init=policy_initializer)
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
             return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                          gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                         output_W_init=tf.contrib.layers.xavier_initializer())
+                         hidden_W_init=policy_initializer,
+                         output_W_init=policy_initializer)
     else:
         raise Exception('Unrecognized policy type.')
 
@@ -167,13 +174,14 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, save_weights=False, *
 
 @ex.automain
 def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural,
-            file_name, logdir, bound, delta, njobs, policy, max_offline_iters,
-            gamma, center, clipping, entropy, max_iters, positive_return,
-            reward_clustering, _run):
+            file_name, logdir, bound, delta, njobs, save_weights, policy,
+            policy_init, max_offline_iters, gamma, center, clipping, entropy,
+            max_iters, positive_return, reward_clustering, _run):
 
     logger.configure(dir=logdir, format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
     train(env=env,
           policy=policy,
+          policy_init=policy_init,
           n_episodes=num_episodes,
           horizon=horizon,
           seed=seed,

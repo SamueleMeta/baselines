@@ -39,7 +39,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, policy, n_episodes, horizon, seed, njobs=1, save_weights=False, **alg_args):
+def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=False, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -74,18 +74,25 @@ def train(env, policy, n_episodes, horizon, seed, njobs=1, save_weights=False, *
         hid_size = [100, 50, 25]
         num_hid_layers = 3
 
+    if policy_init == 'xavier':
+        policy_initializer = tf.contrib.layers.xavier_initializer()
+    elif policy_init == 'zeros':
+        policy_initializer = U.normc_initializer(0.0)
+    else:
+        raise Exception('Unrecognized policy initializer.')
+
     if policy == 'linear' or policy == 'nn':
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                              hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                             hidden_W_init=U.normc_initializer(0.0),
-                             output_W_init=U.normc_initializer(0.0))
+                             hidden_W_init=policy_initializer,
+                             output_W_init=policy_initializer)
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
             return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                          gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                         output_W_init=tf.contrib.layers.xavier_initializer())
+                         hidden_W_init=policy_initializer,
+                         output_W_init=policy_initializer)
     else:
         raise Exception('Unrecognized policy type.')
 
@@ -123,6 +130,7 @@ def main():
     parser.add_argument('--delta', type=float, default=0.99)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='nn')
+    parser.add_argument('--policy_init', type=str, default='xavier')
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
@@ -139,6 +147,7 @@ def main():
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     train(env=args.env,
           policy=args.policy,
+          policy_init=args.policy_init,
           n_episodes=args.num_episodes,
           horizon=args.horizon,
           seed=args.seed,
