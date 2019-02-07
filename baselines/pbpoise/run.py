@@ -248,8 +248,8 @@ def main(args):
     parser.add_argument('--multiple_init', type=int, default=None)
     parser.add_argument('--plot_bound', type=int, default=None)  # 1-2-->1D-2D
     parser.add_argument('--grid_size_1d', type=int, default=0)
-    parser.add_argument('--mu_min', type=int, default=-1)
-    parser.add_argument('--mu_max', type=int, default=1)
+    parser.add_argument('--mu_min', type=float, default=-1)
+    parser.add_argument('--mu_max', type=float, default=1)
     parser.add_argument('--delta_t', type=str, default=None)
     parser.add_argument('--k', type=int, default=2)  # must be>=2
     add_bool_arg(parser, 'bounded_policy', default=True)
