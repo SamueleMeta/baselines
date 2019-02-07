@@ -52,18 +52,20 @@ def play_episode(env, pi, gamma):
     reward = 0
     disc = 1.0
     timesteps = 0
+    renders = []
     while not done:
         ac, vpred = pi.act(True, ob)
         ob, r, done, _ = env.step(ac)
         reward = r * disc
         disc *= gamma
         timesteps += 1
-        print(ob)
-        r = env.render(mode='rgb_array', close=False)
-        print(r)
+        rend = env.render(mode='rgb_array', close=False)
+        renders.append(rend)
     print("Finished episode.")
     print("Total timesteps:", timesteps)
     print("Total reward:", reward)
+
+    pkl.dump(renders, open('renders.pkl', 'wb'))
 
 def create_policy_and_env(env, seed, policy, policy_file):
     # Session
