@@ -137,6 +137,7 @@ def main():
     parser.add_argument('--clipping', type=bool, default=False)
     parser.add_argument('--entropy', type=str, default='none')
     parser.add_argument('--reward_clustering', type=str, default='none')
+    parser.add_argument('--experiment_name', type=str, default='none')
     parser.add_argument('--save_weights', action='store_true', default=False, help='Save policy weights.')
     args = parser.parse_args()
     if args.file_name == 'progress':

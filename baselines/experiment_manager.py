@@ -51,6 +51,7 @@ if args.command == 'launch':
     cmd_base = ''
     # Set env variables
     cmd_base += 'export CUDA_VISIBLE_DEVICES=' + args.cuda_devices + ' && '
+    cmd_base += 'export EXPERIMENT_NAME=' + args.name + ' && '
     if args.sacred_dir and args.sacred:
         cmd_base += 'export SACRED_RUNS_DIRECTORY=' + args.sacred_dir + ' && '
     if args.sacred_slack and args.sacred:
@@ -77,6 +78,11 @@ if args.command == 'launch':
             _c += '-e '
         if args.sacred and len(param_cols) > 0:
             _c += 'with '
+        # Add experiment_name to params
+        if args.sacred:
+            _c += 'experiment_name=' + args.name + ' '
+        else:
+            _c += '--experiment_name=' + args.name + ' '
         # Params
         for p in param_cols:
             if args.sacred:
@@ -93,9 +99,13 @@ elif args.command == 'view':
     assert args.name is not None, "Provide an experiment name."
     rule = re.compile(args.name + '_*')
     # Get all screens
+    all_active_screens = 0
     for s in list_screens():
         if rule.match(s.name):
-            print("Screen live:", s.name)
+            all_active_screens += 1
+    print("Active screens:", all_active_screens)
+    # TODO: add parsing from runs to get active runs in the experiments and
+    # their completion
 
 elif args.command == 'stop':
     assert args.name is not None, "Provide an experiment name."

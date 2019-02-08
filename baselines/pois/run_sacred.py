@@ -31,8 +31,12 @@ from baselines.pois.parallel_sampler import ParallelSampler
 from sacred import Experiment
 from sacred.observers import FileStorageObserver, SlackObserver
 
-# Create experiment
-ex = Experiment('POIS')
+# Create experiment, assign the name if provided in env variables
+if os.environ.get('EXPERIMENT_NAME') is not None:
+    ex = Experiment(os.environ.get('EXPERIMENT_NAME'))
+else:
+    ex = Experiment('POIS')
+
 # Set a File Observer
 if os.environ.get('SACRED_RUNS_DIRECTORY') is not None:
     print("Sacred logging at:", os.environ.get('SACRED_RUNS_DIRECTORY'))
@@ -66,6 +70,7 @@ def custom_config():
     entropy = 'none'
     reward_clustering = 'none'
     positive_return = False
+    experiment_name = None
     # ENTROPY can be of 4 schemes:
     #    - 'none': no entropy bonus
     #    - 'step:<height>:<duration>': step function which is <height> tall for <duration> iterations
