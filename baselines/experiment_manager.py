@@ -90,7 +90,12 @@ if args.command == 'launch':
     scr.run(cmds, name=args.name)
 
 elif args.command == 'view':
-    raise Exception('TBD')
+    assert args.name is not None, "Provide an experiment name."
+    rule = re.compile(args.name + '_*')
+    # Get all screens
+    for s in list_screens():
+        if rule.match(s.name):
+            print("Screen live:", s.name)
 
 elif args.command == 'stop':
     assert args.name is not None, "Provide an experiment name."
