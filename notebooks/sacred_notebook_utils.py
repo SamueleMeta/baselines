@@ -54,7 +54,9 @@ def filter_runs(query, runs, avoid_missing=True):
             # Dot notation at any level
             obj = recursive_json_selector(obj, key)
             # Check if it matches value
-            if obj is None and not avoid_missing:
+            if obj is None and value is None:
+                _keys.append(run_key)
+            elif obj is None and not avoid_missing:
                 _keys.append(run_key)
             elif obj is not None and obj == value:
                 _keys.append(run_key)
