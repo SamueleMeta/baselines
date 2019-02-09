@@ -107,13 +107,12 @@ elif args.command == 'view':
     for s in list_screens():
         if rule.match(s.name):
             all_active_screens += 1
-    print(colorize("==========================================", color='red'))
-    print(colorize("Active screens: {0}".format(all_active_screens), color='red'))
     # Load runs to get active ones
     runs = load_runs(args.dir)
     running_runs = filter_runs({'run.status': 'RUNNING'}, runs)
-    print(colorize("Active runs: {0}".format(len(running_runs.keys())), color='red'))
     print(colorize("==========================================", color='red'))
+    print(colorize("Active screens: {0}".format(all_active_screens), color='red'))
+    print(colorize("Active runs: {0}".format(len(running_runs.keys())), color='red'))
     max_eta, max_duration = None, None
     for key in running_runs.keys():
         run = running_runs[key]
@@ -130,6 +129,8 @@ elif args.command == 'view':
     t = max_eta.total_seconds()
     d = max_duration.total_seconds()
     print(colorize("==========================================", color='red'))
+    print(colorize("Active screens: {0}".format(all_active_screens), color='red'))
+    print(colorize("Active runs: {0}".format(len(running_runs.keys())), color='red'))
     print(colorize("Elapsed time: {0} hours, {1} minutes, {2} seconds".format(int(d // 3600), int((d%3600)//60), int(d%3600)%60), color='red'))
     print(colorize("ETA: {0} hours, {1} minutes, {2} seconds".format(int(t // 3600), int((t%3600)//60), int(t%3600)%60), color='red'))
     print(colorize("==========================================", color='red'))
