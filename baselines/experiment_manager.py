@@ -10,6 +10,7 @@ import pandas as pd
 import argparse, os, sys, re
 from multiprocessing import Pool
 from screenutils import Screen, list_screens
+from baselines.common.sacred_utils import load_runs
 
 class Screener(object):
 
@@ -97,6 +98,7 @@ if args.command == 'launch':
 
 elif args.command == 'view':
     assert args.name is not None, "Provide an experiment name."
+    assert args.dir is not None, "Provide a directory for experiment."
     rule = re.compile(args.name + '_*')
     # Get all screens
     all_active_screens = 0
@@ -104,8 +106,10 @@ elif args.command == 'view':
         if rule.match(s.name):
             all_active_screens += 1
     print("Active screens:", all_active_screens)
-    # TODO: add parsing from runs to get active runs in the experiments and
-    # their completion
+    # Load runs to get active ones
+    runs = load_runs(args.dir)
+    print("Loaded runs", len(runs.keys()))
+
 
 elif args.command == 'stop':
     assert args.name is not None, "Provide an experiment name."
