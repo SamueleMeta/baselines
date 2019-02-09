@@ -110,7 +110,7 @@ elif args.command == 'view':
     runs = load_runs(args.dir)
     print("Loaded runs", len(runs.keys()))
     status = []
-    for key in runs.keys()
+    for key in runs.keys():
         status.append(runs[key]['run']['status'])
     print(set(status))
 
