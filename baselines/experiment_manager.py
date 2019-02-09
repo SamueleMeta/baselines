@@ -128,7 +128,7 @@ elif args.command == 'view':
         etas.append(eta)
     worst_eta = max(etas)
     print(colorize("==========================================", color='red'))
-    print(colorize("ETA: {0} hours, {1} minutes, {2} seconds".format(worst_eta.hourse, worst_eta.minutes, worst_eta.seconds)), color='red'))
+    print(colorize("ETA: {0} hours, {1} minutes, {2} seconds".format(worst_eta.hourse, worst_eta.minutes, worst_eta.seconds), color='red'))
     print(colorize("==========================================", color='red'))
 
 elif args.command == 'stop':
