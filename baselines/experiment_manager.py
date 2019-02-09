@@ -10,7 +10,7 @@ import pandas as pd
 import argparse, os, sys, re
 from multiprocessing import Pool
 from screenutils import Screen, list_screens
-from baselines.common.sacred_utils import load_runs
+from baselines.common.sacred_utils import load_runs, filter_runs
 
 class Screener(object):
 
