@@ -108,11 +108,8 @@ elif args.command == 'view':
     print("Active screens:", all_active_screens)
     # Load runs to get active ones
     runs = load_runs(args.dir)
-    print("Loaded runs", len(runs.keys()))
-    status = []
-    for key in runs.keys():
-        status.append(runs[key]['run']['status'])
-    print(set(status))
+    running_runs = filter_runs({'run.status': 'RUNNING'}, runs)
+    print("Active runs:", len(running_runs.keys()))
 
 elif args.command == 'stop':
     assert args.name is not None, "Provide an experiment name."
