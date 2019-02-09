@@ -114,9 +114,9 @@ elif args.command == 'view':
     print("==========================================")
     for key in running_runs.keys():
         run = running_runs[key]
-        print("Run: {key}".format(**locals()))
-        print("\tSteps: {len(run['metrics']['EpRewMean']['steps'])}/{run['config']['max_iters']}".format(**locals()))
-        print("\tReward: {run['metrics']['EpRewMean']['values'][-1]}".format(**locals()))
+        print("Run: {0}".format(key))
+        print("\tSteps: {0}/{1}".format(len(run['metrics']['EpRewMean']['steps']), run['config']['max_iters']))
+        print("\tReward: {0}".format(run['metrics']['EpRewMean']['values'][-1]))
 
 elif args.command == 'stop':
     assert args.name is not None, "Provide an experiment name."
