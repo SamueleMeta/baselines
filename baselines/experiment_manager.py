@@ -119,7 +119,7 @@ elif args.command == 'view':
         print("Run: {0} ({1})".format(key, run['config']['env']))
         print("\tSteps: {0}/{1}\t\tReward: {2}".format(len(run['metrics']['EpRewMean']['steps']), run['config']['max_iters'], run['metrics']['EpRewMean']['values'][-1]))
         completion = len(run['metrics']['EpRewMean']['steps']) / run['config']['max_iters']
-        start_time = datetime.strptime('%Y-%m-%dT%H:%M:%S.%f', run['run']['start_time'])
+        start_time = datetime.strptime(run['run']['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
         duration = datetime.now() - start_time
         print(duration, completion)
 
