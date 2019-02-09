@@ -114,7 +114,7 @@ elif args.command == 'view':
     running_runs = filter_runs({'run.status': 'RUNNING'}, runs)
     print(colorize("Active runs: {0}".format(len(running_runs.keys())), color='red'))
     print(colorize("==========================================", color='red'))
-    max_eta, max_duration = 0, 0
+    max_eta, max_duration = None, None
     for key in running_runs.keys():
         run = running_runs[key]
         print(colorize('Run:', color='blue'), "{0} ({1})".format(key, run['config']['env']))
@@ -125,8 +125,8 @@ elif args.command == 'view':
         start_time = datetime.strptime(run['run']['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
         duration = datetime.now() - start_time
         eta = duration * (1 - completion) / completion
-        max_eta = max(eta, max_eta)
-        max_duration = max(duration, max_duration)
+        max_eta = max(eta, max_eta) if max_eta is not None else eta
+        max_duration = max(duration, max_duration) if max_duration is not None else duration
     t = max_eta.total_seconds()
     d = max_duration.total_seconds()
     print(colorize("==========================================", color='red'))
