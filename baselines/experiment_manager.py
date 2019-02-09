@@ -11,6 +11,8 @@ import argparse, os, sys, re
 from multiprocessing import Pool
 from screenutils import Screen, list_screens
 from baselines.common.sacred_utils import load_runs, filter_runs
+from baselines.common import colorize
+from datetime import datetime
 
 class Screener(object):
 
@@ -105,19 +107,21 @@ elif args.command == 'view':
     for s in list_screens():
         if rule.match(s.name):
             all_active_screens += 1
-    print("==========================================")
-    print("Active screens:", all_active_screens)
+    print(colorize("==========================================", 'red'))
+    print(colorize("Active screens:", all_active_screens, 'red'))
     # Load runs to get active ones
     runs = load_runs(args.dir)
     running_runs = filter_runs({'run.status': 'RUNNING'}, runs)
-    print("Active runs:", len(running_runs.keys()))
-    print("==========================================")
+    print(colorize("Active runs:", len(running_runs.keys()), 'red'))
+    print(colorize("==========================================", 'red'))
     for key in running_runs.keys():
         run = running_runs[key]
-        print("Run: {0}".format(key))
-        print("\tSteps: {0}/{1}".format(len(run['metrics']['EpRewMean']['steps']), run['config']['max_iters']))
-        print("\tEnv: {0}".format(run['config']['env']))
-        print("\tReward: {0}".format(run['metrics']['EpRewMean']['values'][-1]))
+        print("Run: {0} ({1})".format(key, run['config']['env']))
+        print("\tSteps: {0}/{1}\t\tReward: {2}".format(len(run['metrics']['EpRewMean']['steps']), run['config']['max_iters'], run['metrics']['EpRewMean']['values'][-1]))
+        steps = len(run['metrics']['EpRewMean']['steps']
+        start_time = run['run']['start_time']
+        print(start_time, type(start_time))
+
 
 elif args.command == 'stop':
     assert args.name is not None, "Provide an experiment name."
