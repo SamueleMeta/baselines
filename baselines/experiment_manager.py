@@ -107,13 +107,13 @@ elif args.command == 'view':
     for s in list_screens():
         if rule.match(s.name):
             all_active_screens += 1
-    print(colorize("==========================================", color='magenta'))
-    print(colorize("Active screens: {0}".format(all_active_screens), color='magenta'))
+    print(colorize("==========================================", color='red'))
+    print(colorize("Active screens: {0}".format(all_active_screens), color='red'))
     # Load runs to get active ones
     runs = load_runs(args.dir)
     running_runs = filter_runs({'run.status': 'RUNNING'}, runs)
-    print(colorize("Active runs:", len(running_runs.keys()), color='magenta'))
-    print(colorize("==========================================", color='magenta'))
+    print(colorize("Active runs: {0}".format(len(running_runs.keys())), color='red'))
+    print(colorize("==========================================", color='red'))
     for key in running_runs.keys():
         run = running_runs[key]
         print("Run: {0} ({1})".format(key, run['config']['env']))
