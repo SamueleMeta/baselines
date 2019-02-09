@@ -120,7 +120,7 @@ elif args.command == 'view':
         print(colorize('Run:', color='crimson'), "{0} ({1})".format(key, run['config']['env']))
         print("\t" + colorize("Steps:", color='crimson') +
                 "{0}/{1}".format(len(run['metrics']['EpRewMean']['steps'])+1, run['config']['max_iters']) +
-                "\t\t" + colorize("Reward:", color='crimson') + "{2}".format(run['metrics']['EpRewMean']['values'][-1]))
+                "\t\t" + colorize("Reward:", color='crimson') + "{0}".format(run['metrics']['EpRewMean']['values'][-1]))
         completion = (len(run['metrics']['EpRewMean']['steps'])+1) / run['config']['max_iters']
         start_time = datetime.strptime(run['run']['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
         duration = datetime.now() - start_time
