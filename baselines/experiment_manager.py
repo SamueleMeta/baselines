@@ -116,6 +116,7 @@ elif args.command == 'view':
         run = running_runs[key]
         print("Run: {0}".format(key))
         print("\tSteps: {0}/{1}".format(len(run['metrics']['EpRewMean']['steps']), run['config']['max_iters']))
+        print("\tEnv: {0}".format(run['config']['env']))
         print("\tReward: {0}".format(run['metrics']['EpRewMean']['values'][-1]))
 
 elif args.command == 'stop':
