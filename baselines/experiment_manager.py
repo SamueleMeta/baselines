@@ -109,7 +109,10 @@ elif args.command == 'view':
     # Load runs to get active ones
     runs = load_runs(args.dir)
     print("Loaded runs", len(runs.keys()))
-
+    status = []
+    for key, value in runs:
+        status.append(value['run']['status'])
+    print(set(status))
 
 elif args.command == 'stop':
     assert args.name is not None, "Provide an experiment name."
