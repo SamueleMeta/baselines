@@ -114,15 +114,21 @@ elif args.command == 'view':
     running_runs = filter_runs({'run.status': 'RUNNING'}, runs)
     print(colorize("Active runs: {0}".format(len(running_runs.keys())), color='red'))
     print(colorize("==========================================", color='red'))
+    etas = []
     for key in running_runs.keys():
         run = running_runs[key]
-        print("Run: {0} ({1})".format(key, run['config']['env']))
-        print("\tSteps: {0}/{1}\t\tReward: {2}".format(len(run['metrics']['EpRewMean']['steps'])+1, run['config']['max_iters'], run['metrics']['EpRewMean']['values'][-1]))
+        print(colorize('Run:', color='crimson'), "{0} ({1})".format(key, run['config']['env']))
+        print("\t" + colorize("Steps:", color='crimson') +
+                "{0}/{1}".format(len(run['metrics']['EpRewMean']['steps'])+1, run['config']['max_iters']) +
+                "\t\t" + colorize("Reward:", color='crimson') + "{2}".format(, run['metrics']['EpRewMean']['values'][-1]))
         completion = (len(run['metrics']['EpRewMean']['steps'])+1) / run['config']['max_iters']
         start_time = datetime.strptime(run['run']['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
         duration = datetime.now() - start_time
         eta = duration * (1 - completion) / completion
-        print("ETA", duration, completion, eta)
+        etas.append(eta)
+    print(colorize("==========================================", color='red'))
+    print(colorize("ETA: {0}.".format(max(etas).strftime('%H hours, %M minutes, %S seconds')), color='red'))
+    print(colorize("==========================================", color='red'))
 
 elif args.command == 'stop':
     assert args.name is not None, "Provide an experiment name."
