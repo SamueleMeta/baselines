@@ -126,9 +126,9 @@ elif args.command == 'view':
         duration = datetime.now() - start_time
         eta = duration * (1 - completion) / completion
         etas.append(eta)
-    worst_eta = max(etas)
+    t = max(etas).total_seconds()
     print(colorize("==========================================", color='red'))
-    print(colorize("ETA: {0} hours, {1} minutes, {2} seconds".format(worst_eta.hours, worst_eta.minutes, worst_eta.seconds), color='red'))
+    print(colorize("ETA: {0} hours, {1} minutes, {2} seconds".format(t // 3600, (t%3600)//60, (t%3600)%60), color='red'))
     print(colorize("==========================================", color='red'))
 
 elif args.command == 'stop':
