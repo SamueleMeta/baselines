@@ -124,13 +124,16 @@ elif args.command == 'view':
         eta = duration * (1 - completion) / completion
         max_eta = max(eta, max_eta) if max_eta is not None else eta
         max_duration = max(duration, max_duration) if max_duration is not None else duration
-    t = max_eta.total_seconds()
-    d = max_duration.total_seconds()
-    print(colorize("==========================================", color='red'))
-    print(colorize("Active screens: {0}".format(all_active_screens), color='red'))
-    print(colorize("Active runs: {0}".format(len(running_runs.keys())), color='red'))
-    print(colorize("Elapsed time: {0} hours, {1} minutes, {2} seconds".format(int(d // 3600), int((d%3600)//60), int(d%3600)%60), color='red'))
-    print(colorize("ETA: {0} hours, {1} minutes, {2} seconds".format(int(t // 3600), int((t%3600)//60), int(t%3600)%60), color='red'))
+    if len(running_runs.keys()) == 0:
+        print(colorize("Done.", color='red'))
+    else:
+        t = max_eta.total_seconds()
+        d = max_duration.total_seconds()
+        print(colorize("==========================================", color='red'))
+        print(colorize("Active screens: {0}".format(all_active_screens), color='red'))
+        print(colorize("Active runs: {0}".format(len(running_runs.keys())), color='red'))
+        print(colorize("Elapsed time: {0} hours, {1} minutes, {2} seconds".format(int(d // 3600), int((d%3600)//60), int(d%3600)%60), color='red'))
+        print(colorize("ETA: {0} hours, {1} minutes, {2} seconds".format(int(t // 3600), int((t%3600)//60), int(t%3600)%60), color='red'))
     print(colorize("==========================================", color='red'))
 
 elif args.command == 'stop':
