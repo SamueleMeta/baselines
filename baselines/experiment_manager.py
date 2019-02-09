@@ -117,10 +117,9 @@ elif args.command == 'view':
     etas = []
     for key in running_runs.keys():
         run = running_runs[key]
-        print(colorize('Run:', color='crimson'), "{0} ({1})".format(key, run['config']['env']))
-        print("\t" + colorize("Steps:", color='crimson') +
-                "{0}/{1}".format(len(run['metrics']['EpRewMean']['steps'])+1, run['config']['max_iters']) +
-                "\t\t" + colorize("Reward:", color='crimson') + "{0}".format(run['metrics']['EpRewMean']['values'][-1]))
+        print(colorize("Run: {0} ({1})".format(key, run['config']['env']), color='crimson'))
+        print("\tSteps: {0}/{1}".format(len(run['metrics']['EpRewMean']['steps'])+1, run['config']['max_iters']) +
+                "\t\tReward: {0}".format(run['metrics']['EpRewMean']['values'][-1]))
         completion = (len(run['metrics']['EpRewMean']['steps'])+1) / run['config']['max_iters']
         start_time = datetime.strptime(run['run']['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
         duration = datetime.now() - start_time
@@ -128,7 +127,7 @@ elif args.command == 'view':
         etas.append(eta)
     t = max(etas).total_seconds()
     print(colorize("==========================================", color='red'))
-    print(colorize("ETA: {0} hours, {1} minutes, {2} seconds".format(t // 3600, (t%3600)//60, (t%3600)%60), color='red'))
+    print(colorize("ETA: {0} hours, {1} minutes, {2} seconds".format(int(t // 3600), int((t%3600)//60), int(t%3600)%60), color='red'))
     print(colorize("==========================================", color='red'))
 
 elif args.command == 'stop':
