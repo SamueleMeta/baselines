@@ -105,11 +105,18 @@ elif args.command == 'view':
     for s in list_screens():
         if rule.match(s.name):
             all_active_screens += 1
+    print("==========================================")
     print("Active screens:", all_active_screens)
     # Load runs to get active ones
     runs = load_runs(args.dir)
     running_runs = filter_runs({'run.status': 'RUNNING'}, runs)
     print("Active runs:", len(running_runs.keys()))
+    print("==========================================")
+    for key in running_runs.keys():
+        run = running_runs[key]
+        print(f"Run: {key}")
+        print(f"\tSteps: {len(run['metrics']['EpRewMean']['steps'])}/{run['config']['max_iters']}")
+        print(f"\tReward: {run['metrics']['EpRewMean']['values'][-1]}")
 
 elif args.command == 'stop':
     assert args.name is not None, "Provide an experiment name."
