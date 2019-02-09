@@ -117,9 +117,10 @@ elif args.command == 'view':
     etas = []
     for key in running_runs.keys():
         run = running_runs[key]
-        print(colorize("Run: {0} ({1})".format(key, run['config']['env']), color='crimson'))
-        print("\tSteps: {0}/{1}".format(len(run['metrics']['EpRewMean']['steps'])+1, run['config']['max_iters']) +
-                "\t\tReward: {0}".format(run['metrics']['EpRewMean']['values'][-1]))
+        print(colorize('Run:', color='blue'), "{0} ({1})".format(key, run['config']['env']))
+        print("\t" + colorize("Steps:", color='blue') +
+                "{0}/{1}".format(len(run['metrics']['EpRewMean']['steps'])+1, run['config']['max_iters']) +
+                "\t\t" + colorize("Reward:", color='blue') + "{0}".format(run['metrics']['EpRewMean']['values'][-1]))
         completion = (len(run['metrics']['EpRewMean']['steps'])+1) / run['config']['max_iters']
         start_time = datetime.strptime(run['run']['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
         duration = datetime.now() - start_time
