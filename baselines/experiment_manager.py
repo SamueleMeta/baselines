@@ -12,7 +12,7 @@ from multiprocessing import Pool
 from screenutils import Screen, list_screens
 from baselines.common.sacred_utils import load_runs, filter_runs
 from baselines.common import colorize
-import datetime
+from datetime import datetime
 
 class Screener(object):
 
@@ -120,7 +120,7 @@ elif args.command == 'view':
         print("\tSteps: {0}/{1}\t\tReward: {2}".format(len(run['metrics']['EpRewMean']['steps']), run['config']['max_iters'], run['metrics']['EpRewMean']['values'][-1]))
         completion = len(run['metrics']['EpRewMean']['steps']) / run['config']['max_iters']
         start_time = datetime.strptime('%Y-%m-%dT%H%M%S.%f', run['run']['start_time'])
-        duration = datetime.datetime.now() - start_time
+        duration = datetime.now() - start_time
         print(duration, completion)
 
 
