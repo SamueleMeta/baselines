@@ -111,8 +111,6 @@ elif args.command == 'view':
     runs = load_runs(args.dir)
     running_runs = filter_runs({'run.status': 'RUNNING'}, runs)
     print(colorize("==========================================", color='red'))
-    print(colorize("Active screens: {0}".format(all_active_screens), color='red'))
-    print(colorize("Active runs: {0}".format(len(running_runs.keys())), color='red'))
     max_eta, max_duration = None, None
     for key in running_runs.keys():
         run = running_runs[key]
