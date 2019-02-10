@@ -10,8 +10,6 @@ import pandas as pd
 import argparse, os, sys, re
 from multiprocessing import Pool
 from screenutils import Screen, list_screens
-from baselines.common.sacred_utils import load_runs, filter_runs
-from baselines.common import colorize
 from datetime import datetime
 
 class Screener(object):
@@ -99,6 +97,8 @@ if args.command == 'launch':
     scr.run(cmds, name=args.name)
 
 elif args.command == 'view':
+    from baselines.common.sacred_utils import load_runs, filter_runs
+    from baselines.common import colorize
     assert args.name is not None, "Provide an experiment name."
     assert args.dir is not None, "Provide a directory for experiment."
     rule = re.compile(args.name + '_*')
