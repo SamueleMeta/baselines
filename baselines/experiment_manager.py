@@ -120,6 +120,8 @@ elif args.command == 'view':
                 "\t\t" + colorize("Reward:", color='blue') + "{0}".format(run['metrics']['EpRewMean']['values'][-1]))
         completion = (len(run['metrics']['EpRewMean']['steps'])+1) / run['config']['max_iters']
         start_time = datetime.strptime(run['run']['start_time'], '%Y-%m-%dT%H:%M:%S.%f')
+        print(run['run']['start_time'], start_time)
+        print(datetime.now())
         duration = datetime.now() - start_time
         eta = duration * (1 - completion) / completion
         max_eta = max(eta, max_eta) if max_eta is not None else eta
