@@ -125,7 +125,7 @@ def main():
     parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
-    parser.add_argument('--lambda', type=float, default=1.0)
+    parser.add_argument('--lam', type=float, default=1.0)
     parser.add_argument('--center', type=bool, default=False)
     parser.add_argument('--max_kl', type=float, default=0.0)
     parser.add_argument('--cg_iters', type=int, default=10)
@@ -150,7 +150,7 @@ def main():
           max_kl=args.max_kl,
           cg_iters=args.cg_iters,
           gamma=args.gamma,
-          lam=args.lamba,
+          lam=args.lam,
           center_return=args.center,
           entropy=args.entropy,)
 
