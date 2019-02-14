@@ -22,7 +22,7 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 
-from baselines.trpo_mpi import trpo_mpi
+from baselines.trpo_mpi_per_episode import trpo_mpi_per_episode
 
 def get_env_type(env_id):
     #First load all envs
@@ -107,7 +107,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     gym.logger.setLevel(logging.WARNING)
 
     env = make_env()
-    trpo_mpi.learn(env, make_policy, batch_size=n_episodes, task_horizon=horizon,
+    trpo_mpi_per_episode.learn(env, make_policy, batch_size=n_episodes, task_horizon=horizon,
                 max_kl=alg_args['max_kl'], cg_iters=alg_args['cg_iters'],
                 gamma=alg_args['gamma'], lam=alg_args['lam'], max_iters=alg_args['max_iters'])
 
