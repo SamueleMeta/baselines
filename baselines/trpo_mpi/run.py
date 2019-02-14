@@ -84,12 +84,12 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     if policy == 'linear' or policy == 'nn':
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
+                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=True,
                              hidden_W_init=policy_initializer, output_W_init=policy_initializer)
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
             return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                         gaussian_fixed_var=True, use_bias=False, use_critic=False,
+                         gaussian_fixed_var=True, use_bias=False, use_critic=True,
                          hidden_W_init=policy_initializer,
                          output_W_init=policy_initializer)
     else:
