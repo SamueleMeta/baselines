@@ -128,13 +128,13 @@ def main():
     parser.add_argument('--lambda', type=float, default=1.0)
     parser.add_argument('--center', type=bool, default=False)
     parser.add_argument('--max_kl', type=float, default=0.0)
-    parser.add_argument('--cg_iters', type=float, default=0.0)
+    parser.add_argument('--cg_iters', type=int, default=10)
     parser.add_argument('--entropy', type=str, default='none')
     parser.add_argument('--experiment_name', type=str, default='none')
     parser.add_argument('--save_weights', action='store_true', default=False, help='Save policy weights.')
     args = parser.parse_args()
     if args.file_name == 'progress':
-        file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
+        file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.max_kl, args.seed, time.time())
     else:
         file_name = args.file_name
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
