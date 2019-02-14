@@ -22,7 +22,7 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 
-from baselines.trpo_mpi_per_episode import trpo_mpi_per_episode
+from baselines.trpo_mpi import trpo_mpi_per_episode
 
 def get_env_type(env_id):
     #First load all envs
