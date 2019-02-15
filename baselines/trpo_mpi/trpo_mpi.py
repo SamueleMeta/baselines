@@ -181,6 +181,10 @@ def learn(env, policy_fn, *,
         out /= nworkers
         return out
 
+    if sampler is None:
+        seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True)
+        sampler = type("SequentialSampler", (object,), {"collect": lambda self, _: seg_gen.__next__()})()
+
     U.initialize()
     th_init = get_flat()
     MPI.COMM_WORLD.Bcast(th_init, root=0)
@@ -201,7 +205,6 @@ def learn(env, policy_fn, *,
 
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0])==1
 
-
     while True:
         if callback: callback(locals(), globals())
         if max_timesteps and timesteps_so_far >= max_timesteps:
@@ -217,7 +220,6 @@ def learn(env, policy_fn, *,
         with timed("sampling"):
             seg = sampler.collect(theta)
         add_vtarg_and_adv(seg, gamma, lam)
-
 
         #Params
         #"""
@@ -311,193 +313,14 @@ def learn(env, policy_fn, *,
             disc_rews.append(np.sum(disc_rewards))
             start = end
 
-        #Save importance weights
-        simple_iw = pi.eval_simple_iw(states,
-                               actions,
-                               rewards,
-                               lens,
-                               gamma=gamma,
-                               behavioral=oldpi)
-        np.save(weights_dir+'/iws_'+str(iters_so_far), simple_iw)
-        #print(len(simple_iw), simple_iw)
-
-        #Save returns
         ep_rets = np.array(disc_rews)
-        np.save(weights_dir+'/rets_'+str(iters_so_far), ep_rets)
-        #print(len(ep_rets), ep_rets)
-
-
-        #lenbuffer.extend(lens)
-        #rewbuffer.extend(rews)
-
-        #Renyi
-        """
-        renyi_4 = np.mean(pi.eval_renyi(states, oldpi, 4))
-        #print('Renyi:', renyi)
-        #"""
-
-        #Importance weights stats
-        """
-        avg_iw, var_iw, max_iw, ess = pi.eval_iw_stats(states,
-                               actions,
-                               rewards,
-                               lens,
-                               gamma=gamma,
-                               behavioral=oldpi,
-                               per_decision=per_decision,
-                               normalize=normalize,
-                               truncate_at=truncate_at)
-        #"""
-
-        #Returns stats
-        """
-        avg_ret, var_ret, max_ret = pi.eval_ret_stats(states,
-                               actions,
-                               rewards,
-                               lens,
-                               gamma=gamma,
-                               behavioral=oldpi,
-                               per_decision=per_decision,
-                               normalize=normalize,
-                               truncate_at=truncate_at)
-        #"""
-
-        #Performance
-        #"""
-        bound_delta = .2
-        batch_size = len(lens)
-        J = pi.eval_J(states,
-                      actions,
-                      rewards,
-                      lens,
-                      gamma=gamma,
-                      behavioral=oldpi,
-                      per_decision=per_decision,
-                      normalize=normalize,
-                      truncate_at=truncate_at)
-
-        var_J = pi.eval_var_J(states,
-                      actions,
-                      rewards,
-                      lens,
-                      gamma=gamma,
-                      behavioral=oldpi,
-                      per_decision=per_decision,
-                      normalize=normalize,
-                      truncate_at=truncate_at)
-
-        """
-        bound = pi.eval_bound(states,
-                      actions,
-                      rewards,
-                      lens,
-                      gamma=gamma,
-                      behavioral=oldpi,
-                      per_decision=per_decision,
-                      normalize=normalize,
-                      truncate_at=truncate_at,
-                      delta=bound_delta,
-                      use_ess=True)
-        #"""
-
-        #Sample Renyi
-        d2s = pi.eval_renyi(states, oldpi, 2)
-        d2s_by_episode = []
-        start = 0
-        for ep_len in lens:
-            end = start + ep_len
-            d2s_by_episode = np.sum(d2s[start:end])
-            start = end
-        sample_d2 = np.mean(np.exp(d2s_by_episode))
-
-        """
-        grad_bound = pi.eval_grad_bound(states,
-                      actions,
-                      rewards,
-                      lens,
-                      gamma=gamma,
-                      behavioral=oldpi,
-                      per_decision=per_decision,
-                      normalize=normalize,
-                      truncate_at=truncate_at,
-                      delta=bound_delta,
-                      use_ess=True)
-        print(grad_bound)
-        #print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))
-        #"""
-
-        #Gradients
-        """
-        grad_J = pi.eval_grad_J(states,
-                                       actions,
-                                       rewards,
-                                       lens,
-                                       behavioral=oldpi,
-                                       per_decision=True)
-        grad_var_J = pi.eval_grad_var_J(states,
-                                       actions,
-                                       rewards,
-                                       lens,
-                                       behavioral=oldpi,
-                                       per_decision=True)
-        print('Target performance grads', grad_J, grad_var_J)
-        #"""
-
-        #Student-t bound
-        """
-        bound = pi.eval_bound(states,
-                                 actions,
-                                 rewards,
-                                 lens,
-                                 behavioral=oldpi,
-                                 per_decision=True)
-        #print('Bound comp. time', time.time() - checkpoint)
-        print("StudentTBound", bound)
-        #"""
-
-
-        #Student-t bound grad
-        """
-        bound_grad = pi.eval_bound_grad(states,
-                                 actions,
-                                 rewards,
-                                 lens,
-                                 behavioral=oldpi,
-                                 per_decision=True)
-        print("StudentTBound grad", bound_grad)
-        #"""
-
-        #Fisher
-        """
-        checkpoint = time.time()
-        fisher = oldpi.eval_fisher(states, actions, lens, behavioral=None)
-        #print(fisher)
-        assert np.array_equal(fisher, fisher.T)
-        print('Fisher comp. time', time.time() - checkpoint)
-        checkpoint = time.time()
-        natural = np.linalg.solve(fisher + 1e-12*np.eye(fisher.shape[0]), grad_J)
-        print(natural)
-        #print('Fisher vector product time:', time.time() - checkpoint)
-        #"""
 
         #Logging
         logger.record_tabular("Step_size", stepsize)
-        #logger.record_tabular("Our_bound", bound)
-        #logger.record_tabular("Reny_4", renyi_4)
-        logger.record_tabular("SampleRenyi2", sample_d2)
-        #logger.record_tabular("Max_iw", max_iw)
-        #logger.record_tabular("Ess", ess)
-        #logger.record_tabular("Avg_iw", avg_iw)
-        #logger.record_tabular("Var_iw", var_iw)
-        #logger.record_tabular("Max_ret", max_ret)
-        #logger.record_tabular("Avg_ret", avg_ret)
-        #logger.record_tabular("Var_ret", var_ret)
         logger.record_tabular("EpLenMean", np.mean(lens))
         logger.record_tabular("DiscEpRewMean", np.mean(disc_rews))
         logger.record_tabular("EpRewMean", np.mean(rews))
         logger.record_tabular("EpThisIter", len(lens))
-        logger.record_tabular("J_hat", J)
-        logger.record_tabular("Var_J", var_J)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
         iters_so_far += 1
