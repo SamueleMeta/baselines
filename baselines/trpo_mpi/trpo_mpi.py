@@ -103,7 +103,7 @@ def learn(env, policy_fn, *,
         per_decision = True,
         normalize = False,
         truncate_at = np.infty,
-        sampler=None,
+        sampler=None
         ):
     nworkers = MPI.COMM_WORLD.Get_size()
     rank = MPI.COMM_WORLD.Get_rank()
