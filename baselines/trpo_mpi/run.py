@@ -109,7 +109,9 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
 
     gym.logger.setLevel(logging.WARNING)
 
-    trpo_mpi.learn(make_env, make_policy, batch_size=n_episodes, task_horizon=horizon,
+    env = make_env()
+
+    trpo_mpi.learn(env, make_policy, batch_size=n_episodes, task_horizon=horizon,
                 max_kl=alg_args['max_kl'], cg_iters=alg_args['cg_iters'], sampler=sampler,
                 gamma=alg_args['gamma'], lam=alg_args['lam'], max_iters=alg_args['max_iters'])
 

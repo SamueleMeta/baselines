@@ -4,20 +4,14 @@ import baselines.common.tf_util as U
 import tensorflow as tf, numpy as np
 import time
 from baselines.common import colorize
+from mpi4py import MPI
 from collections import deque
-from baselines.common import set_global_seeds
 from baselines.common.mpi_adam import MpiAdam
 from baselines.common.cg import cg
-from baselines.common.input import observation_placeholder
-from baselines.common.policies import build_policy
 from contextlib import contextmanager
+import numpy as np
 
-try:
-    from mpi4py import MPI
-except ImportError:
-    MPI = None
-
-def traj_segment_generator(pi, env, horizon, stochastic):
+def traj_segment_generator(pi, env, horizon, steps_per_batch, stochastic):
     # Initialize state variables
     t = 0
     ac = env.action_space.sample()
@@ -31,29 +25,37 @@ def traj_segment_generator(pi, env, horizon, stochastic):
     ep_lens = []
 
     # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon)])
-    rews = np.zeros(horizon, 'float32')
-    vpreds = np.zeros(horizon, 'float32')
-    news = np.zeros(horizon, 'int32')
-    acs = np.array([ac for _ in range(horizon)])
+    obs = np.array([ob for _ in range(steps_per_batch)])
+    rews = np.zeros(steps_per_batch, 'float32')
+    vpreds = np.zeros(steps_per_batch, 'float32')
+    news = np.zeros(steps_per_batch, 'int32')
+    acs = np.array([ac for _ in range(steps_per_batch)])
     prevacs = acs.copy()
 
     while True:
         prevac = ac
-        ac, vpred, _, _ = pi.step(ob, stochastic=stochastic)
+        ac, vpred = pi.act(stochastic, ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
-        if t > 0 and t % horizon == 0:
-            yield {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
-                    "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
+        if t > 0 and t % steps_per_batch == 0:
+            n_samples = sum(ep_lens)
+            yield {"ob" : obs[:n_samples], "rew" : rews[:n_samples],
+                   "vpred" : vpreds[:n_samples], "new" : news[:n_samples],
+                    "ac" : acs[:n_samples], "prevac" : prevacs[:n_samples],
+                    "nextvpred": vpred * (1 - new),
                     "ep_rets" : ep_rets, "ep_lens" : ep_lens}
-            _, vpred, _, _ = pi.step(ob, stochastic=stochastic)
+            _, vpred = pi.act(stochastic, ob)
             # Be careful!!! if you change the downstream algorithm to aggregate
             # several of these batches, then be sure to do a deepcopy
             ep_rets = []
             ep_lens = []
-        i = t % horizon
+            if not new:
+                cur_ep_ret = 0
+                cur_ep_len = 0
+                ob = env.reset()
+
+        i = t % steps_per_batch
         obs[i] = ob
         vpreds[i] = vpred
         news[i] = new
@@ -65,7 +67,7 @@ def traj_segment_generator(pi, env, horizon, stochastic):
 
         cur_ep_ret += rew
         cur_ep_len += 1
-        if new:
+        if new or i%horizon==horizon-1:
             ep_rets.append(cur_ep_ret)
             ep_lens.append(cur_ep_len)
             cur_ep_ret = 0
@@ -86,94 +88,46 @@ def add_vtarg_and_adv(seg, gamma, lam):
         gaelam[t] = lastgaelam = delta + gamma * lam * nonterminal * lastgaelam
     seg["tdlamret"] = seg["adv"] + seg["vpred"]
 
-def learn(make_env,
-        make_policy,
-        *,
-        total_timesteps,
-        timesteps_per_batch=1024, # what to train on
-        max_kl=0.001,
-        cg_iters=10,
-        gamma=0.99,
-        lam=1.0, # advantage estimation
-        seed=None,
-        ent_coef=0.0,
+def learn(env, policy_fn, *,
+        batch_size, # what to train on
+        task_horizon,
+        max_kl, cg_iters,
+        gamma, lam, # advantage estimation
+        entcoeff=0.0,
         cg_damping=1e-2,
         vf_stepsize=3e-4,
         vf_iters =3,
-        max_episodes=0, max_iters=0,  # time constraint
+        max_timesteps=0, max_episodes=0, max_iters=0,  # time constraint
         callback=None,
-        load_path=None,
+        weights_dir='.',
+        per_decision = True,
+        normalize = False,
+        truncate_at = np.infty,
         sampler=None,
-        **network_kwargs
         ):
-    '''
-    learn a policy function with TRPO algorithm
-
-    Parameters:
-    ----------
-
-    make_env                environment (one of the gym environments or wrapped via baselines.common.vec_env.VecEnv-type class
-
-    make_policy             policy builder
-
-    timesteps_per_batch     timesteps per gradient estimation batch
-
-    max_kl                  max KL divergence between old policy and new policy ( KL(pi_old || pi) )
-
-    ent_coef                coefficient of policy entropy term in the optimization objective
-
-    cg_iters                number of iterations of conjugate gradient algorithm
-
-    cg_damping              conjugate gradient damping
-
-    vf_stepsize             learning rate for adam optimizer used to optimie value function loss
-
-    vf_iters                number of iterations of value function optimization iterations per each policy optimization step
-
-    total_timesteps           max number of timesteps
-
-    max_episodes            max number of episodes
-
-    max_iters               maximum number of policy optimization iterations
-
-    callback                function to be called with (locals(), globals()) each policy optimization step
-
-    load_path               str, path to load the model from (default: None, i.e. no model is loaded)
-
-    sampler                 parallel sampler
-
-    **network_kwargs        keyword arguments to the policy / network builder. See baselines.common/policies.py/build_policy and arguments to a particular type of network
-
-    Returns:
-    -------
-
-    learnt model
-
-    '''
+    nworkers = MPI.COMM_WORLD.Get_size()
+    rank = MPI.COMM_WORLD.Get_rank()
     np.set_printoptions(precision=3)
-    max_samples = horizon * n_episodes
-
-    # Building the environment
-    env = make_env()
+    timesteps_per_batch = batch_size * task_horizon
+    # Setup losses and stuff
+    # ----------------------------------------
     ob_space = env.observation_space
     ac_space = env.action_space
-
-    # Building the policy
-    pi = make_policy('pi', ob_space, ac_space)
-    oldpi = make_policy('oldpi', ob_space, ac_space)
-
+    pi = policy_fn("pi", ob_space, ac_space)
+    oldpi = policy_fn("oldpi", ob_space, ac_space)
     atarg = tf.placeholder(dtype=tf.float32, shape=[None]) # Target advantage function (if applicable)
     ret = tf.placeholder(dtype=tf.float32, shape=[None]) # Empirical return
 
+    ob = U.get_placeholder_cached(name="ob")
     ac = pi.pdtype.sample_placeholder([None])
 
     kloldnew = oldpi.pd.kl(pi.pd)
     ent = pi.pd.entropy()
     meankl = tf.reduce_mean(kloldnew)
     meanent = tf.reduce_mean(ent)
-    entbonus = ent_coef * meanent
+    entbonus = entcoeff * meanent
 
-    vferr = tf.reduce_mean(tf.square(pi.vf - ret))
+    vferr = tf.reduce_mean(tf.square(pi.vpred - ret))
 
     ratio = tf.exp(pi.pd.logp(ac) - oldpi.pd.logp(ac)) # advantage * pnew / pold
     surrgain = tf.reduce_mean(ratio * atarg)
@@ -184,12 +138,9 @@ def learn(make_env,
 
     dist = meankl
 
-    all_var_list = get_trainable_variables("pi")
-    # var_list = [v for v in all_var_list if v.name.split("/")[1].startswith("pol")]
-    # vf_var_list = [v for v in all_var_list if v.name.split("/")[1].startswith("vf")]
-    var_list = get_pi_trainable_variables("pi")
-    vf_var_list = get_vf_trainable_variables("pi")
-
+    all_var_list = pi.get_trainable_variables()
+    var_list = [v for v in all_var_list if v.name.split("/")[1].startswith("pol")]
+    vf_var_list = [v for v in all_var_list if v.name.split("/")[1].startswith("vf")]
     vfadam = MpiAdam(vf_var_list)
 
     get_flat = U.GetFlat(var_list)
@@ -207,8 +158,7 @@ def learn(make_env,
     fvp = U.flatgrad(gvp, var_list)
 
     assign_old_eq_new = U.function([],[], updates=[tf.assign(oldv, newv)
-        for (oldv, newv) in zipsame(get_variables("oldpi"), get_variables("pi"))])
-
+        for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
     compute_losses = U.function([ob, ac, atarg], losses)
     compute_lossandgrad = U.function([ob, ac, atarg], losses + [U.flatgrad(optimgain, var_list)])
     compute_fvp = U.function([flat_tangent, ob, ac, atarg], fvp)
@@ -226,30 +176,21 @@ def learn(make_env,
 
     def allmean(x):
         assert isinstance(x, np.ndarray)
-        if MPI is not None:
-            out = np.empty_like(x)
-            MPI.COMM_WORLD.Allreduce(x, out, op=MPI.SUM)
-            out /= nworkers
-        else:
-            out = np.copy(x)
-
+        out = np.empty_like(x)
+        MPI.COMM_WORLD.Allreduce(x, out, op=MPI.SUM)
+        out /= nworkers
         return out
 
     U.initialize()
-    if load_path is not None:
-        pi.load(load_path)
-
     th_init = get_flat()
-    if MPI is not None:
-        MPI.COMM_WORLD.Bcast(th_init, root=0)
-
+    MPI.COMM_WORLD.Bcast(th_init, root=0)
     set_from_flat(th_init)
     vfadam.sync()
     print("Init param sum", th_init.sum(), flush=True)
 
     # Prepare for rollouts
     # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_batch, stochastic=True)
+    seg_gen = traj_segment_generator(pi, env, task_horizon, timesteps_per_batch, stochastic=True)
 
     episodes_so_far = 0
     timesteps_so_far = 0
@@ -258,16 +199,12 @@ def learn(make_env,
     lenbuffer = deque(maxlen=40) # rolling buffer for episode lengths
     rewbuffer = deque(maxlen=40) # rolling buffer for episode rewards
 
-    if sum([max_iters>0, total_timesteps>0, max_episodes>0])==0:
-        # noththing to be done
-        return pi
+    assert sum([max_iters>0, max_timesteps>0, max_episodes>0])==1
 
-    assert sum([max_iters>0, total_timesteps>0, max_episodes>0]) < 2, \
-        'out of max_iters, total_timesteps, and max_episodes only one should be specified'
 
     while True:
         if callback: callback(locals(), globals())
-        if total_timesteps and timesteps_so_far >= total_timesteps:
+        if max_timesteps and timesteps_so_far >= max_timesteps:
             break
         elif max_episodes and episodes_so_far >= max_episodes:
             break
@@ -278,6 +215,14 @@ def learn(make_env,
         with timed("sampling"):
             seg = seg_gen.__next__()
         add_vtarg_and_adv(seg, gamma, lam)
+
+
+        #Params
+        #"""
+        params = pi.eval_param()
+        #print(params)
+        np.save(weights_dir+'/weights_'+str(iters_so_far), params)
+        #"""
 
         # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
         ob, ac, atarg, tdlamret = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
@@ -305,6 +250,7 @@ def learn(make_env,
             assert np.isfinite(stepdir).all()
             shs = .5*stepdir.dot(fisher_vector_product(stepdir))
             lm = np.sqrt(shs / max_kl)
+            print('DOT: %s' % np.dot(stepdir, g))
             # logger.log("lagrange multiplier:", lm, "gnorm:", np.linalg.norm(g))
             fullstep = stepdir / lm
             expectedimprove = g.dot(fullstep)
@@ -347,19 +293,209 @@ def learn(make_env,
 
         logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
 
-        lrlocal = (seg["ep_lens"], seg["ep_rets"]) # local values
-        if MPI is not None:
-            listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
-        else:
-            listoflrpairs = [lrlocal]
+        lrlocal = (seg["ep_lens"], seg["ep_rets"], seg["ob"],
+                   seg["ac"],seg["rew"]) # local values
+        listoflrpairs = MPI.COMM_WORLD.allgather(lrlocal) # list of tuples
+        lens, rews, states, actions, rewards = map(flatten_lists, zip(*listoflrpairs))
 
-        lens, rews = map(flatten_lists, zip(*listoflrpairs))
-        lenbuffer.extend(lens)
-        rewbuffer.extend(rews)
+        disc_rews = []
+        start = 0
+        for ep_len in lens:
+            end = start + ep_len
+            disc = gamma + np.zeros(ep_len)
+            disc[0] = 1
+            disc = np.cumprod(disc)
+            disc_rewards = np.array(rewards[start:end]) * disc
+            disc_rews.append(np.sum(disc_rewards))
+            start = end
 
-        logger.record_tabular("EpLenMean", np.mean(lenbuffer))
-        logger.record_tabular("EpRewMean", np.mean(rewbuffer))
+        #Save importance weights
+        simple_iw = pi.eval_simple_iw(states,
+                               actions,
+                               rewards,
+                               lens,
+                               gamma=gamma,
+                               behavioral=oldpi)
+        np.save(weights_dir+'/iws_'+str(iters_so_far), simple_iw)
+        #print(len(simple_iw), simple_iw)
+
+        #Save returns
+        ep_rets = np.array(disc_rews)
+        np.save(weights_dir+'/rets_'+str(iters_so_far), ep_rets)
+        #print(len(ep_rets), ep_rets)
+
+
+        #lenbuffer.extend(lens)
+        #rewbuffer.extend(rews)
+
+        #Renyi
+        """
+        renyi_4 = np.mean(pi.eval_renyi(states, oldpi, 4))
+        #print('Renyi:', renyi)
+        #"""
+
+        #Importance weights stats
+        """
+        avg_iw, var_iw, max_iw, ess = pi.eval_iw_stats(states,
+                               actions,
+                               rewards,
+                               lens,
+                               gamma=gamma,
+                               behavioral=oldpi,
+                               per_decision=per_decision,
+                               normalize=normalize,
+                               truncate_at=truncate_at)
+        #"""
+
+        #Returns stats
+        """
+        avg_ret, var_ret, max_ret = pi.eval_ret_stats(states,
+                               actions,
+                               rewards,
+                               lens,
+                               gamma=gamma,
+                               behavioral=oldpi,
+                               per_decision=per_decision,
+                               normalize=normalize,
+                               truncate_at=truncate_at)
+        #"""
+
+        #Performance
+        #"""
+        bound_delta = .2
+        batch_size = len(lens)
+        J = pi.eval_J(states,
+                      actions,
+                      rewards,
+                      lens,
+                      gamma=gamma,
+                      behavioral=oldpi,
+                      per_decision=per_decision,
+                      normalize=normalize,
+                      truncate_at=truncate_at)
+
+        var_J = pi.eval_var_J(states,
+                      actions,
+                      rewards,
+                      lens,
+                      gamma=gamma,
+                      behavioral=oldpi,
+                      per_decision=per_decision,
+                      normalize=normalize,
+                      truncate_at=truncate_at)
+
+        """
+        bound = pi.eval_bound(states,
+                      actions,
+                      rewards,
+                      lens,
+                      gamma=gamma,
+                      behavioral=oldpi,
+                      per_decision=per_decision,
+                      normalize=normalize,
+                      truncate_at=truncate_at,
+                      delta=bound_delta,
+                      use_ess=True)
+        #"""
+
+        #Sample Renyi
+        d2s = pi.eval_renyi(states, oldpi, 2)
+        d2s_by_episode = []
+        start = 0
+        for ep_len in lens:
+            end = start + ep_len
+            d2s_by_episode = np.sum(d2s[start:end])
+            start = end
+        sample_d2 = np.mean(np.exp(d2s_by_episode))
+
+        """
+        grad_bound = pi.eval_grad_bound(states,
+                      actions,
+                      rewards,
+                      lens,
+                      gamma=gamma,
+                      behavioral=oldpi,
+                      per_decision=per_decision,
+                      normalize=normalize,
+                      truncate_at=truncate_at,
+                      delta=bound_delta,
+                      use_ess=True)
+        print(grad_bound)
+        #print('Target performance', J, '+-', np.sqrt(var_J/len(lens)))
+        #"""
+
+        #Gradients
+        """
+        grad_J = pi.eval_grad_J(states,
+                                       actions,
+                                       rewards,
+                                       lens,
+                                       behavioral=oldpi,
+                                       per_decision=True)
+        grad_var_J = pi.eval_grad_var_J(states,
+                                       actions,
+                                       rewards,
+                                       lens,
+                                       behavioral=oldpi,
+                                       per_decision=True)
+        print('Target performance grads', grad_J, grad_var_J)
+        #"""
+
+        #Student-t bound
+        """
+        bound = pi.eval_bound(states,
+                                 actions,
+                                 rewards,
+                                 lens,
+                                 behavioral=oldpi,
+                                 per_decision=True)
+        #print('Bound comp. time', time.time() - checkpoint)
+        print("StudentTBound", bound)
+        #"""
+
+
+        #Student-t bound grad
+        """
+        bound_grad = pi.eval_bound_grad(states,
+                                 actions,
+                                 rewards,
+                                 lens,
+                                 behavioral=oldpi,
+                                 per_decision=True)
+        print("StudentTBound grad", bound_grad)
+        #"""
+
+        #Fisher
+        """
+        checkpoint = time.time()
+        fisher = oldpi.eval_fisher(states, actions, lens, behavioral=None)
+        #print(fisher)
+        assert np.array_equal(fisher, fisher.T)
+        print('Fisher comp. time', time.time() - checkpoint)
+        checkpoint = time.time()
+        natural = np.linalg.solve(fisher + 1e-12*np.eye(fisher.shape[0]), grad_J)
+        print(natural)
+        #print('Fisher vector product time:', time.time() - checkpoint)
+        #"""
+
+        #Logging
+        logger.record_tabular("Step_size", stepsize)
+        #logger.record_tabular("Our_bound", bound)
+        #logger.record_tabular("Reny_4", renyi_4)
+        logger.record_tabular("SampleRenyi2", sample_d2)
+        #logger.record_tabular("Max_iw", max_iw)
+        #logger.record_tabular("Ess", ess)
+        #logger.record_tabular("Avg_iw", avg_iw)
+        #logger.record_tabular("Var_iw", var_iw)
+        #logger.record_tabular("Max_ret", max_ret)
+        #logger.record_tabular("Avg_ret", avg_ret)
+        #logger.record_tabular("Var_ret", var_ret)
+        logger.record_tabular("EpLenMean", np.mean(lens))
+        logger.record_tabular("DiscEpRewMean", np.mean(disc_rews))
+        logger.record_tabular("EpRewMean", np.mean(rews))
         logger.record_tabular("EpThisIter", len(lens))
+        logger.record_tabular("J_hat", J)
+        logger.record_tabular("Var_J", var_J)
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
         iters_so_far += 1
@@ -371,19 +507,5 @@ def learn(make_env,
         if rank==0:
             logger.dump_tabular()
 
-    return pi
-
 def flatten_lists(listoflists):
     return [el for list_ in listoflists for el in list_]
-
-def get_variables(scope):
-    return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope)
-
-def get_trainable_variables(scope):
-    return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
-
-def get_vf_trainable_variables(scope):
-    return [v for v in get_trainable_variables(scope) if 'vf' in v.name[len(scope):].split('/')]
-
-def get_pi_trainable_variables(scope):
-    return [v for v in get_trainable_variables(scope) if 'pi' in v.name[len(scope):].split('/')]
