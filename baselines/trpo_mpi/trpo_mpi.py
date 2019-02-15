@@ -212,8 +212,10 @@ def learn(env, policy_fn, *,
             break
         logger.log("********** Iteration %i ************"%iters_so_far)
 
+        theta = get_flat()
+
         with timed("sampling"):
-            seg = seg_gen.__next__()
+            seg = sampler.collect(theta)
         add_vtarg_and_adv(seg, gamma, lam)
 
 
