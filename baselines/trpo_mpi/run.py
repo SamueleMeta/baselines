@@ -18,11 +18,12 @@ from baselines import logger
 import baselines.common.tf_util as U
 from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
+from baselines.common.parallel_sampler import ParallelSampler
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 
-from baselines.trpo_mpi import trpo_mpi_per_episode
+from baselines.trpo_mpi import trpo_mpi
 
 def get_env_type(env_id):
     #First load all envs
@@ -95,6 +96,8 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     else:
         raise Exception('Unrecognized policy type.')
 
+    sampler = ParallelSampler(make_policy, make_env, n_episodes, horizon, True, n_workers=njobs, seed=seed)
+
     try:
         affinity = len(os.sched_getaffinity(0))
     except:
@@ -106,9 +109,8 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
 
     gym.logger.setLevel(logging.WARNING)
 
-    env = make_env()
-    trpo_mpi_per_episode.learn(env, make_policy, batch_size=n_episodes, task_horizon=horizon,
-                max_kl=alg_args['max_kl'], cg_iters=alg_args['cg_iters'],
+    trpo_mpi.learn(make_env, make_policy, batch_size=n_episodes, task_horizon=horizon,
+                max_kl=alg_args['max_kl'], cg_iters=alg_args['cg_iters'], sampler=sampler,
                 gamma=alg_args['gamma'], lam=alg_args['lam'], max_iters=alg_args['max_iters'])
 
 def main():

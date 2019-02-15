@@ -86,9 +86,9 @@ def add_vtarg_and_adv(seg, gamma, lam):
         gaelam[t] = lastgaelam = delta + gamma * lam * nonterminal * lastgaelam
     seg["tdlamret"] = seg["adv"] + seg["vpred"]
 
-def learn(*,
-        network,
-        env,
+def learn(make_env,
+        make_policy,
+        *,
         total_timesteps,
         timesteps_per_batch=1024, # what to train on
         max_kl=0.001,
@@ -103,6 +103,7 @@ def learn(*,
         max_episodes=0, max_iters=0,  # time constraint
         callback=None,
         load_path=None,
+        sampler=None,
         **network_kwargs
         ):
     '''
@@ -111,11 +112,9 @@ def learn(*,
     Parameters:
     ----------
 
-    network                 neural network to learn. Can be either string ('mlp', 'cnn', 'lstm', 'lnlstm' for basic types)
-                            or function that takes input placeholder and returns tuple (output, None) for feedforward nets
-                            or (output, (state_placeholder, state_output, mask_placeholder)) for recurrent nets
+    make_env                environment (one of the gym environments or wrapped via baselines.common.vec_env.VecEnv-type class
 
-    env                     environment (one of the gym environments or wrapped via baselines.common.vec_env.VecEnv-type class
+    make_policy             policy builder
 
     timesteps_per_batch     timesteps per gradient estimation batch
 
@@ -141,6 +140,8 @@ def learn(*,
 
     load_path               str, path to load the model from (default: None, i.e. no model is loaded)
 
+    sampler                 parallel sampler
+
     **network_kwargs        keyword arguments to the policy / network builder. See baselines.common/policies.py/build_policy and arguments to a particular type of network
 
     Returns:
@@ -149,36 +150,17 @@ def learn(*,
     learnt model
 
     '''
-
-    if MPI is not None:
-        nworkers = MPI.COMM_WORLD.Get_size()
-        rank = MPI.COMM_WORLD.Get_rank()
-    else:
-        nworkers = 1
-        rank = 0
-
-    cpus_per_worker = 1
-    U.get_session(config=tf.ConfigProto(
-            allow_soft_placement=True,
-            inter_op_parallelism_threads=cpus_per_worker,
-            intra_op_parallelism_threads=cpus_per_worker
-    ))
-
-
-    policy = build_policy(env, network, value_network='copy', **network_kwargs)
-    set_global_seeds(seed)
-
     np.set_printoptions(precision=3)
-    # Setup losses and stuff
-    # ----------------------------------------
+    max_samples = horizon * n_episodes
+
+    # Building the environment
+    env = make_env()
     ob_space = env.observation_space
     ac_space = env.action_space
 
-    ob = observation_placeholder(ob_space)
-    with tf.variable_scope("pi"):
-        pi = policy(observ_placeholder=ob)
-    with tf.variable_scope("oldpi"):
-        oldpi = policy(observ_placeholder=ob)
+    # Building the policy
+    pi = make_policy('pi', ob_space, ac_space)
+    oldpi = make_policy('oldpi', ob_space, ac_space)
 
     atarg = tf.placeholder(dtype=tf.float32, shape=[None]) # Target advantage function (if applicable)
     ret = tf.placeholder(dtype=tf.float32, shape=[None]) # Empirical return
@@ -405,4 +387,3 @@ def get_vf_trainable_variables(scope):
 
 def get_pi_trainable_variables(scope):
     return [v for v in get_trainable_variables(scope) if 'pi' in v.name[len(scope):].split('/')]
-
