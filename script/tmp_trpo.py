@@ -11,7 +11,7 @@ from rllab.envs.normalized_env import normalize
 from rllab.policies.gaussian_mlp_policy import GaussianMLPPolicy
 
 HORIZON = 500
-BATCH_SIZE = 100
+BATCH_SIZE = 100 * 500
 N_ITR = 500
 GAMMA = 0.99
 STEP_SIZE = 0.1
