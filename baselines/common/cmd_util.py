@@ -11,6 +11,24 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from mpi4py import MPI
 
+def get_env_type(env_id):
+    """
+    Get the env type [atari, box2d, ...].
+    """
+    #First load all envs
+    _game_envs = defaultdict(set)
+    for env in gym.envs.registry.all():
+        # TODO: solve this with regexes
+        env_type = env._entry_point.split(':')[0].split('.')[-1]
+        _game_envs[env_type].add(env.id)
+    # Get env type
+    env_type = None
+    for g, e in _game_envs.items():
+        if env_id in e:
+            env_type = g
+            break
+    return env_type
+
 def make_atari_env(env_id, num_env, seed, wrapper_kwargs=None, start_index=0):
     """
     Create a wrapped, monitored SubprocVecEnv for Atari.

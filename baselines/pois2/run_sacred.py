@@ -19,6 +19,7 @@ from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.common.vec_env.vec_frame_stack import VecFrameStack
+from baselines.common.cmd_util import get_env_type
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
@@ -70,21 +71,6 @@ def custom_config():
         file_name = '%s_iw=%s_bound=%s_delta=%s_gamma=%s_center=%s_entropy=%s_seed=%s_%s' % (env.upper(), iw_method, bound, delta, gamma, center, entropy, seed, time.time())
     else:
         file_name = file_name
-
-def get_env_type(env_id):
-    #First load all envs
-    _game_envs = defaultdict(set)
-    for env in gym.envs.registry.all():
-        # TODO: solve this with regexes
-        env_type = env._entry_point.split(':')[0].split('.')[-1]
-        _game_envs[env_type].add(env.id)
-    # Get env type
-    env_type = None
-    for g, e in _game_envs.items():
-        if env_id in e:
-            env_type = g
-            break
-    return env_type
 
 def train(env, policy, seed, njobs=1, **alg_args):
 
