@@ -72,7 +72,7 @@ def main():
     train(env=args.env,
           policy=args.policy,
           policy_init=args.policy_init,
-          n_episodes=args.num_episodes,
+          num_episodes=args.num_episodes,
           horizon=args.horizon,
           seed=args.seed,
           n_itr=args.max_iters,
