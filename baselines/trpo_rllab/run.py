@@ -63,7 +63,7 @@ def main():
     parser.add_argument('--experiment_name', type=str, default='none')
     args = parser.parse_args()
     if args.file_name == 'progress':
-        file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
+        file_name = '%s_TRPO_sz=%s_seed=%s_%s' % (args.env.upper(), args.step_size, args.seed, time.time())
     else:
         file_name = args.file_name
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
