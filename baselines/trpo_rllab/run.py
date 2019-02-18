@@ -14,6 +14,7 @@ from rllab.algos.trpo import TRPO
 from rllab.baselines.linear_feature_baseline import LinearFeatureBaseline
 from rllab.policies.gaussian_mlp_policy import GaussianMLPPolicy
 # Baselines
+from baselines import logger
 from baselines.common.rllab_utils import rllab_env_from_name
 from baselines.common.cmd_util import get_env_type
 
