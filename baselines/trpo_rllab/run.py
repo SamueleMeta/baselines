@@ -57,6 +57,7 @@ def main():
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--step_size', type=float, default=0.01)
     parser.add_argument('--njobs', type=int, default=-1)
+    parser.add_argument('--logdir', type=str, default='logs')
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--policy_init', type=str, default='xavier')
     parser.add_argument('--max_iters', type=int, default=500)
