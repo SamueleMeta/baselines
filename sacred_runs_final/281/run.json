@@ -1,0 +1,93 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/pois/nico/t3p/baselines/baselines/pois",
+    "dependencies": [
+      "baselines==0.1.5",
+      "gym==0.10.8",
+      "numpy==1.14.3",
+      "sacred==0.7.4",
+      "tensorflow==1.10.1"
+    ],
+    "mainfile": "run_sacred.py",
+    "name": "is_cartpole_tuning",
+    "repositories": [
+      {
+        "commit": "5a5baa768ae945be17b162a7a2bed2d44e548192",
+        "dirty": true,
+        "url": "https://github.com/t3p/baselines.git"
+      },
+      {
+        "commit": "5a5baa768ae945be17b162a7a2bed2d44e548192",
+        "dirty": true,
+        "url": "https://github.com/t3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "pois.py",
+        "_sources/pois_24c32f700c3c7739533e36529db7746d.py"
+      ],
+      [
+        "run_sacred.py",
+        "_sources/run_sacred_926b2f1738101acc8665dff2324ae499.py"
+      ]
+    ]
+  },
+  "heartbeat": "2019-02-18T19:31:05.613033",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E7-8880 v4 @ 2.20GHz",
+    "hostname": "turing",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-138-generic-x86_64-with-Ubuntu-16.04-xenial"
+    ],
+    "python_version": "3.5.2"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": false,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "experiment_name=is_cartpole_tuning",
+        "env=rllab.cartpole",
+        "policy=linear",
+        "iw_method=is",
+        "bound=max-d2",
+        "delta=0.2",
+        "gamma=0.99",
+        "center=False",
+        "njobs=1",
+        "seed=160",
+        "policy_init=zeros"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2019-02-18T16:34:03.980675",
+  "status": "COMPLETED",
+  "stop_time": "2019-02-18T19:31:05.608444"
+}
