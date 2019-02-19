@@ -131,7 +131,7 @@ def main():
     parser.add_argument('--env', type=str, default='cartpole')
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--policy_file', type=str, default=None)
-    parser.add_argument('--gamma', type=float, default=1.0)r
+    parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--output', type=str, default='render.pkl')
     args = parser.parse_args()
 
