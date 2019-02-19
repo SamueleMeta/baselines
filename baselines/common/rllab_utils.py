@@ -81,4 +81,5 @@ class Rllab2GymWrapper(gym.Env):
         pass
 
     def render(self, mode='human', close=False):
-        return self.rllab_env.render(mode=mode, close=close)
+        #return self.rllab_env.render(mode=mode, close=close)
+        return self.rllab_env.render()

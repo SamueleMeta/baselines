@@ -17,6 +17,7 @@ import pickle as pkl
 # Framework imports
 import gym
 import tensorflow as tf
+from time import sleep
 
 # Self imports: utils
 from baselines.common import set_global_seeds
@@ -36,6 +37,7 @@ def play_episode(env, pi, gamma, filename='render.pkl'):
     ob = env.reset()
     done = False
     reward = 0
+    disc_reward = 0
     disc = 1.0
     timesteps = 0
     renders = []
@@ -43,11 +45,13 @@ def play_episode(env, pi, gamma, filename='render.pkl'):
         ac, vpred = pi.act(True, ob)
         print("ACTION:", ac)
         ob, r, done, _ = env.step(ac)
-        reward = r * disc
+        reward += r
+        disc_reward += r * disc
         disc *= gamma
         timesteps += 1
         rend = env.render(mode='rgb_array', close=False)
         renders.append(rend)
+        sleep(0.05)
     print("Finished episode.")
     print("Total timesteps:", timesteps)
     print("Total reward:", reward)

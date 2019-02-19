@@ -17,6 +17,10 @@ from rllab.algos.trpo import TRPO
 from rllab.baselines.linear_feature_baseline import LinearFeatureBaseline
 from rllab.policies.gaussian_mlp_policy import GaussianMLPPolicy
 from rllab.envs.normalized_env import normalize
+from rllab.core.network import MLP
+# Lasagne
+import lasagne.nonlinearities as NL
+import lasagne.init as LI
 # Baselines
 from baselines import logger
 from baselines.common.rllab_utils import rllab_env_from_name
@@ -67,15 +71,43 @@ def train(env, policy, policy_init, num_episodes, horizon, **alg_args):
     env_class = rllab_env_from_name(env)
     env = normalize(env_class())
 
+    # Policy initialization
+    if policy_init == 'zeros':
+        initializer = LI.Constant(0)
+    elif policy_init == 'normal':
+        initializer = LI.Normal()
+    else:
+        raise Exception('Unrecognized policy initialization.')
+
     # Creating the policy
     if policy == 'linear':
-        hidden_sizes = []
+        obs_dim = env.observation_space.flat_dim
+        action_dim = env.action_space.flat_dim
+        mean_network = MLP(
+                    input_shape=(obs_dim,),
+                    output_dim=action_dim,
+                    hidden_sizes=tuple(),
+                    hidden_nonlinearity=NL.tanh,
+                    output_nonlinearity=None,
+                    output_b_init=None,
+                    output_W_init=initializer,
+                )
+        policy = GaussianMLPPolicy(
+            env_spec=env.spec,
+            # The neural network policy should have two hidden layers, each with 32 hidden units.
+            hidden_sizes=tuple(),
+            mean_network=mean_network,
+            log_weights=False,
+        )
     else:
         raise Exception('NOT IMPLEMENTED.')
-    policy = GaussianMLPPolicy(env_spec=env.spec, hidden_sizes=hidden_sizes)
 
     # Creating baseline
     baseline = LinearFeatureBaseline(env_spec=env.spec)
+
+    # Adding max_episodes constraint. If -1, this is unbounded
+    if num_episodes > 0:
+        alg_args['max_episodes'] = num_episodes
 
     # Run algorithm
     algo = TRPO(
@@ -83,7 +115,6 @@ def train(env, policy, policy_init, num_episodes, horizon, **alg_args):
         policy=policy,
         baseline=baseline,
         batch_size=horizon * num_episodes,
-        max_episodes=num_episodes,
         whole_paths=True,
         max_path_length=horizon,
         **alg_args
