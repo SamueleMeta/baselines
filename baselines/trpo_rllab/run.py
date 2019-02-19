@@ -55,7 +55,7 @@ def train(env, policy, policy_init, num_episodes, episode_cap, horizon, **alg_ar
             # The neural network policy should have two hidden layers, each with 32 hidden units.
             hidden_sizes=tuple(),
             mean_network=mean_network,
-            log_weights=False,
+            log_weights=True,
         )
     else:
         raise Exception('NOT IMPLEMENTED.')
@@ -102,6 +102,7 @@ def main():
     else:
         file_name = args.file_name
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
+    
     train(env=args.env,
           policy=args.policy,
           policy_init=args.policy_init,

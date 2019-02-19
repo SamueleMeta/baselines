@@ -49,6 +49,7 @@ def custom_config():
     seed = 0
     env = 'rllab.cartpole'
     num_episodes = 100
+    episode_cap = False
     max_iters = 500
     horizon = 500
     file_name = 'progress'
@@ -65,7 +66,7 @@ def custom_config():
     else:
         file_name = file_name
 
-def train(env, policy, policy_init, num_episodes, horizon, **alg_args):
+def train(env, policy, policy_init, num_episodes, episode_cap, horizon, **alg_args):
 
     # Getting the environment
     env_class = rllab_env_from_name(env)
@@ -97,7 +98,7 @@ def train(env, policy, policy_init, num_episodes, horizon, **alg_args):
             # The neural network policy should have two hidden layers, each with 32 hidden units.
             hidden_sizes=tuple(),
             mean_network=mean_network,
-            log_weights=False,
+            log_weights=True,
         )
     else:
         raise Exception('NOT IMPLEMENTED.')
@@ -106,7 +107,7 @@ def train(env, policy, policy_init, num_episodes, horizon, **alg_args):
     baseline = LinearFeatureBaseline(env_spec=env.spec)
 
     # Adding max_episodes constraint. If -1, this is unbounded
-    if num_episodes > 0:
+    if episode_cap:
         alg_args['max_episodes'] = num_episodes
 
     # Run algorithm
@@ -122,14 +123,15 @@ def train(env, policy, policy_init, num_episodes, horizon, **alg_args):
     algo.train()
 
 @ex.automain
-def main(seed, env, num_episodes, horizon, file_name, logdir, step_size, njobs,
-            policy, policy_init, gamma, max_iters, _run):
+def main(seed, env, num_episodes, episode_cap, horizon, file_name, logdir,
+            step_size, njobs, policy, policy_init, gamma, max_iters, _run):
 
     logger.configure(dir=logdir, format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
     train(env=env,
           policy=policy,
           policy_init=policy_init,
           n_episodes=num_episodes,
+          episode_cap=episode_cap,
           horizon=horizon,
           seed=seed,
           njobs=njobs,
