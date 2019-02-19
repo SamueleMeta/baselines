@@ -24,28 +24,14 @@ from baselines import logger
 import baselines.common.tf_util as U
 from baselines.common.rllab_utils import Rllab2GymWrapper, rllab_env_from_name
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
+from baselines.common.cmd_util import get_env_type
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.pois import pois
 from baselines.pois.parallel_sampler import ParallelSampler
 
-def get_env_type(env_id):
-    #First load all envs
-    _game_envs = defaultdict(set)
-    for env in gym.envs.registry.all():
-        # TODO: solve this with regexes
-        env_type = env._entry_point.split(':')[0].split('.')[-1]
-        _game_envs[env_type].add(env.id)
-    # Get env type
-    env_type = None
-    for g, e in _game_envs.items():
-        if env_id in e:
-            env_type = g
-            break
-    return env_type
-
-def play_episode(env, pi, gamma):
+def play_episode(env, pi, gamma, filename='render.pkl'):
 
     ob = env.reset()
     done = False
@@ -66,7 +52,7 @@ def play_episode(env, pi, gamma):
     print("Total timesteps:", timesteps)
     print("Total reward:", reward)
 
-    pkl.dump(renders, open('renders.pkl', 'wb'))
+    pkl.dump(renders, open(filename, 'wb'))
 
 def create_policy_and_env(env, seed, policy, policy_file):
     # Session
@@ -146,10 +132,11 @@ def main():
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--policy_file', type=str, default=None)
     parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--output', type=str, default='render.pkl')
     args = parser.parse_args()
 
     env, pi = create_policy_and_env(args.env, args.seed, args.policy, args.policy_file)
-    play_episode(env, pi, args.gamma)
+    play_episode(env, pi, args.gamma, args.output)
 
 if __name__ == '__main__':
     main()
