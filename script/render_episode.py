@@ -29,7 +29,7 @@ from baselines.common.cmd_util import get_env_type
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.pois import pois
-from baselines.pois.parallel_sampler import ParallelSampler
+from baselines.common import ParallelSampler
 
 def play_episode(env, pi, gamma, filename='render.pkl'):
 
@@ -131,7 +131,7 @@ def main():
     parser.add_argument('--env', type=str, default='cartpole')
     parser.add_argument('--policy', type=str, default='nn')
     parser.add_argument('--policy_file', type=str, default=None)
-    parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--gamma', type=float, default=1.0)r
     parser.add_argument('--output', type=str, default='render.pkl')
     args = parser.parse_args()
 
