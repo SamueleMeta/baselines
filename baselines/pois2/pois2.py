@@ -316,7 +316,7 @@ def learn(env, make_policy, *,
           iw_norm='none',
           bound='J',
           line_search_type='parabola',
-          save_weights=False,
+          save_weights=0,
           improvement_tol=0.,
           center_return=False,
           render_after=None,
@@ -680,8 +680,11 @@ def learn(env, make_policy, *,
             logger.record_tabular("PolicyRatio", seg['policy_time'] / seg['total_time'])
             logger.record_tabular("EnvRatio", seg['env_time'] / seg['total_time'])
 
-        if save_weights:
+        if save_weights > 0 and iters_so_far % save_weights == 0:
             logger.record_tabular('Weights', str(get_parameter()))
+            import pickle
+            file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
+            pickle.dump(theta, file)
 
         with timed("offline optimization"):
 

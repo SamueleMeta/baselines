@@ -61,7 +61,7 @@ def custom_config():
     bound = 'max-d2'
     delta = 0.99
     njobs = -1
-    save_weights = False
+    save_weights = 0
     policy = 'nn'
     policy_init = 'xavier'
     max_offline_iters = 10
@@ -89,7 +89,7 @@ def custom_config():
     else:
         file_name = file_name
 
-def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=False, **alg_args):
+def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class

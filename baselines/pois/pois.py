@@ -312,7 +312,7 @@ def learn(make_env, make_policy, *,
           iw_norm='none',
           bound='J',
           line_search_type='parabola',
-          save_weights=False,
+          save_weights=0,
           improvement_tol=0.,
           center_return=False,
           render_after=None,
@@ -739,10 +739,10 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
 
-        if save_weights:
+        if save_weights > 0 and iters_so_far % save_weights == 0:
             logger.record_tabular('Weights', str(get_parameter()))
             import pickle
-            file = open('checkpoint.pkl', 'wb')
+            file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
             pickle.dump(theta, file)
 
         with timed("offline optimization"):

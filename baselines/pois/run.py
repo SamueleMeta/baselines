@@ -25,7 +25,7 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.pois import pois
 
-def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=False, **alg_args):
+def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -124,7 +124,7 @@ def main():
     parser.add_argument('--entropy', type=str, default='none')
     parser.add_argument('--reward_clustering', type=str, default='none')
     parser.add_argument('--experiment_name', type=str, default='none')
-    parser.add_argument('--save_weights', action='store_true', default=False, help='Save policy weights.')
+    parser.add_argument('--save_weights', type=int, default=0)
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())

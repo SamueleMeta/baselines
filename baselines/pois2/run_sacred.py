@@ -61,6 +61,7 @@ def custom_config():
     clipping = False
     entropy = 'none'
     positive_return = False
+    save_weights = 0
     # ENTROPY can be of 4 schemes:
     #    - 'none'
     #    - 'step:<height>:<duration>': step function which is <height> tall for <duration> iterations
@@ -149,7 +150,8 @@ def train(env, policy, seed, njobs=1, **alg_args):
 
 @ex.automain
 def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_name, logdir, bound, delta,
-            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, max_iters, positive_return, _run):
+            njobs, policy, max_offline_iters, gamma, center, clipping, entropy, max_iters,
+            save_weights, positive_return, _run):
 
     logger.configure(dir=logdir, format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
     train(env=env,
@@ -168,4 +170,5 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural, file_nam
           max_offline_iters=max_offline_iters,
           center_return=center,
           clipping=clipping,
-          entropy=entropy)
+          entropy=entropy,
+          save_weights=save_weights)
