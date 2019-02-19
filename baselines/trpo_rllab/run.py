@@ -23,7 +23,7 @@ from baselines import logger
 from baselines.common.rllab_utils import rllab_env_from_name
 from baselines.common.cmd_util import get_env_type
 
-def train(env, policy, policy_init, num_episodes, horizon, **alg_args):
+def train(env, policy, policy_init, num_episodes, episode_cap, horizon, **alg_args):
 
     # Getting the environment
     env_class = rllab_env_from_name(env)
@@ -64,7 +64,7 @@ def train(env, policy, policy_init, num_episodes, horizon, **alg_args):
     baseline = LinearFeatureBaseline(env_spec=env.spec)
 
     # Adding max_episodes constraint. If -1, this is unbounded
-    if num_episodes > 0:
+    if episode_cap:
         alg_args['max_episodes'] = num_episodes
 
     # Run algorithm
@@ -106,6 +106,7 @@ def main():
           policy=args.policy,
           policy_init=args.policy_init,
           num_episodes=args.num_episodes,
+          episode_cap=args.episode_cap,
           horizon=args.horizon,
           seed=args.seed,
           n_itr=args.max_iters,
