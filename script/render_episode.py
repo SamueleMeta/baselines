@@ -29,7 +29,7 @@ from baselines.common.cmd_util import get_env_type
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.pois import pois
-from baselines.common import ParallelSampler
+from baselines.common.parallel_sampler import ParallelSampler
 
 def play_episode(env, pi, gamma, filename='render.pkl'):
 
