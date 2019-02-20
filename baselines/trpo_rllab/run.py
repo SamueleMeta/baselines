@@ -15,6 +15,7 @@ from rllab.baselines.linear_feature_baseline import LinearFeatureBaseline
 from rllab.policies.gaussian_mlp_policy import GaussianMLPPolicy
 from rllab.envs.normalized_env import normalize
 from rllab.core.network import MLP
+from rllab.misc.instrument import run_experiment_lite
 # Lasagne
 import lasagne.nonlinearities as NL
 import lasagne.init as LI
@@ -102,7 +103,7 @@ def main():
     else:
         file_name = args.file_name
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
-    
+
     train(env=args.env,
           policy=args.policy,
           policy_init=args.policy_init,
