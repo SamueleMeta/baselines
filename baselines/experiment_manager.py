@@ -75,7 +75,7 @@ if args.command == 'launch':
         script = 'baselines/' + script + '.py '
         _c = cmd_base + script
         # Check if dirty and if to use with
-        if args.sacred and args.dirty:
+        if args.sacred and not args.dirty:
             _c += '-e '
         if args.sacred and len(param_cols) > 0:
             _c += 'with '
