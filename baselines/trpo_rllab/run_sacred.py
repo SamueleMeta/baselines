@@ -137,4 +137,5 @@ def main(seed, env, num_episodes, episode_cap, horizon, file_name, logdir,
           njobs=njobs,
           max_iters=max_iters,
           step_size=step_size,
-          gamma=gamma)
+          gamma=gamma,
+          logger=logger)

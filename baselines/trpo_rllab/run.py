@@ -113,7 +113,8 @@ def main():
           seed=args.seed,
           n_itr=args.max_iters,
           step_size=args.step_size,
-          discount=args.gamma,)
+          discount=args.gamma,
+          logger=logger)
 
 if __name__ == '__main__':
     main()

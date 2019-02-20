@@ -123,7 +123,10 @@ def create_policy_and_env(env, seed, policy, policy_file):
     var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
     set_parameter = U.SetFromFlat(var_list)
 
-    weights = pkl.load(open(policy_file, 'rb'))
+    #weights = pkl.load(open(policy_file, 'rb'))
+    # TMP overriding weights
+    #weights = [-0.19337249, -0.12103618, 0.00849289, -0.1105529, -3.6525128] # TRPO
+    weights = [-0.5894, -0.2585, -0.0137, -0.2464, -0.2788] # POIS
     pi.set_param(weights)
 
     return env, pi
