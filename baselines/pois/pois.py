@@ -738,9 +738,9 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("EpisodesSoFar", episodes_so_far)
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
+            logger.record_tabular('Weights', str(["{0:0.4f}".format(i) for i in get_parameter()]))
 
         if save_weights > 0 and iters_so_far % save_weights == 0:
-            logger.record_tabular('Weights', str(get_parameter()))
             import pickle
             file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
             pickle.dump(theta, file)
