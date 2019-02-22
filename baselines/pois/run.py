@@ -56,7 +56,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
 
     if policy == 'linear':
         hid_size = num_hid_layers = 0
-    elif policy = 'simple-nn':
+    elif policy == 'simple-nn':
         hid_size = [16]
         num_hid_layers = 1
     elif policy == 'nn':
