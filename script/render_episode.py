@@ -98,12 +98,15 @@ def create_policy_and_env(env, seed, policy, policy_file):
     # Make policy
     if policy == 'linear':
         hid_size = num_hid_layers = 0
+    elif policy == 'simple-nn':
+        hid_size = [16]
+        num_hid_layers = 1
     elif policy == 'nn':
         hid_size = [100, 50, 25]
         num_hid_layers = 3
     # Temp initializer
     policy_initializer = U.normc_initializer(0.0)
-    if policy == 'linear' or policy == 'nn':
+    if policy == 'linear' or policy == 'nn' or policy == 'simple-nn':
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                              hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,

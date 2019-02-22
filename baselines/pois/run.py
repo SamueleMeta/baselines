@@ -67,6 +67,8 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
         policy_initializer = tf.contrib.layers.xavier_initializer()
     elif policy_init == 'zeros':
         policy_initializer = U.normc_initializer(0.0)
+    elif policy_init == 'small-weights':
+        policy_initializer = U.normc_initializer(0.1)
     else:
         raise Exception('Unrecognized policy initializer.')
 
