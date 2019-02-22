@@ -126,7 +126,8 @@ def create_policy_and_env(env, seed, policy, policy_file):
     #weights = pkl.load(open(policy_file, 'rb'))
     # TMP overriding weights
     #weights = [-0.19337249, -0.12103618, 0.00849289, -0.1105529, -3.6525128] # TRPO
-    weights = [-0.5894, -0.2585, -0.0137, -0.2464, -0.2788] # POIS
+    #weights = [-0.5894, -0.2585, -0.0137, -0.2464, -0.2788] # POIS
+    weights = list(map(float, ['-0.5807', '-0.3046', '-0.0127', '-0.3045', '-0.7427']))
     pi.set_param(weights)
 
     return env, pi

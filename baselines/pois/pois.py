@@ -488,10 +488,11 @@ def learn(make_env, make_policy, *,
             iwn = iw / tf.reduce_sum(iw)
             w_return_mean = tf.reduce_sum(iwn * ep_return)
         elif iw_norm == 'regression':
-            iwn = iw / n_episodes
+            # Get optimized beta
             mean_iw = tf.reduce_mean(iw)
             beta = tf.reduce_sum((iw - mean_iw) * ep_return * iw) / (tf.reduce_sum((iw - mean_iw) ** 2) + 1e-24)
-            w_return_mean = tf.reduce_mean(iw * ep_return - beta * (iw - 1))
+            # Get the estimator
+            w_return_mean = tf.reduce_sum(ep_return * iw + beta * (iw - 1)) / n_episodes
         else:
             raise NotImplementedError()
         ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
