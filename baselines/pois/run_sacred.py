@@ -120,6 +120,9 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
 
     if policy == 'linear':
         hid_size = num_hid_layers = 0
+    elif policy = 'simple-nn':
+        hid_size = [16]
+        num_hid_layers = 1
     elif policy == 'nn':
         hid_size = [100, 50, 25]
         num_hid_layers = 3
@@ -131,7 +134,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     else:
         raise Exception('Unrecognized policy initializer.')
 
-    if policy == 'linear' or policy == 'nn':
+    if policy == 'linear' or policy == 'nn' or policy == 'simple-nn':
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                              hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
