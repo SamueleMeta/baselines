@@ -38,28 +38,33 @@ def train(env, policy, policy_init, num_episodes, episode_cap, horizon, **alg_ar
     else:
         raise Exception('Unrecognized policy initialization.')
 
-    # Creating the policy
+    # Setting the policy type
     if policy == 'linear':
-        obs_dim = env.observation_space.flat_dim
-        action_dim = env.action_space.flat_dim
-        mean_network = MLP(
-                    input_shape=(obs_dim,),
-                    output_dim=action_dim,
-                    hidden_sizes=tuple(),
-                    hidden_nonlinearity=NL.tanh,
-                    output_nonlinearity=None,
-                    output_b_init=None,
-                    output_W_init=initializer,
-                )
-        policy = GaussianMLPPolicy(
-            env_spec=env.spec,
-            # The neural network policy should have two hidden layers, each with 32 hidden units.
-            hidden_sizes=tuple(),
-            mean_network=mean_network,
-            log_weights=True,
-        )
+        hidden_sizes = tuple()
+    elif policy == 'simple-nn':
+        hidden_sizes = [16]
     else:
         raise Exception('NOT IMPLEMENTED.')
+
+    # Creating the policy
+    obs_dim = env.observation_space.flat_dim
+    action_dim = env.action_space.flat_dim
+    mean_network = MLP(
+                input_shape=(obs_dim,),
+                output_dim=action_dim,
+                hidden_sizes=hidden_sizes,
+                hidden_nonlinearity=NL.tanh,
+                output_nonlinearity=None,
+                output_b_init=None,
+                output_W_init=initializer,
+            )
+    policy = GaussianMLPPolicy(
+        env_spec=env.spec,
+        # The neural network policy should have two hidden layers, each with 32 hidden units.
+        hidden_sizes=hidden_sizes,
+        mean_network=mean_network,
+        log_weights=True,
+    )
 
     # Creating baseline
     baseline = LinearFeatureBaseline(env_spec=env.spec)
