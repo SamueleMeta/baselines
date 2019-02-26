@@ -66,7 +66,7 @@ class MlpPolicy(object):
                 self.mean = mean = tf.layers.dense(last_out, pdtype.param_shape()[0]//2,
                                        name='final',
                                        kernel_initializer=output_W_init,
-                                       use_bias=use_bias)
+                                       use_bias=False) # FIXME: USE BIAS OR NOT?
                 self.logstd = logstd = tf.get_variable(name="pol_logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=output_b_init)
                 pdparam = tf.concat([mean, mean * 0.0 + logstd], axis=1)
             else:
@@ -526,7 +526,7 @@ class MlpPolicy(object):
         with tf.variable_scope('pol') as vs:
             self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
-
+        print(self.var_list)
         self.get_parameter = U.GetFlat(self.var_list)
         self.set_parameter = U.SetFromFlat(self.var_list)
 

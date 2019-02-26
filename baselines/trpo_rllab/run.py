@@ -85,6 +85,9 @@ def train(env, policy, policy_init, num_episodes, episode_cap, horizon, **alg_ar
     )
     algo.train()
 
+    print('----- ENDING ------')
+    print(policy.get_param_values())
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
