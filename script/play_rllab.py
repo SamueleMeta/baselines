@@ -36,6 +36,7 @@ from baselines.common.parallel_sampler import ParallelSampler
 # ============================
 # HARD CODED WEIGHTS
 # ============================
+'''
 WEIGHTS = list(map(lambda x: x.rstrip(' \r\n') if len(x.rstrip(' \r\n')) > 0 else None, """0.05305602 -0.18459691  0.70950599  0.53141615  0.31627853 -0.29742844
  -0.61745293  0.51616656 -0.31569655 -0.33130817  0.40292603 -0.29140672
  -0.57827868 -0.13929554  0.21483592 -0.15595037  0.17454522 -0.19326297
@@ -55,10 +56,15 @@ WEIGHTS = list(map(lambda x: x.rstrip(' \r\n') if len(x.rstrip(' \r\n')) > 0 els
  -2.63364337""".replace('\n',' ').rstrip(' \r\n').split(' ')))
 WEIGHTS = [w for w in WEIGHTS if w is not None]
 WEIGHTS = list(map(float, WEIGHTS))
+'''
+
+WEIGHTS = ['0.1163', '-0.3044', '-0.1754', '0.0914', '-0.0129', '-0.1291', '-0.0098', '-0.2662', '0.0580', '-0.1830', '-0.1240', '0.2472', '-0.1398', '-0.1622', '0.2156', '-0.1441', '0.0631', '-0.0534', '-0.1399', '-0.0087', '-0.0867', '-0.1211', '-0.0542', '-0.0151', '-0.0275', '-0.0898', '-0.1394', '0.1250', '-0.1422', '-0.1334', '-0.0221', '-0.0983', '0.1030', '0.0052', '-0.0084', '-0.0814', '0.0374', '0.0227', '0.0819', '-0.0214', '-0.0257', '0.0081', '0.0154', '0.0081', '0.0063', '0.0114', '-0.0122', '-0.0223', '0.1098', '-0.0778', '-0.0661', '0.0696', '-0.0625', '-0.0549', '-0.0241', '-0.0638', '-0.0703', '-0.0516', '-0.0629', '0.0665', '-0.0701', '-0.0701', '0.0640', '-0.0399', '-0.0130', '-0.0029', '0.0008', '0.0047', '-0.0025', '-0.0049', '-0.0017', '0.0086', '-0.0012', '-0.0038', '-0.0040', '0.0017', '-0.0022', '-0.0028', '0.0018', '-0.0001', '-0.1935', '0.3248', '0.2395', '-0.1013', '0.0603', '0.1723', '0.0294', '0.2791', '-0.0009', '0.1988', '0.1828', '-0.2936', '0.2109', '0.2184', '-0.2037', '0.1647', '-0.2419']
+#WEIGHTS = ['-0.6329', '-0.2922', '0.0046', '-0.2229', '-0.2590']
+WEIGHTS = list(map(float, WEIGHTS))
 
 # ============================
 
-def play_episode(env, pi, gamma, horizon=500):
+def play_episode(env, pi, gamma, horizon=500, render=False):
     ob = env.reset()
     done = False
     reward = disc_reward = 0.0
@@ -77,7 +83,10 @@ def play_episode(env, pi, gamma, horizon=500):
         disc_reward += r * disc
         disc *= gamma
         timesteps += 1
-        # TODO: add renders
+        if render:
+            rend = env.render(mode='rgb_array', close=False)
+            frames.append(rend)
+            sleep(0.01)
     return {
         'reward': reward,
         'frames': frames
@@ -219,10 +228,11 @@ def main():
     N = 1 if args.command == 'render' else args.episodes
     rewards = []
     for i in trange(N):
-        stats = play_episode(env, pi, args.gamma)
+        stats = play_episode(env, pi, args.gamma, render=args.command=='render')
         rewards.append(stats['reward'])
 
     if args.command == 'render':
+        print("Mean reward:", np.mean(rewards))
         pass # TODO save frames
     elif args.command == 'stats':
         print("Mean reward:", np.mean(rewards))
