@@ -383,8 +383,10 @@ def learn(make_env, make_policy, *,
         rew_split = tf.clip_by_value(rew_split, -1, 1)
 
     if center_return:
-        ep_return = ep_return - tf.reduce_mean(ep_return)
-        rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
+        # SUPER TEMPORARY TWEAK FOR INVERTED-PENDULUM, DON'T LEAVE THIS HERE
+        ep_return = ep_return + 600
+        #ep_return = ep_return - tf.reduce_mean(ep_return)
+        #rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
 
     discounter = [pow(gamma, i) for i in range(0, horizon)] # Decreasing gamma
     discounter_tf = tf.constant(discounter)
