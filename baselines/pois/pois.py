@@ -384,7 +384,7 @@ def learn(make_env, make_policy, *,
 
     if center_return:
         # SUPER TEMPORARY TWEAK FOR INVERTED-PENDULUM, DON'T LEAVE THIS HERE
-        ep_return = ep_return + 600
+        rew_split = rew_split + 1
         #ep_return = ep_return - tf.reduce_mean(ep_return)
         #rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
 
