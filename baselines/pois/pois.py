@@ -202,7 +202,8 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
     return theta_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
 
-def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
+def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4,
+                        bound_tol=1e-4, max_offline_ite=100, min_step_size=0.0):
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
     set_parameter(theta)
@@ -273,6 +274,12 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
         theta_old = theta
         improvement_old = improvement
         theta, epsilon, delta_bound, num_line_search = line_search(theta, alpha, natural_gradient, set_parameter, evaluate_loss)
+
+        # TMP: setting minimum step size
+        if epsilon * alpha < min_step_size:
+            print("Overriding step size of:", epsilon * alpha)
+            theta = theta_old + natural_gradient * min_step_size * alpha
+
         set_parameter(theta)
 
         improvement += delta_bound
@@ -321,7 +328,8 @@ def learn(make_env, make_policy, *,
           clipping=False,
           entropy='none',
           positive_return=False,
-          reward_clustering='none'):
+          reward_clustering='none',
+          min_step_size=0.0):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -756,7 +764,8 @@ def learn(make_env, make_policy, *,
                                                   evaluate_loss,
                                                   evaluate_gradient,
                                                   evaluate_natural_gradient,
-                                                  max_offline_ite=max_offline_iters)
+                                                  max_offline_ite=max_offline_iters,
+                                                  min_step_size=min_step_size)
 
         set_parameter(theta)
 
