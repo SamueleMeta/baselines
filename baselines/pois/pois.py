@@ -391,8 +391,10 @@ def learn(make_env, make_policy, *,
         rew_split = tf.clip_by_value(rew_split, -1, 1)
 
     if center_return:
-        ep_return = ep_return - tf.reduce_mean(ep_return)
-        rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
+        # TMP: add reward to avoid suicide
+        rew_split = rew_split + 1.0 
+        #ep_return = ep_return - tf.reduce_mean(ep_return)
+        #rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
 
     discounter = [pow(gamma, i) for i in range(0, horizon)] # Decreasing gamma
     discounter_tf = tf.constant(discounter)
@@ -469,32 +471,6 @@ def learn(make_env, make_policy, *,
         ratio_cumsum = tf.exp(log_ratio_cumsum)
         # Multiply by the step-wise reward (not episode)
         ratio_reward = ratio_cumsum * disc_rew_split
-        # Average on episodes
-        ratio_reward_per_episode = tf.reduce_sum(ratio_reward, axis=1)
-        w_return_mean = tf.reduce_sum(ratio_reward_per_episode, axis=0) / n_episodes
-        # Get d2(w0:t) with mask
-        d2_w_0t = tf.exp(tf.cumsum(emp_d2_split, axis=1)) * mask_split # LEAVE THIS OUTSIDE
-        # Sum d2(w0:t) over timesteps
-        episode_d2_0t = tf.reduce_sum(d2_w_0t, axis=1)
-        # Sample variance
-        J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(ratio_reward_per_episode - w_return_mean))
-        losses_with_name.append((J_sample_variance, 'J_sample_variance'))
-        losses_with_name.extend([(tf.reduce_max(ratio_cumsum), 'MaxIW'),
-                                 (tf.reduce_min(ratio_cumsum), 'MinIW'),
-                                 (tf.reduce_mean(ratio_cumsum), 'MeanIW'),
-                                 (U.reduce_std(ratio_cumsum), 'StdIW')])
-        losses_with_name.extend([(tf.reduce_max(d2_w_0t), 'MaxD2w0t'),
-                                 (tf.reduce_min(d2_w_0t), 'MinD2w0t'),
-                                 (tf.reduce_mean(d2_w_0t), 'MeanD2w0t'),
-                                 (U.reduce_std(d2_w_0t), 'StdD2w0t')])
-    # TMP
-    elif iw_method == 'pdis-gammaone':
-        # log_ratio_split cumulative sum
-        log_ratio_cumsum = tf.cumsum(log_ratio_split, axis=1)
-        # Exponentiate
-        ratio_cumsum = tf.exp(log_ratio_cumsum)
-        # Multiply by the step-wise reward (not episode)
-        ratio_reward = ratio_cumsum * rew_split
         # Average on episodes
         ratio_reward_per_episode = tf.reduce_sum(ratio_reward, axis=1)
         w_return_mean = tf.reduce_sum(ratio_reward_per_episode, axis=0) / n_episodes
