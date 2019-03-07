@@ -392,7 +392,7 @@ def learn(make_env, make_policy, *,
 
     if center_return:
         # TMP: add reward to avoid suicide
-        rew_split = rew_split + 1.0 
+        rew_split = rew_split + 1.0
         #ep_return = ep_return - tf.reduce_mean(ep_return)
         #rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
 
@@ -627,6 +627,11 @@ def learn(make_env, make_policy, *,
             ent_f = tf.exp(-tf.abs(tf.reduce_mean(iw) - 1) * float(v2)) * float(v1)
             losses_with_name.append((ent_f, 'EntropyCoefficient'))
             bound_ = bound_ + ent_f * meanent
+        elif scheme == 'steprew':
+            entcoeff = tf.cond(iter_number_ < int(v2), lambda: float(v1), lambda: float(0.0))
+            losses_with_name.append((entcoeff, 'EntropyCoefficient'))
+            entbonus = entcoeff * meanent * discounted_episode_reward
+            bound_ = bound_ + entbonus
         else:
             raise Exception('Unrecognized entropy scheme.')
 
