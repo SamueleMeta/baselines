@@ -630,7 +630,7 @@ def learn(make_env, make_policy, *,
         elif scheme == 'steprew':
             entcoeff = tf.cond(iter_number_ < int(v2), lambda: float(v1), lambda: float(0.0))
             losses_with_name.append((entcoeff, 'EntropyCoefficient'))
-            entbonus = entcoeff * meanent * discounted_episode_reward
+            entbonus = entcoeff * meanent * tf.mean(discounted_episode_reward)
             bound_ = bound_ + entbonus
         else:
             raise Exception('Unrecognized entropy scheme.')
