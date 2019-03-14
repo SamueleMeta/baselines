@@ -28,7 +28,7 @@ from baselines.common.cmd_util import get_env_type
 
 # Sacred
 from sacred import Experiment
-from sacred.observers import FileStorageObserver, SlackObserver
+from sacred.observers import FileStorageObserver, SlackObserver, MongoObserver
 
 # Create experiment, assign the name if provided in env variables
 if os.environ.get('EXPERIMENT_NAME') is not None:
@@ -37,7 +37,11 @@ else:
     ex = Experiment('POIS')
 
 # Set a File Observer
-if os.environ.get('SACRED_RUNS_DIRECTORY') is not None:
+if os.environ.get('SACRED_MONGODB_URL') is not None and os.environ.get('SACRED_MONGODB_NAME') is not None:
+    print("Sacred logging on MongoDB at", os.environ.get('SACRED_MONGODB_URL'), "|| DB:", os.environ.get('SACRED_MONGODB_NAME'))
+    ex.observers.append(MongoObserver.create(
+        url=os.environ.get('SACRED_MONGODB_URL')))
+elif os.environ.get('SACRED_RUNS_DIRECTORY') is not None:
     print("Sacred logging at:", os.environ.get('SACRED_RUNS_DIRECTORY'))
     ex.observers.append(FileStorageObserver.create(os.environ.get('SACRED_RUNS_DIRECTORY')))
 if os.environ.get('SACRED_SLACK_CONFIG') is not None:

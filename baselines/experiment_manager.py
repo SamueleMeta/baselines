@@ -39,6 +39,7 @@ parser.add_argument('--cuda_devices', help='CUDA visible devices.', type=str, de
 parser.add_argument('--sacred', action='store_true', default=False, help='Enable sacred.')
 parser.add_argument('--sacred_dir', help='Dir used by sacred to log.', type=str, default=None)
 parser.add_argument('--sacred_slack', help='Config file for slack.', type=str, default=None)
+parser.add_argument('--sacred_mongo', help='Config file for MongoDB. It automatically excludes FileObserver.', type=str, default=None)
 parser.add_argument('--dirty', action='store_true', default=False, help='Enable sacred dirty running.')
 args = parser.parse_args()
 
@@ -53,6 +54,13 @@ if args.command == 'launch':
     # Set env variables
     cmd_base += 'export CUDA_VISIBLE_DEVICES=' + args.cuda_devices + ' && '
     cmd_base += 'export EXPERIMENT_NAME=' + args.name + ' && '
+    if args.sacred and args.sacred_mongo:
+        # Load JSON config for monogdb
+        import json
+        mongo_config = json.load(open(args.sacred_mongo))
+        mongo_url = mongo_config['url']
+        # Add URL and NAME
+        cmd_base += 'export SACRED_MONGODB_URL=' + mongo_url + ' && '
     if args.sacred_dir and args.sacred:
         cmd_base += 'export SACRED_RUNS_DIRECTORY=' + args.sacred_dir + ' && '
     if args.sacred_slack and args.sacred:
