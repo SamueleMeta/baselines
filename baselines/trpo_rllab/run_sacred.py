@@ -40,7 +40,8 @@ else:
 if os.environ.get('SACRED_MONGODB_URL') is not None and os.environ.get('SACRED_MONGODB_NAME') is not None:
     print("Sacred logging on MongoDB at", os.environ.get('SACRED_MONGODB_URL'), "|| DB:", os.environ.get('SACRED_MONGODB_NAME'))
     ex.observers.append(MongoObserver.create(
-        url=os.environ.get('SACRED_MONGODB_URL')))
+        url=os.environ.get('SACRED_MONGODB_URL'),
+        db_name=os.environ.get('SACRED_MONGODB_NAME')))
 elif os.environ.get('SACRED_RUNS_DIRECTORY') is not None:
     print("Sacred logging at:", os.environ.get('SACRED_RUNS_DIRECTORY'))
     ex.observers.append(FileStorageObserver.create(os.environ.get('SACRED_RUNS_DIRECTORY')))

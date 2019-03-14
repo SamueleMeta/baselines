@@ -59,8 +59,10 @@ if args.command == 'launch':
         import json
         mongo_config = json.load(open(args.sacred_mongo))
         mongo_url = mongo_config['url']
+        mongo_name = mongo_config['name']
         # Add URL and NAME
         cmd_base += 'export SACRED_MONGODB_URL=' + mongo_url + ' && '
+        cmd_base += 'export SACRED_MONGODB_NAME=' + mongo_name + ' && '
     if args.sacred_dir and args.sacred:
         cmd_base += 'export SACRED_RUNS_DIRECTORY=' + args.sacred_dir + ' && '
     if args.sacred_slack and args.sacred:
