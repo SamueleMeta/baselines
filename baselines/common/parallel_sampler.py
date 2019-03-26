@@ -129,11 +129,14 @@ class Worker(Process):
 class ParallelSampler(object):
 
     def __init__(self, make_pi, make_env, n_episodes, horizon, stochastic, n_workers=-1, seed=0):
-        affinity = len(os.sched_getaffinity(0))
-        if n_workers == -1:
-            self.n_workers = affinity
-        else:
-            self.n_workers = min(n_workers, affinity)
+        try:
+            affinity = len(os.sched_getaffinity(0))
+            if n_workers == -1:
+                self.n_workers = affinity
+            else:
+                self.n_workers = min(n_workers, affinity)
+        except:
+            self.n_workers = max(1, n_workers)
 
         print('Using %s CPUs' % self.n_workers)
 
