@@ -419,7 +419,7 @@ def learn(make_env, make_policy, *,
         # Get the denominator by averaging over behavioral policies
         behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0) + 1e-24
         # Compute the J
-        w_return_mean = tf.reduce_mean(target_pdf_episode / behavioral_pdf_mixture)
+        w_return_mean = tf.reduce_mean(ep_return * target_pdf_episode / behavioral_pdf_mixture)
     else:
         raise NotImplementedError()
 
