@@ -81,7 +81,6 @@ class Memory():
                 previous_pi = target_pi
             else:
                 previous_pi = self.policies[i-1]
-            print("Creating op", i)
             op = U.function([], [], updates=[tf.assign(oldv, newv) for (oldv, newv) in zipsame(self.policies[i].get_variables(), previous_pi.get_variables())])
             self.assigning_ops.append(op)
 

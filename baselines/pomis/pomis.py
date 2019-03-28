@@ -417,7 +417,7 @@ def learn(make_env, make_policy, *,
         target_pdf_episode = tf.exp(target_log_pdf_episode)
         behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode)
         # Get the denominator by averaging over behavioral policies
-        behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0)
+        behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0) + 1e-24
         # Compute the J
         w_return_mean = tf.reduce_mean(target_pdf_episode / behavioral_pdf_mixture)
     else:
