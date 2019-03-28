@@ -322,7 +322,8 @@ def learn(make_env, make_policy, *,
           clipping=False,
           entropy='none',
           positive_return=False,
-          reward_clustering='none'):
+          reward_clustering='none',
+          capacity=10):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -340,7 +341,7 @@ def learn(make_env, make_policy, *,
     ac_space = env.action_space
 
     # Creating the memory buffer
-    memory = Memory(capacity=3, batch_size=n_episodes, horizon=horizon,
+    memory = Memory(capacity=capacity, batch_size=n_episodes, horizon=horizon,
                     ob_space=ob_space, ac_space=ac_space)
 
     # Building the target policy and saving its parameters
