@@ -4,6 +4,9 @@ Practically, it is a buffer of trajectories and policies.
 """
 
 import numpy as np
+import baselines.common.tf_util as U
+from baselines.common import zipsame
+import tensorflow as tf
 
 class Memory():
 
@@ -12,6 +15,8 @@ class Memory():
         self.capacity = capacity
         self.batch_size = batch_size
         self.horizon = horizon
+        self.ob_space = ob_space
+        self.ac_space = ac_space
         self.ob_shape = list(ob_space.shape)
         self.ac_shape = list(ac_space.shape)
         self.strategy = strategy
@@ -24,6 +29,10 @@ class Memory():
             'new': None,
             'mask': None
         }
+        # Init the behavioral policies
+        self.policies = []
+        self.assigning_ops = []
+        self.get_flats = []
 
     def unflatten_batch_dict(self, batch):
         return {k: np.reshape(batch[k], [1, self.batch_size, self.horizon] + list(np.array(batch[k]).shape[1:])) for k in self.trajectory_buffer.keys()}
@@ -33,10 +42,14 @@ class Memory():
 
     def trim_batch(self):
         if self.strategy == 'fifo':
+            # Remove from observations
             for k, v in self.trajectory_buffer.items():
                 if v is not None and v.shape[0] == self.capacity:
                     # We remove the first one since they are inserted in order
                     self.trajectory_buffer[k] = np.delete(v, 0, axis=0)
+            # Use assigning ops, in reverse order
+            for i in range(self.capacity-1, -1, -1):
+                self.assigning_ops[i]()
         else:
             raise Exception('Trimming strategy not recognized.')
 
@@ -53,3 +66,27 @@ class Memory():
 
     def get_trajectories(self):
         return self.flatten_batch_dict(self.trajectory_buffer)
+
+    def build_policies(self, make_policy, target_pi):
+        # Build the policies
+        for i in range(self.capacity):
+            name = 'behavioral_' + str(i+1)
+            self.policies.append(make_policy(name, self.ob_space, self.ac_space))
+            all_var_list = self.policies[i].get_trainable_variables()
+            var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
+            self.get_flats.append(U.GetFlat(var_list))
+        # Build the swapping actions
+        for i in range(self.capacity):
+            if i == 0:
+                previous_pi = target_pi
+            else:
+                previous_pi = self.policies[i-1]
+            op = U.function([], [], updates=[tf.assign(oldv, newv) for (oldv, newv) in zipsame(self.policies[i].get_variables(), previous_pi.get_variables())])
+            self.assigning_ops.append(op)
+
+    def print_parameters(self):
+        if self.trajectory_buffer['ob'] is not None:
+            print('//', self.trajectory_buffer['ob'].shape[0])
+        for i in range(self.capacity):
+            theta = self.get_flats[i]()
+            print(i, theta)
