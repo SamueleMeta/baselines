@@ -67,6 +67,12 @@ class Memory():
     def get_trajectories(self):
         return self.flatten_batch_dict(self.trajectory_buffer)
 
+    def get_current_load(self):
+        if self.trajectory_buffer['ob'] is not None:
+            return self.trajectory_buffer['ob'].shape[0]
+        else:
+            return 0
+
     def build_policies(self, make_policy, target_pi):
         # Build the policies
         for i in range(self.capacity):

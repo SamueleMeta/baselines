@@ -371,9 +371,9 @@ def learn(make_env, make_policy, *,
     mask_split = tf.reshape(mask_, [-1, horizon])
 
     # Policy densities
-    target_log_pdf = pi.pd.logp(ac_)
+    target_log_pdf = pi.pd.logp(ac_) * mask_
     target_log_pdf_split = tf.reshape(target_log_pdf, [-1, horizon])
-    behavioral_log_pdfs = tf.stack([bpi.pd.logp(ac_) for bpi in memory.policies]) # Shape is (capacity, ntraj*horizon)
+    behavioral_log_pdfs = tf.stack([bpi.pd.logp(ac_) * mask_ for bpi in memory.policies]) # Shape is (capacity, ntraj*horizon)
     behavioral_log_pdfs_split = tf.reshape(behavioral_log_pdfs, [memory.capacity, -1, horizon])
 
     # Compute renyi divergencies
@@ -406,6 +406,7 @@ def learn(make_env, make_policy, *,
                              (return_min, 'InitialReturnMin'),
                              (return_std, 'InitialReturnStd'),
                              #(empirical_d2, 'EmpiricalD2'),
+                             (tf.reduce_mean(target_log_pdf), 'TLPDF'),
                              (return_step_max, 'ReturnStepMax'),
                              (return_step_maxmin, 'ReturnStepMaxmin')])
 
