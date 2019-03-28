@@ -29,7 +29,7 @@ class Memory():
         return {k: np.reshape(batch[k], [1, self.batch_size, self.horizon] + list(np.array(batch[k]).shape[1:])) for k in self.trajectory_buffer.keys()}
 
     def flatten_batch_dict(self, batch):
-        return {k: np.reshape(v, [None] + list(v.shape[3:])) for k,v in batch.items()}
+        return {k: np.reshape(v, [-1] + list(v.shape[3:])) for k,v in batch.items()}
 
     def trim_batch(self):
         if self.strategy == 'fifo':
@@ -50,7 +50,6 @@ class Memory():
                 self.trajectory_buffer[k] = batch[k]
             else:
                 self.trajectory_buffer[k] = np.concatenate((self.trajectory_buffer[k], batch[k]), axis=0)
-            print(k, self.trajectory_buffer[k].shape)
 
     def get_trajectories(self):
         return self.flatten_batch_dict(self.trajectory_buffer)

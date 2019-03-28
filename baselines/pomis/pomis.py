@@ -351,18 +351,16 @@ def learn(make_env, make_policy, *,
     all_var_list = pi.get_trainable_variables()
     var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
 
-
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
     n_parameters = sum(shapes)
 
-    '''
     # Placeholders
     ob_ = ob = U.get_placeholder_cached(name='ob')
-    ac_ = pi.pdtype.sample_placeholder([max_samples], name='ac')
-    mask_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='mask')
-    rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
-    disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='disc_rew')
-    clustered_rew_ = tf.placeholder(dtype=tf.float32, shape=(n_episodes))
+    ac_ = pi.pdtype.sample_placeholder([None], name='ac')
+    mask_ = tf.placeholder(dtype=tf.float32, shape=(None), name='mask')
+    rew_ = tf.placeholder(dtype=tf.float32, shape=(None), name='rew')
+    disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(None), name='disc_rew')
+    clustered_rew_ = tf.placeholder(dtype=tf.float32, shape=(None))
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
     losses_with_name = []
@@ -373,15 +371,15 @@ def learn(make_env, make_policy, *,
     log_ratio = target_log_pdf - behavioral_log_pdf
 
     # Split operations
-    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes))
-    rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes))
-    log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
-    target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes))
-    behavioral_log_pdf_split = tf.stack(tf.split(behavioral_log_pdf * mask_, n_episodes))
-    mask_split = tf.stack(tf.split(mask_, n_episodes))
+    disc_rew_split = tf.reshape(disc_rew_ * mask_, [-1, horizon])
+    rew_split = tf.reshape(rew_ * mask_, [-1, horizon])
+    log_ratio_split = tf.reshape(log_ratio * mask_, [-1, horizon])
+    target_log_pdf_split = tf.reshape(target_log_pdf * mask_, [-1, horizon])
+    behavioral_log_pdf_split = tf.reshape(behavioral_log_pdf * mask_, [-1, horizon])
+    mask_split = tf.reshape(mask_, [-1, horizon])
 
     # Renyi divergence
-    emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
+    emp_d2_split = tf.reshape(pi.pd.renyi(oldpi.pd, 2) * mask_, [-1, horizon])
     emp_d2_cum_split = tf.reduce_sum(emp_d2_split, axis=1)
     empirical_d2 = tf.reduce_mean(tf.exp(emp_d2_cum_split))
 
@@ -608,9 +606,7 @@ def learn(make_env, make_policy, *,
     compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [bound_, assert_ops, print_ops])
     compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses)
-    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
-
-    '''
+    compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [empirical_d2, empirical_d2])
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
@@ -634,7 +630,6 @@ def learn(make_env, make_policy, *,
 
         iters_so_far += 1
 
-        '''
         if render_after is not None and iters_so_far % render_after == 0:
             if hasattr(env, 'render'):
                 render(env, pi, horizon)
@@ -645,7 +640,6 @@ def learn(make_env, make_policy, *,
         if iters_so_far >= max_iters:
             print('Finished...')
             break
-        '''
 
         logger.log('********** Iteration %i ************' % iters_so_far)
 
@@ -665,9 +659,11 @@ def learn(make_env, make_policy, *,
         # Adding batch of trajectories to memory
         memory.add_trajectory_batch(seg)
 
-        '''
+        # Get multiple batches from memory
+        seg_with_memory = memory.get_trajectories()
+
         # Get clustered reward
-        reward_matrix = np.reshape(seg['disc_rew'] * seg['mask'], (n_episodes, horizon))
+        reward_matrix = np.reshape(seg_with_memory['disc_rew'] * seg_with_memory['mask'], (-1, horizon))
         ep_reward = np.sum(reward_matrix, axis=1)
         if reward_clustering == 'none':
             pass
@@ -683,10 +679,8 @@ def learn(make_env, make_policy, *,
             ep_reward = np.floor(ep_reward * 100) / 100
         elif reward_clustering == 'ceil100':
             ep_reward = np.ceil(ep_reward * 100) / 100
-        '''
 
-        '''
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], ep_reward, seg['mask'], iters_so_far
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number = seg_with_memory['ob'], seg_with_memory['ac'], seg_with_memory['rew'], seg_with_memory['disc_rew'], ep_reward, seg_with_memory['mask'], iters_so_far
 
         assign_old_eq_new()
 
@@ -707,7 +701,6 @@ def learn(make_env, make_policy, *,
         else:
             evaluate_natural_gradient = None
 
-        '''
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
             #logger.record_tabular("InitialBound", evaluate_loss())
@@ -717,8 +710,6 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("EpisodesSoFar", episodes_so_far)
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
-
-        '''
 
         if save_weights > 0 and iters_so_far % save_weights == 0:
             logger.record_tabular('Weights', str(get_parameter()))
@@ -741,7 +732,7 @@ def learn(make_env, make_policy, *,
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
-        '''
+        
         logger.dump_tabular()
 
     env.close()
