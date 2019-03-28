@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
+from baselines.pomis.memory import Memory
 
 @contextmanager
 def timed(msg):
@@ -338,16 +339,23 @@ def learn(make_env, make_policy, *,
     ob_space = env.observation_space
     ac_space = env.action_space
 
+    # Creating the memory buffer
+    memory = Memory(capacity=3, batch_size=n_episodes, horizon=horizon,
+                    ob_space=ob_space, ac_space=ac_space)
+
     # Building the policy
     pi = make_policy('pi', ob_space, ac_space)
     oldpi = make_policy('oldpi', ob_space, ac_space)
 
+
     all_var_list = pi.get_trainable_variables()
     var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
+
 
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
     n_parameters = sum(shapes)
 
+    '''
     # Placeholders
     ob_ = ob = U.get_placeholder_cached(name='ob')
     ac_ = pi.pdtype.sample_placeholder([max_samples], name='ac')
@@ -602,6 +610,8 @@ def learn(make_env, make_policy, *,
     compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses)
     #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
 
+    '''
+
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
 
@@ -624,6 +634,7 @@ def learn(make_env, make_policy, *,
 
         iters_so_far += 1
 
+        '''
         if render_after is not None and iters_so_far % render_after == 0:
             if hasattr(env, 'render'):
                 render(env, pi, horizon)
@@ -632,8 +643,9 @@ def learn(make_env, make_policy, *,
             callback(locals(), globals())
 
         if iters_so_far >= max_iters:
-            print('Finised...')
+            print('Finished...')
             break
+        '''
 
         logger.log('********** Iteration %i ************' % iters_so_far)
 
@@ -650,6 +662,10 @@ def learn(make_env, make_policy, *,
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
 
+        # Adding batch of trajectories to memory
+        memory.add_trajectory_batch(seg)
+
+        '''
         # Get clustered reward
         reward_matrix = np.reshape(seg['disc_rew'] * seg['mask'], (n_episodes, horizon))
         ep_reward = np.sum(reward_matrix, axis=1)
@@ -667,8 +683,9 @@ def learn(make_env, make_policy, *,
             ep_reward = np.floor(ep_reward * 100) / 100
         elif reward_clustering == 'ceil100':
             ep_reward = np.ceil(ep_reward * 100) / 100
+        '''
 
-
+        '''
         args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], ep_reward, seg['mask'], iters_so_far
 
         assign_old_eq_new()
@@ -690,9 +707,10 @@ def learn(make_env, make_policy, *,
         else:
             evaluate_natural_gradient = None
 
+        '''
         with timed('summaries before'):
             logger.record_tabular("Iteration", iters_so_far)
-            logger.record_tabular("InitialBound", evaluate_loss())
+            #logger.record_tabular("InitialBound", evaluate_loss())
             logger.record_tabular("EpLenMean", np.mean(lenbuffer))
             logger.record_tabular("EpRewMean", np.mean(rewbuffer))
             logger.record_tabular("EpThisIter", len(lens))
@@ -700,8 +718,7 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
 
-        # TMP printing of weights
-        print(["{0:0.4f}".format(i) for i in get_parameter()])
+        '''
 
         if save_weights > 0 and iters_so_far % save_weights == 0:
             logger.record_tabular('Weights', str(get_parameter()))
@@ -724,7 +741,7 @@ def learn(make_env, make_policy, *,
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
-
+        '''
         logger.dump_tabular()
 
     env.close()
