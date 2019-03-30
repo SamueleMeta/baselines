@@ -82,7 +82,7 @@ class Memory():
     def build_policies(self, make_policy, target_pi):
         # Build the policies
         for i in range(self.capacity):
-            name = 'behavioral_' + str(i+1)
+            name = 'behavioral_' + str(i+1) + '_policy'
             self.policies.append(make_policy(name, self.ob_space, self.ac_space))
             all_var_list = self.policies[i].get_trainable_variables()
             var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
