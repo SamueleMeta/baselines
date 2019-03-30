@@ -383,7 +383,7 @@ def learn(make_env, make_policy, *,
     # Compute arithmetic and harmonic mean of emp_d2
     emp_d2_mean = tf.reduce_mean(emp_d2_split_cum, axis=1)
     emp_d2_arithmetic = tf.reduce_mean(emp_d2_mean)
-    emp_d2_harmonic = 1 / tf.reduce_sum(n_episodes / emp_d2_mean)
+    emp_d2_harmonic = 1 / tf.reduce_sum(1 / emp_d2_mean)
 
     # Return processing: clipping, centering, discounting
     ep_return = clustered_rew_ #tf.reduce_sum(mask_split * disc_rew_split, axis=1)
@@ -438,6 +438,10 @@ def learn(make_env, make_policy, *,
                                  (tf.reduce_min(iw), 'MinIW'),
                                  (tf.reduce_mean(iw), 'MeanIW'),
                                  (U.reduce_std(iw), 'StdIW'),
+                                 (tf.reduce_max(target_pdf_episode), 'MaxTarget'),
+                                 (tf.reduce_mean(target_pdf_episode), 'MeanTarget'),
+                                 (tf.reduce_max(behavioral_pdf_episode), 'MaxBehave'),
+                                 (tf.reduce_mean(behavioral_pdf_episode), 'MeanBehave'),
                                  (ess_renyi_arithmetic, 'ESSRenyiArithmetic'),
                                  (ess_renyi_harmonic, 'ESSRenyiHarmonic')])
     else:
