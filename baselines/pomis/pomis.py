@@ -420,12 +420,16 @@ def learn(make_env, make_policy, *,
         # Sum the log prob over time. Shapes: target(Nep, H), behav (Cap, Nep, H)
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
+        # To avoid numerical instability, compute the inversed ratio
+        log_inverse_ratio = behavioral_log_pdf_episode - target_log_pdf_episode
+        iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio), axis=0)
+
         # Get the probability by exponentiation
-        target_pdf_episode = tf.exp(target_log_pdf_episode)
-        behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode)
+        #target_pdf_episode = tf.exp(target_log_pdf_episode)
+        #behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode)
         # Get the denominator by averaging over behavioral policies
-        behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0) + 1e-24
-        iw = target_pdf_episode / behavioral_pdf_mixture
+        #behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0) + 1e-24
+        #iw = target_pdf_episode / behavioral_pdf_mixture
         iwn = iw / n_episodes
 
         # Compute the J
@@ -438,10 +442,8 @@ def learn(make_env, make_policy, *,
                                  (tf.reduce_min(iw), 'MinIW'),
                                  (tf.reduce_mean(iw), 'MeanIW'),
                                  (U.reduce_std(iw), 'StdIW'),
-                                 (tf.reduce_max(target_pdf_episode), 'MaxTarget'),
-                                 (tf.reduce_mean(target_pdf_episode), 'MeanTarget'),
-                                 (tf.reduce_max(behavioral_pdf_episode), 'MaxBehave'),
-                                 (tf.reduce_mean(behavioral_pdf_episode), 'MeanBehave'),
+                                 (tf.reduce_min(target_log_pdf_episode), 'MinTargetPdf'),
+                                 (tf.reduce_min(behavioral_log_pdf_episode), 'MinBehavPdf'),
                                  (ess_renyi_arithmetic, 'ESSRenyiArithmetic'),
                                  (ess_renyi_harmonic, 'ESSRenyiHarmonic')])
     else:
@@ -502,7 +504,7 @@ def learn(make_env, make_policy, *,
     compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [bound_, assert_ops, print_ops])
     compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses)
-    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [target_log_pdf_split, behavioral_log_pdfs_split])
+    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [log_inverse_ratio, ratio_memory, iw])
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
@@ -625,6 +627,13 @@ def learn(make_env, make_policy, *,
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
+
+        '''
+        l = compute_temp(*args)
+        print(l[0])
+        print(l[1])
+        print(l[2])
+        '''
 
         logger.dump_tabular()
 
