@@ -353,6 +353,7 @@ def learn(make_env, make_policy, *,
 
     # Building a set of behavioral policies
     behavioral_policies = memory.build_policies(make_policy, pi)
+    oldpi = make_policy('oldpi', ob_space, ac_space)
 
     # Placeholders
     ob_ = ob = U.get_placeholder_cached(name='ob')
@@ -377,6 +378,11 @@ def learn(make_env, make_policy, *,
     behavioral_log_pdfs = tf.stack([bpi.pd.logp(ac_) * mask_ for bpi in memory.policies]) # Shape is (capacity, ntraj*horizon)
     behavioral_log_pdfs_split = tf.reshape(behavioral_log_pdfs, [memory.capacity, -1, horizon])
 
+    # TMP
+    old_log_pdf = oldpi.pd.logp(ac_) * mask_
+    old_log_pdf_split = tf.reshape(old_log_pdf, [-1, horizon])
+    old_log_ratio_split = target_log_pdf_split - old_log_pdf_split
+
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
     emp_d2_split_cum = tf.exp(tf.reduce_sum(emp_d2_split, axis=2))
@@ -384,6 +390,11 @@ def learn(make_env, make_policy, *,
     emp_d2_mean = tf.reduce_mean(emp_d2_split_cum, axis=1)
     emp_d2_arithmetic = tf.reduce_mean(emp_d2_mean)
     emp_d2_harmonic = 1 / tf.reduce_sum(n_episodes / emp_d2_mean)
+
+    # TMP
+    old_emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
+    old_emp_d2_cum_split = tf.reduce_sum(old_emp_d2_split, axis=1)
+    old_empirical_d2 = tf.reduce_mean(tf.exp(old_emp_d2_cum_split))
 
     # Return processing: clipping, centering, discounting
     ep_return = clustered_rew_ #tf.reduce_sum(mask_split * disc_rew_split, axis=1)
@@ -411,8 +422,8 @@ def learn(make_env, make_policy, *,
                              (return_max, 'InitialReturnMax'),
                              (return_min, 'InitialReturnMin'),
                              (return_std, 'InitialReturnStd'),
-                             (emp_d2_arithmetic, 'EmpiricalD2Arithmetic'),
-                             (emp_d2_harmonic, 'EmpiricalD2Harmonic'),
+                             (old_empirical_d2, 'EmpiricalD2'),
+                             #(tf.reduce_mean(target_log_pdf), 'TLPDF'),
                              (return_step_max, 'ReturnStepMax'),
                              (return_step_maxmin, 'ReturnStepMaxmin')])
 
@@ -428,27 +439,31 @@ def learn(make_env, make_policy, *,
         iw = target_pdf_episode / behavioral_pdf_mixture
         iwn = iw / n_episodes
 
+        # TMP
+        old_iw = tf.exp(tf.reduce_sum(old_log_ratio_split, axis=1))
+        old_iwn = old_iw / n_episodes
+
         # Compute the J
         w_return_mean = tf.reduce_sum(ep_return * iwn)
         # Empirical D2 of the mixture and relative ESS
-        ess_renyi_arithmetic = n_episodes / emp_d2_arithmetic
-        ess_renyi_harmonic = n_episodes / emp_d2_harmonic
+        ess_renyi = n_episodes / emp_d2_arithmetic
         # Log quantities
-        losses_with_name.extend([(tf.reduce_max(iw), 'MaxIW'),
-                                 (tf.reduce_min(iw), 'MinIW'),
-                                 (tf.reduce_mean(iw), 'MeanIW'),
-                                 (U.reduce_std(iw), 'StdIW'),
-                                 (ess_renyi_arithmetic, 'ESSRenyiArithmetic'),
-                                 (ess_renyi_harmonic, 'ESSRenyiHarmonic')])
+        losses_with_name.extend([(tf.reduce_max(old_iw), 'MaxIW'),
+                                 (tf.reduce_min(old_iw), 'MinIW'),
+                                 (tf.reduce_mean(old_iw), 'MeanIW'),
+                                 (U.reduce_std(old_iw), 'StdIW'),
+                                 (ess_renyi, 'ESSRenyi')])
     else:
         raise NotImplementedError()
 
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
-        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max
+        #var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
+        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
     elif bound == 'max-d2-arithmetic':
-        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi_arithmetic)) * return_abs_max
+        #var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
+        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
     else:
         raise NotImplementedError()
 
@@ -498,10 +513,13 @@ def learn(make_env, make_policy, *,
     compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [bound_, assert_ops, print_ops])
     compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses)
-    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [old_empirical_d2, emp_d2_arithmetic])
+    compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [old_empirical_d2, emp_d2_arithmetic])
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
+
+    assign_old_eq_new = U.function([], [], updates=[tf.assign(oldv, newv)
+                for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
 
     if sampler is None:
         seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True)
@@ -573,6 +591,8 @@ def learn(make_env, make_policy, *,
 
         args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number = seg_with_memory['ob'], seg_with_memory['ac'], seg_with_memory['rew'], seg_with_memory['disc_rew'], ep_reward, seg_with_memory['mask'], iters_so_far
 
+        assign_old_eq_new()
+
         def evaluate_loss():
             loss = compute_bound(*args)
             return loss[0]
@@ -621,6 +641,10 @@ def learn(make_env, make_policy, *,
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
+
+        l = compute_temp(*args)
+        print(l[0])
+        print(l[1])
 
         logger.dump_tabular()
 
