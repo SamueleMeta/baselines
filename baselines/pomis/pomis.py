@@ -363,8 +363,11 @@ def learn(make_env, make_policy, *,
     clustered_rew_ = tf.placeholder(dtype=tf.float32, shape=(None))
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
-    active_policies = tf.placeholder(dtype=tf.int32, shape=(capacity), name='active_policies')
+    active_policies = tf.placeholder(dtype=tf.float32, shape=(capacity), name='active_policies')
     losses_with_name = []
+
+    # Total number of trajectories
+    N_total = tf.reduce_sum(active_policies) * n_episodes
 
     # Split operations
     disc_rew_split = tf.reshape(disc_rew_ * mask_, [-1, horizon])
@@ -382,8 +385,8 @@ def learn(make_env, make_policy, *,
     emp_d2_split_cum = tf.exp(tf.reduce_sum(emp_d2_split, axis=2))
     # Compute arithmetic and harmonic mean of emp_d2
     emp_d2_mean = tf.reduce_mean(emp_d2_split_cum, axis=1)
-    emp_d2_arithmetic = tf.reduce_mean(emp_d2_mean)
-    emp_d2_harmonic = 1 / tf.reduce_sum(1 / emp_d2_mean)
+    emp_d2_arithmetic = tf.reduce_sum(emp_d2_mean * active_policies) / tf.reduce_sum(active_policies)
+    emp_d2_harmonic = tf.reduce_sum(active_policies) / tf.reduce_sum(1 / emp_d2_mean)
 
     # Return processing: clipping, centering, discounting
     ep_return = clustered_rew_ #tf.reduce_sum(mask_split * disc_rew_split, axis=1)
@@ -422,7 +425,8 @@ def learn(make_env, make_policy, *,
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
         # To avoid numerical instability, compute the inversed ratio
         log_inverse_ratio = behavioral_log_pdf_episode - target_log_pdf_episode
-        iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio), axis=0)
+        abc = tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1)
+        iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
 
         # Get the probability by exponentiation
         #target_pdf_episode = tf.exp(target_log_pdf_episode)
@@ -430,13 +434,13 @@ def learn(make_env, make_policy, *,
         # Get the denominator by averaging over behavioral policies
         #behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0) + 1e-24
         #iw = target_pdf_episode / behavioral_pdf_mixture
-        iwn = iw / n_episodes
+        iwn = iw / N_total
 
         # Compute the J
         w_return_mean = tf.reduce_sum(ep_return * iwn)
         # Empirical D2 of the mixture and relative ESS
-        ess_renyi_arithmetic = n_episodes / emp_d2_arithmetic
-        ess_renyi_harmonic = n_episodes / emp_d2_harmonic
+        ess_renyi_arithmetic = N_total / emp_d2_arithmetic
+        ess_renyi_harmonic = N_total / emp_d2_harmonic
         # Log quantities
         losses_with_name.extend([(tf.reduce_max(iw), 'MaxIW'),
                                  (tf.reduce_min(iw), 'MinIW'),
@@ -500,11 +504,11 @@ def learn(make_env, make_policy, *,
     assert_ops = tf.group(*tf.get_collection('asserts'))
     print_ops = tf.group(*tf.get_collection('prints'))
 
-    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [bound_, assert_ops, print_ops])
-    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses)
-    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [log_inverse_ratio, ratio_memory, iw])
+    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [bound_, assert_ops, print_ops])
+    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], losses)
+    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [log_inverse_ratio, abc, iw])
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
@@ -577,7 +581,14 @@ def learn(make_env, make_policy, *,
         elif reward_clustering == 'ceil100':
             ep_reward = np.ceil(ep_reward * 100) / 100
 
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number = seg_with_memory['ob'], seg_with_memory['ac'], seg_with_memory['rew'], seg_with_memory['disc_rew'], ep_reward, seg_with_memory['mask'], iters_so_far
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, active_policies = (seg_with_memory['ob'],
+                                                                                           seg_with_memory['ac'],
+                                                                                           seg_with_memory['rew'],
+                                                                                           seg_with_memory['disc_rew'],
+                                                                                           ep_reward,
+                                                                                           seg_with_memory['mask'],
+                                                                                           iters_so_far,
+                                                                                           memory.get_active_policies_mask())
 
         def evaluate_loss():
             loss = compute_bound(*args)

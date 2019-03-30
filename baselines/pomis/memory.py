@@ -73,6 +73,12 @@ class Memory():
         else:
             return 0
 
+    def get_active_policies_mask(self):
+        load = self.get_current_load()
+        mask = np.zeros(self.capacity)
+        mask[:load] = 1
+        return mask
+
     def build_policies(self, make_policy, target_pi):
         # Build the policies
         for i in range(self.capacity):
