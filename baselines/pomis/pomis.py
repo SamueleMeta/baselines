@@ -377,9 +377,6 @@ def learn(make_env, make_policy, *,
     behavioral_log_pdfs = tf.stack([bpi.pd.logp(ac_) * mask_ for bpi in memory.policies]) # Shape is (capacity, ntraj*horizon)
     behavioral_log_pdfs_split = tf.reshape(behavioral_log_pdfs, [memory.capacity, -1, horizon])
 
-    tf.add_to_collection('asserts', tf.assert_non_positive(target_log_pdf, name='target_pdf_non_positive'))
-    tf.add_to_collection('asserts', tf.assert_non_positive(behavioral_log_pdfs, name='behavioral_pdf_non_positive'))
-
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
     emp_d2_split_cum = tf.exp(tf.reduce_sum(emp_d2_split, axis=2))
@@ -423,8 +420,6 @@ def learn(make_env, make_policy, *,
         # Sum the log prob over time. Shapes: target(Nep, H), behav (Cap, Nep, H)
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
-        tf.add_to_collection('asserts', tf.assert_non_positive(target_log_pdf_episode, name='target_episode_pdf_non_positive'))
-        tf.add_to_collection('asserts', tf.assert_non_positive(behavioral_log_pdf_episode, name='behavioral_episode_pdf_non_positive'))
         # Get the probability by exponentiation
         target_pdf_episode = tf.exp(target_log_pdf_episode)
         behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode)
@@ -507,7 +502,7 @@ def learn(make_env, make_policy, *,
     compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [bound_, assert_ops, print_ops])
     compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses)
-    compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [target_log_pdf_split, behavioral_log_pdfs_split])
+    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [target_log_pdf_split, behavioral_log_pdfs_split])
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
@@ -630,10 +625,6 @@ def learn(make_env, make_policy, *,
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
-
-        l = compute_temp(*args)
-        print(l[0])
-        print(l[1])
 
         logger.dump_tabular()
 
