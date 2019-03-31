@@ -1,0 +1,94 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/pois/nico/t3p/baselines/baselines/pomis",
+    "dependencies": [
+      "baselines==0.1.5",
+      "gym==0.10.8",
+      "numpy==1.14.3",
+      "sacred==0.7.4",
+      "tensorflow==1.10.1"
+    ],
+    "mainfile": "run_sacred.py",
+    "name": "mis_cp_cap2",
+    "repositories": [
+      {
+        "commit": "fbd7eed70899034e66ce054d07fdb5bb667d830a",
+        "dirty": false,
+        "url": "https://github.com/t3p/baselines.git"
+      },
+      {
+        "commit": "fbd7eed70899034e66ce054d07fdb5bb667d830a",
+        "dirty": false,
+        "url": "https://github.com/t3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "pomis.py",
+        "_sources/pomis_7684fbbcdc80f5385e2f015d1cde0e9d.py"
+      ],
+      [
+        "run_sacred.py",
+        "_sources/run_sacred_fe7c2dd02ad27fbfed7ce9654437fc2a.py"
+      ]
+    ]
+  },
+  "heartbeat": "2019-03-31T05:38:37.407731",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E7-8880 v4 @ 2.20GHz",
+    "hostname": "turing",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-143-generic-x86_64-with-Ubuntu-16.04-xenial"
+    ],
+    "python_version": "3.5.2"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": true,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "experiment_name=mis_cp_cap2",
+        "env=rllab.cartpole",
+        "policy=linear",
+        "iw_method=is",
+        "bound=max-d2-harmonic",
+        "delta=0.3",
+        "gamma=1.0",
+        "center=False",
+        "njobs=1",
+        "seed=904",
+        "policy_init=zeros",
+        "capacity=2"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2019-03-30T17:36:48.832096",
+  "status": "COMPLETED",
+  "stop_time": "2019-03-31T05:38:37.394222"
+}
