@@ -434,7 +434,7 @@ def learn(make_env, make_policy, *,
         # Get the denominator by averaging over behavioral policies
         #behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0) + 1e-24
         #iw = target_pdf_episode / behavioral_pdf_mixture
-        iwn = iw / N_total
+        iwn = iw / n_episodes
 
         # Compute the J
         w_return_mean = tf.reduce_sum(ep_return * iwn)
