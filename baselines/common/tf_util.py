@@ -56,7 +56,7 @@ def make_session(num_cpu=None, make_default=False):
         inter_op_parallelism_threads=num_cpu,
         intra_op_parallelism_threads=num_cpu,
         )
-    tf_config.gpu_options.allocator_type = 'BFC'
+    tf_config.gpu_options.allow_growth = True
     if make_default:
         return tf.InteractiveSession(config=tf_config)
     else:
@@ -223,7 +223,7 @@ def flatgrad(loss, var_list, clip_norm=None, grad_ys=None, aggregation_method=No
 def assignFromFlat(var_list, values):
     assigns = []
     shapes = list(map(var_shape, var_list))
-   
+
     start = 0
     assigns = []
     for (shape, v) in zip(shapes, var_list):
