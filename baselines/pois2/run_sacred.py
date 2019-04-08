@@ -77,7 +77,7 @@ def train(env, policy, seed, njobs=1, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
-        env_name = re.match('rllab.(\w+)', env).group(1)
+        env_name = re.match('rllab.(\S+)', env).group(1)
         env_rllab_class = rllab_env_from_name(env_name)
         # Define env maker
         def make_env(seed=0):
@@ -116,9 +116,15 @@ def train(env, policy, seed, njobs=1, **alg_args):
     # Create the policy
     if policy == 'linear':
         hid_size = num_hid_layers = 0
+        use_bias = False
+    elif policy == 'simple-nn':
+        hid_size = [16]
+        num_hid_layers = 1
+        use_bias = True
     elif policy == 'nn':
         hid_size = [100, 50, 25]
         num_hid_layers = 3
+        use_bias = True
 
     if policy == 'linear' or policy == 'nn':
         def make_policy(name, ob_space, ac_space):
