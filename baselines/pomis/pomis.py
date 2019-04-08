@@ -9,6 +9,7 @@ from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
 from baselines.pomis.memory import Memory
+from baselines.pois.utils import add_disc_rew, cluster_rewards
 
 @contextmanager
 def timed(msg):
@@ -16,108 +17,6 @@ def timed(msg):
     tstart = time.time()
     yield
     print(colorize('done in %.3f seconds'%(time.time() - tstart), color='magenta'))
-
-def traj_segment_generator(pi, env, n_episodes, horizon, stochastic):
-    # Initialize state variables
-    t = 0
-    ac = env.action_space.sample()
-    new = True
-    ob = env.reset()
-
-    cur_ep_ret = 0
-    cur_ep_len = 0
-    ep_rets = []
-    ep_lens = []
-
-    # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon * n_episodes)])
-    rews = np.zeros(horizon * n_episodes, 'float32')
-    vpreds = np.zeros(horizon * n_episodes, 'float32')
-    news = np.zeros(horizon * n_episodes, 'int32')
-    acs = np.array([ac for _ in range(horizon * n_episodes)])
-    prevacs = acs.copy()
-    mask = np.ones(horizon * n_episodes, 'float32')
-
-    i = 0
-    j = 0
-    while True:
-        prevac = ac
-        ac, vpred = pi.act(stochastic, ob)
-        # Slight weirdness here because we need value function at time T
-        # before returning segment [0, T-1] so we get the correct
-        # terminal value
-        #if t > 0 and t % horizon == 0:
-        if i == n_episodes:
-            yield {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
-                    "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
-            _, vpred = pi.act(stochastic, ob)
-            # Be careful!!! if you change the downstream algorithm to aggregate
-            # several of these batches, then be sure to do a deepcopy
-            ep_rets = []
-            ep_lens = []
-            mask = np.ones(horizon * n_episodes, 'float32')
-            i = 0
-            t = 0
-
-        obs[t] = ob
-        vpreds[t] = vpred
-        news[t] = new
-        acs[t] = ac
-        prevacs[t] = prevac
-
-        ob, rew, new, _ = env.step(ac)
-        rews[t] = rew
-
-        cur_ep_ret += rew
-        cur_ep_len += 1
-        j += 1
-        if new or j == horizon:
-            new = True
-            env.done = True
-
-            ep_rets.append(cur_ep_ret)
-            ep_lens.append(cur_ep_len)
-
-            cur_ep_ret = 0
-            cur_ep_len = 0
-            ob = env.reset()
-
-            next_t = (i+1) * horizon
-
-            mask[t+1:next_t] = 0.
-            acs[t+1:next_t] = acs[t]
-            obs[t+1:next_t] = obs[t]
-
-            t = next_t - 1
-            i += 1
-            j = 0
-        t += 1
-
-def add_disc_rew(seg, gamma):
-    new = np.append(seg['new'], 1)
-    rew = seg['rew']
-
-    n_ep = len(seg['ep_rets'])
-    n_samp = len(rew)
-
-    seg['ep_disc_ret'] = ep_disc_ret = np.empty(n_ep, 'float32')
-    seg['disc_rew'] = disc_rew = np.empty(n_samp, 'float32')
-
-    discounter = 0
-    ret = 0.
-    i = 0
-    for t in range(n_samp):
-        disc_rew[t] = rew[t] * gamma ** discounter
-        ret += disc_rew[t]
-
-        if new[t + 1]:
-            discounter = 0
-            ep_disc_ret[i] = ret
-            i += 1
-            ret = 0.
-        else:
-            discounter += 1
 
 def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
     if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
@@ -202,7 +101,6 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
 
     return theta_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
-
 def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
@@ -284,21 +182,6 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
             return theta, improvement
 
     return theta, improvement
-
-def render(env, pi, horizon):
-
-    t = 0
-    ob = env.reset()
-    env.render()
-
-    done = False
-    while not done and t < horizon:
-        ac, _ = pi.act(True, ob)
-        ob, _, done, _ = env.step(ac)
-        time.sleep(0.1)
-        env.render()
-        t += 1
-
 
 def learn(make_env, make_policy, *,
           n_episodes,
@@ -427,13 +310,6 @@ def learn(make_env, make_policy, *,
         log_inverse_ratio = behavioral_log_pdf_episode - target_log_pdf_episode
         abc = tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1)
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
-
-        # Get the probability by exponentiation
-        #target_pdf_episode = tf.exp(target_log_pdf_episode)
-        #behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode)
-        # Get the denominator by averaging over behavioral policies
-        #behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0) + 1e-24
-        #iw = target_pdf_episode / behavioral_pdf_mixture
         iwn = iw / n_episodes
 
         # Compute the J
@@ -566,20 +442,7 @@ def learn(make_env, make_policy, *,
         # Get clustered reward
         reward_matrix = np.reshape(seg_with_memory['disc_rew'] * seg_with_memory['mask'], (-1, horizon))
         ep_reward = np.sum(reward_matrix, axis=1)
-        if reward_clustering == 'none':
-            pass
-        elif reward_clustering == 'floor':
-            ep_reward = np.floor(ep_reward)
-        elif reward_clustering == 'ceil':
-            ep_reward = np.ceil(ep_reward)
-        elif reward_clustering == 'floor10':
-            ep_reward = np.floor(ep_reward * 10) / 10
-        elif reward_clustering == 'ceil10':
-            ep_reward = np.ceil(ep_reward * 10) / 10
-        elif reward_clustering == 'floor100':
-            ep_reward = np.floor(ep_reward * 100) / 100
-        elif reward_clustering == 'ceil100':
-            ep_reward = np.ceil(ep_reward * 100) / 100
+        ep_reward = cluster_rewards(ep_reward, reward_clustering)
 
         args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, active_policies = (seg_with_memory['ob'],
                                                                                            seg_with_memory['ac'],
@@ -638,13 +501,6 @@ def learn(make_env, make_policy, *,
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
-
-        '''
-        l = compute_temp(*args)
-        print(l[0])
-        print(l[1])
-        print(l[2])
-        '''
 
         logger.dump_tabular()
 

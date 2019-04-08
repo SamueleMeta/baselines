@@ -8,7 +8,9 @@ from contextlib import contextmanager
 from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
-from baselines.pomis.memory import Memory
+from baselines.pomis2.memory import Memory
+from baselines.common.centralized_sampler import traj_segment_generator
+from baselines.pois.utils import cluster_rewards
 
 @contextmanager
 def timed(msg):
@@ -16,108 +18,6 @@ def timed(msg):
     tstart = time.time()
     yield
     print(colorize('done in %.3f seconds'%(time.time() - tstart), color='magenta'))
-
-def traj_segment_generator(pi, env, n_episodes, horizon, stochastic):
-    # Initialize state variables
-    t = 0
-    ac = env.action_space.sample()
-    new = True
-    ob = env.reset()
-
-    cur_ep_ret = 0
-    cur_ep_len = 0
-    ep_rets = []
-    ep_lens = []
-
-    # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon * n_episodes)])
-    rews = np.zeros(horizon * n_episodes, 'float32')
-    vpreds = np.zeros(horizon * n_episodes, 'float32')
-    news = np.zeros(horizon * n_episodes, 'int32')
-    acs = np.array([ac for _ in range(horizon * n_episodes)])
-    prevacs = acs.copy()
-    mask = np.ones(horizon * n_episodes, 'float32')
-
-    i = 0
-    j = 0
-    while True:
-        prevac = ac
-        ac, vpred = pi.act(stochastic, ob)
-        # Slight weirdness here because we need value function at time T
-        # before returning segment [0, T-1] so we get the correct
-        # terminal value
-        #if t > 0 and t % horizon == 0:
-        if i == n_episodes:
-            yield {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
-                    "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
-            _, vpred = pi.act(stochastic, ob)
-            # Be careful!!! if you change the downstream algorithm to aggregate
-            # several of these batches, then be sure to do a deepcopy
-            ep_rets = []
-            ep_lens = []
-            mask = np.ones(horizon * n_episodes, 'float32')
-            i = 0
-            t = 0
-
-        obs[t] = ob
-        vpreds[t] = vpred
-        news[t] = new
-        acs[t] = ac
-        prevacs[t] = prevac
-
-        ob, rew, new, _ = env.step(ac)
-        rews[t] = rew
-
-        cur_ep_ret += rew
-        cur_ep_len += 1
-        j += 1
-        if new or j == horizon:
-            new = True
-            env.done = True
-
-            ep_rets.append(cur_ep_ret)
-            ep_lens.append(cur_ep_len)
-
-            cur_ep_ret = 0
-            cur_ep_len = 0
-            ob = env.reset()
-
-            next_t = (i+1) * horizon
-
-            mask[t+1:next_t] = 0.
-            acs[t+1:next_t] = acs[t]
-            obs[t+1:next_t] = obs[t]
-
-            t = next_t - 1
-            i += 1
-            j = 0
-        t += 1
-
-def add_disc_rew(seg, gamma):
-    new = np.append(seg['new'], 1)
-    rew = seg['rew']
-
-    n_ep = len(seg['ep_rets'])
-    n_samp = len(rew)
-
-    seg['ep_disc_ret'] = ep_disc_ret = np.empty(n_ep, 'float32')
-    seg['disc_rew'] = disc_rew = np.empty(n_samp, 'float32')
-
-    discounter = 0
-    ret = 0.
-    i = 0
-    for t in range(n_samp):
-        disc_rew[t] = rew[t] * gamma ** discounter
-        ret += disc_rew[t]
-
-        if new[t + 1]:
-            discounter = 0
-            ep_disc_ret[i] = ret
-            i += 1
-            ret = 0.
-        else:
-            discounter += 1
 
 def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
     if delta_bound > (1. - 1. / (2 * max_increase)) * epsilon_old:
@@ -202,7 +102,6 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
 
     return theta_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
-
 def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
@@ -285,22 +184,7 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
 
     return theta, improvement
 
-def render(env, pi, horizon):
-
-    t = 0
-    ob = env.reset()
-    env.render()
-
-    done = False
-    while not done and t < horizon:
-        ac, _ = pi.act(True, ob)
-        ob, _, done, _ = env.step(ac)
-        time.sleep(0.1)
-        env.render()
-        t += 1
-
-
-def learn(make_env, make_policy, *,
+def learn(env, make_policy, *,
           n_episodes,
           horizon,
           delta,
@@ -336,7 +220,6 @@ def learn(make_env, make_policy, *,
         raise ValueError()
 
     # Building the environment
-    env = make_env()
     ob_space = env.observation_space
     ac_space = env.action_space
 
@@ -353,7 +236,6 @@ def learn(make_env, make_policy, *,
 
     # Building a set of behavioral policies
     behavioral_policies = memory.build_policies(make_policy, pi)
-    oldpi = make_policy('oldpi', ob_space, ac_space)
 
     # Placeholders
     ob_ = ob = U.get_placeholder_cached(name='ob')
@@ -364,8 +246,11 @@ def learn(make_env, make_policy, *,
     clustered_rew_ = tf.placeholder(dtype=tf.float32, shape=(None))
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
-    active_policies = tf.placeholder(dtype=tf.int32, shape=(capacity), name='active_policies')
+    active_policies = tf.placeholder(dtype=tf.float32, shape=(capacity), name='active_policies')
     losses_with_name = []
+
+    # Total number of trajectories
+    N_total = tf.reduce_sum(active_policies) * n_episodes
 
     # Split operations
     disc_rew_split = tf.reshape(disc_rew_ * mask_, [-1, horizon])
@@ -378,23 +263,13 @@ def learn(make_env, make_policy, *,
     behavioral_log_pdfs = tf.stack([bpi.pd.logp(ac_) * mask_ for bpi in memory.policies]) # Shape is (capacity, ntraj*horizon)
     behavioral_log_pdfs_split = tf.reshape(behavioral_log_pdfs, [memory.capacity, -1, horizon])
 
-    # TMP
-    old_log_pdf = oldpi.pd.logp(ac_) * mask_
-    old_log_pdf_split = tf.reshape(old_log_pdf, [-1, horizon])
-    old_log_ratio_split = target_log_pdf_split - old_log_pdf_split
-
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
     emp_d2_split_cum = tf.exp(tf.reduce_sum(emp_d2_split, axis=2))
     # Compute arithmetic and harmonic mean of emp_d2
     emp_d2_mean = tf.reduce_mean(emp_d2_split_cum, axis=1)
-    emp_d2_arithmetic = tf.reduce_mean(emp_d2_mean)
-    emp_d2_harmonic = 1 / tf.reduce_sum(n_episodes / emp_d2_mean)
-
-    # TMP
-    old_emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
-    old_emp_d2_cum_split = tf.reduce_sum(old_emp_d2_split, axis=1)
-    old_empirical_d2 = tf.reduce_mean(tf.exp(old_emp_d2_cum_split))
+    emp_d2_arithmetic = tf.reduce_sum(emp_d2_mean * active_policies) / tf.reduce_sum(active_policies)
+    emp_d2_harmonic = tf.reduce_sum(active_policies) / tf.reduce_sum(1 / emp_d2_mean)
 
     # Return processing: clipping, centering, discounting
     ep_return = clustered_rew_ #tf.reduce_sum(mask_split * disc_rew_split, axis=1)
@@ -422,8 +297,8 @@ def learn(make_env, make_policy, *,
                              (return_max, 'InitialReturnMax'),
                              (return_min, 'InitialReturnMin'),
                              (return_std, 'InitialReturnStd'),
-                             (old_empirical_d2, 'EmpiricalD2'),
-                             #(tf.reduce_mean(target_log_pdf), 'TLPDF'),
+                             (emp_d2_arithmetic, 'EmpiricalD2Arithmetic'),
+                             (emp_d2_harmonic, 'EmpiricalD2Harmonic'),
                              (return_step_max, 'ReturnStepMax'),
                              (return_step_maxmin, 'ReturnStepMaxmin')])
 
@@ -431,39 +306,42 @@ def learn(make_env, make_policy, *,
         # Sum the log prob over time. Shapes: target(Nep, H), behav (Cap, Nep, H)
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
-        # Get the probability by exponentiation
-        target_pdf_episode = tf.exp(target_log_pdf_episode)
-        behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode)
-        # Get the denominator by averaging over behavioral policies
-        behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0) + 1e-24
-        iw = target_pdf_episode / behavioral_pdf_mixture
-        iwn = iw / n_episodes
+        # To avoid numerical instability, compute the inversed ratio
+        log_inverse_ratio = behavioral_log_pdf_episode - target_log_pdf_episode
+        abc = tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1)
+        iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
 
-        # TMP
-        old_iw = tf.exp(tf.reduce_sum(old_log_ratio_split, axis=1))
-        old_iwn = old_iw / n_episodes
+        # Get the probability by exponentiation
+        #target_pdf_episode = tf.exp(target_log_pdf_episode)
+        #behavioral_pdf_episode = tf.exp(behavioral_log_pdf_episode)
+        # Get the denominator by averaging over behavioral policies
+        #behavioral_pdf_mixture = tf.reduce_mean(behavioral_pdf_episode, axis=0) + 1e-24
+        #iw = target_pdf_episode / behavioral_pdf_mixture
+        iwn = iw / n_episodes
 
         # Compute the J
         w_return_mean = tf.reduce_sum(ep_return * iwn)
         # Empirical D2 of the mixture and relative ESS
-        ess_renyi = n_episodes / emp_d2_arithmetic
+        ess_renyi_arithmetic = N_total / emp_d2_arithmetic
+        ess_renyi_harmonic = N_total / emp_d2_harmonic
         # Log quantities
-        losses_with_name.extend([(tf.reduce_max(old_iw), 'MaxIW'),
-                                 (tf.reduce_min(old_iw), 'MinIW'),
-                                 (tf.reduce_mean(old_iw), 'MeanIW'),
-                                 (U.reduce_std(old_iw), 'StdIW'),
-                                 (ess_renyi, 'ESSRenyi')])
+        losses_with_name.extend([(tf.reduce_max(iw), 'MaxIW'),
+                                 (tf.reduce_min(iw), 'MinIW'),
+                                 (tf.reduce_mean(iw), 'MeanIW'),
+                                 (U.reduce_std(iw), 'StdIW'),
+                                 (tf.reduce_min(target_log_pdf_episode), 'MinTargetPdf'),
+                                 (tf.reduce_min(behavioral_log_pdf_episode), 'MinBehavPdf'),
+                                 (ess_renyi_arithmetic, 'ESSRenyiArithmetic'),
+                                 (ess_renyi_harmonic, 'ESSRenyiHarmonic')])
     else:
         raise NotImplementedError()
 
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
-        #var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
-        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
+        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max
     elif bound == 'max-d2-arithmetic':
-        #var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
-        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
+        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi_arithmetic)) * return_abs_max
     else:
         raise NotImplementedError()
 
@@ -509,20 +387,17 @@ def learn(make_env, make_policy, *,
     assert_ops = tf.group(*tf.get_collection('asserts'))
     print_ops = tf.group(*tf.get_collection('prints'))
 
-    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [bound_, assert_ops, print_ops])
-    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses)
-    compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [old_empirical_d2, emp_d2_arithmetic])
+    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [bound_, assert_ops, print_ops])
+    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], losses)
+    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [log_inverse_ratio, abc, iw])
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
 
-    assign_old_eq_new = U.function([], [], updates=[tf.assign(oldv, newv)
-                for (oldv, newv) in zipsame(oldpi.get_variables(), pi.get_variables())])
-
     if sampler is None:
-        seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True)
+        seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True, gamma=gamma)
         sampler = type("SequentialSampler", (object,), {"collect": lambda self, _: seg_gen.__next__()})()
 
     U.initialize()
@@ -557,8 +432,6 @@ def learn(make_env, make_policy, *,
         with timed('sampling'):
             seg = sampler.collect(theta)
 
-        add_disc_rew(seg, gamma)
-
         lens, rets = seg['ep_lens'], seg['ep_rets']
         lenbuffer.extend(lens)
         rewbuffer.extend(rets)
@@ -574,24 +447,16 @@ def learn(make_env, make_policy, *,
         # Get clustered reward
         reward_matrix = np.reshape(seg_with_memory['disc_rew'] * seg_with_memory['mask'], (-1, horizon))
         ep_reward = np.sum(reward_matrix, axis=1)
-        if reward_clustering == 'none':
-            pass
-        elif reward_clustering == 'floor':
-            ep_reward = np.floor(ep_reward)
-        elif reward_clustering == 'ceil':
-            ep_reward = np.ceil(ep_reward)
-        elif reward_clustering == 'floor10':
-            ep_reward = np.floor(ep_reward * 10) / 10
-        elif reward_clustering == 'ceil10':
-            ep_reward = np.ceil(ep_reward * 10) / 10
-        elif reward_clustering == 'floor100':
-            ep_reward = np.floor(ep_reward * 100) / 100
-        elif reward_clustering == 'ceil100':
-            ep_reward = np.ceil(ep_reward * 100) / 100
+        ep_reward = cluster_rewards(ep_reward, reward_clustering)
 
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number = seg_with_memory['ob'], seg_with_memory['ac'], seg_with_memory['rew'], seg_with_memory['disc_rew'], ep_reward, seg_with_memory['mask'], iters_so_far
-
-        assign_old_eq_new()
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, active_policies = (seg_with_memory['ob'],
+                                                                                           seg_with_memory['ac'],
+                                                                                           seg_with_memory['rew'],
+                                                                                           seg_with_memory['disc_rew'],
+                                                                                           ep_reward,
+                                                                                           seg_with_memory['mask'],
+                                                                                           iters_so_far,
+                                                                                           memory.get_active_policies_mask())
 
         def evaluate_loss():
             loss = compute_bound(*args)
@@ -641,10 +506,6 @@ def learn(make_env, make_policy, *,
             meanlosses = np.array(compute_losses(*args))
             for (lossname, lossval) in zip(loss_names, meanlosses):
                 logger.record_tabular(lossname, lossval)
-
-        l = compute_temp(*args)
-        print(l[0])
-        print(l[1])
 
         logger.dump_tabular()
 
