@@ -1,0 +1,118 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/restelli/nico/t3p/baselines/baselines/pomis2",
+    "dependencies": [
+      "gym==0.10.5",
+      "numpy==1.14.3",
+      "sacred==0.7.4",
+      "tensorflow-gpu==1.8.0"
+    ],
+    "mainfile": "run_sacred.py",
+    "name": "pomis_ip_tuned_part1",
+    "repositories": [
+      {
+        "commit": "127d461a1da14fbd20dae6cd02e21e600fbfabea",
+        "dirty": false,
+        "url": "https://github.com/T3p/baselines.git"
+      },
+      {
+        "commit": "127d461a1da14fbd20dae6cd02e21e600fbfabea",
+        "dirty": false,
+        "url": "https://github.com/T3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "pomis2.py",
+        "_sources/pomis2_fbabadecedd295440d70969f60f934c7.py"
+      ],
+      [
+        "run_sacred.py",
+        "_sources/run_sacred_2ba782121bbcd70260e74757a58b6fc1.py"
+      ]
+    ]
+  },
+  "heartbeat": "2019-04-10T13:08:46.370925",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E5-2698 v4 @ 2.20GHz",
+    "gpus": {
+      "driver_version": "384.125",
+      "gpus": [
+        {
+          "model": "Tesla V100-DGXS-16GB",
+          "persistence_mode": true,
+          "total_memory": 16149
+        },
+        {
+          "model": "Tesla V100-DGXS-16GB",
+          "persistence_mode": true,
+          "total_memory": 16149
+        },
+        {
+          "model": "Tesla V100-DGXS-16GB",
+          "persistence_mode": true,
+          "total_memory": 16149
+        },
+        {
+          "model": "Tesla V100-DGXS-16GB",
+          "persistence_mode": true,
+          "total_memory": 16149
+        }
+      ]
+    },
+    "hostname": "dgxstation-ita",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-127-generic-x86_64-with-Ubuntu-16.04-xenial"
+    ],
+    "python_version": "3.5.2"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": true,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "experiment_name=pomis_ip_tuned_part1",
+        "env=rllab.inverted-pendulum",
+        "policy=linear",
+        "iw_method=is",
+        "bound=max-d2-harmonic",
+        "delta=0.9999",
+        "gamma=1.0",
+        "center=False",
+        "njobs=8",
+        "seed=245",
+        "policy_init=zeros",
+        "capacity=10"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2019-04-10T12:30:52.657467",
+  "status": "COMPLETED",
+  "stop_time": "2019-04-10T13:08:46.368308"
+}
