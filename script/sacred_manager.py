@@ -40,7 +40,7 @@ parser.add_argument('--command', help='Different commands of the manager.', defa
 parser.add_argument('--groupby', help='Count groups by a specified config parameter (stats mode only).', default=None)
 parser.add_argument('--uncompleted', default=False, action='store_true')
 parser.add_argument('--cout', default=False, action='store_true')
-parser.add_argument('--filter', help='Remove the runs filtered as specified [key==value]', default=None)
+parser.add_argument('--filter', help='Remove the runs filtered as specified [key1==value1#key2==value2]', default=None)
 args = parser.parse_args()
 
 my_runs = load_runs(args.dir)
@@ -68,7 +68,13 @@ elif args.command == 'clean':
     removed_runs = 0
     # Parse the filter argument
     if args.filter is not None:
-        filter_key, filter_value = args.filter.split('==')
+        # Check multiple filters
+        if '#' in args.filter:
+            filters = args.filter.split('#')
+        else:
+            filters = [args.filter]
+        # Extract key and value
+        filters = [tuple(f.split('==')) for f in filters]
 
     for key, value in my_runs.items():
         if value['run']['status'] != 'COMPLETED' and args.uncompleted:
@@ -85,8 +91,12 @@ elif args.command == 'clean':
                 pass
         elif args.filter is not None:
             # Check if the filter applies
-            selected_value = recursive_json_selector(value, filter_key)
-            if selected_value is not None and str(selected_value) == filter_value:
+            to_be_filtered = True
+            for (filter_key, filter_value) in filters:
+                selected_value = recursive_json_selector(value, filter_key)
+                if selected_value is None or str(selected_value) != filter_value:
+                    to_be_filtered = False
+            if to_be_filtered:
                 # Remove run with key
                 shutil.rmtree(base_directory + str(key) + '/')
                 print("Removed run:", key)
