@@ -359,6 +359,21 @@ def learn(make_env, make_policy, *,
                                  (tf.reduce_min(d2_w_0t), 'MinD2w0t'),
                                  (tf.reduce_mean(d2_w_0t), 'MeanD2w0t'),
                                  (U.reduce_std(d2_w_0t), 'StdD2w0t')])
+        # TMP: adding also IS logging to compare
+        iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
+        iwn = iw / n_episodes
+        IS_w_return_mean = tf.reduce_sum(iwn * ep_return)
+        IS_J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(iw * ep_return - w_return_mean))
+        losses_with_name.append((IS_J_sample_variance, 'IS_J_sample_variance'))
+        losses_with_name.append((IS_w_return_mean, 'IS_ReturnMeanIW'))
+        losses_with_name.extend([(tf.reduce_max(iwn), 'IS_MaxIWNorm'),
+                                 (tf.reduce_min(iwn), 'IS_MinIWNorm'),
+                                 (tf.reduce_mean(iwn), 'IS_MeanIWNorm'),
+                                 (U.reduce_std(iwn), 'IS_StdIWNorm'),
+                                 (tf.reduce_max(iw), 'IS_MaxIW'),
+                                 (tf.reduce_min(iw), 'IS_MinIW'),
+                                 (tf.reduce_mean(iw), 'IS_MeanIW'),
+                                 (U.reduce_std(iw), 'IS_StdIW')])
 
     elif iw_method == 'is':
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
