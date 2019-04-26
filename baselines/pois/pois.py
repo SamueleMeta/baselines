@@ -354,7 +354,7 @@ def learn(make_env, make_policy, *,
         losses_with_name.extend([(tf.reduce_max(ratio_cumsum), 'MaxIW'),
                                  (tf.reduce_min(ratio_cumsum), 'MinIW'),
                                  (tf.reduce_mean(ratio_cumsum), 'MeanIW'),
-                                 (U.reduce_std(ratio_cumsum), 'StdIW')])
+                                 (tf.reduce_mean(U.reduce_std(ratio_cumsum, axis=0)), 'StdIW')])
         losses_with_name.extend([(tf.reduce_max(d2_w_0t), 'MaxD2w0t'),
                                  (tf.reduce_min(d2_w_0t), 'MinD2w0t'),
                                  (tf.reduce_mean(d2_w_0t), 'MeanD2w0t'),

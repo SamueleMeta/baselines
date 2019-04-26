@@ -24,10 +24,11 @@ def plot_mean_ci(my_runs, metric, axis, conf=0.95):
 '''
     This function creates a plot of all the metrics specified in the given runs.
 '''
-def plot_all(my_runs, metric, axis):
+def plot_all(my_runs, metric, axis, legend=True):
     # Extract the metric
     run_keys = list(my_runs.keys())
     metric_matrix = np.array([my_runs[key]['metrics'][metric]['values'] for key in run_keys])
     for i in range(metric_matrix.shape[0]):
         axis.plot(metric_matrix[i], label='Seed:'+str(my_runs[run_keys[i]]['config']['seed']))
-    axis.legend()
+    if legend:
+        axis.legend()
