@@ -360,6 +360,7 @@ def learn(make_env, make_policy, *,
                                  (tf.reduce_min(d2_w_0t), 'MinD2w0t'),
                                  (tf.reduce_mean(d2_w_0t), 'MeanD2w0t'),
                                  (U.reduce_std(d2_w_0t), 'StdD2w0t')])
+        '''
         # TMP: adding also IS logging to compare
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
         iwn = iw / n_episodes
@@ -375,6 +376,7 @@ def learn(make_env, make_policy, *,
                                  (tf.reduce_min(iw), 'IS_MinIW'),
                                  (tf.reduce_mean(iw), 'IS_MeanIW'),
                                  (U.reduce_std(iw), 'IS_StdIW')])
+        '''
 
     elif iw_method == 'is':
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
