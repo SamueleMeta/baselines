@@ -72,7 +72,6 @@ def custom_config():
     reward_clustering = 'none'
     positive_return = False
     experiment_name = None
-    capacity = 1
     # ENTROPY can be of 4 schemes:
     #    - 'none': no entropy bonus
     #    - 'step:<height>:<duration>': step function which is <height> tall for <duration> iterations
@@ -176,7 +175,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
 def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural,
             file_name, logdir, bound, delta, njobs, save_weights, policy,
             policy_init, max_offline_iters, gamma, center, clipping, entropy,
-            max_iters, positive_return, reward_clustering, capacity, _run):
+            max_iters, positive_return, reward_clustering, _run):
 
     logger.configure(dir=logdir, format_strs=['stdout', 'csv', 'tensorboard', 'sacred'], file_name=file_name, run=_run)
     train(env=env,

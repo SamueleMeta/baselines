@@ -11,7 +11,7 @@ import scipy.stats as sts
     specified metric, the mean and the confidence interval of the metric for the
     given runs.
 '''
-def plot_mean_ci(my_runs, metric, axis, conf=0.95):
+def plot_mean_ci(my_runs, metric, axis, conf=0.95, label=None):
     # Extract the metric
     metric_matrix = np.array([value['metrics'][metric]['values'] for key, value in my_runs.items()])
     # Get mean and ci
@@ -19,7 +19,7 @@ def plot_mean_ci(my_runs, metric, axis, conf=0.95):
     std = np.std(metric_matrix, axis=0)
     interval = sts.t.interval(conf, metric_matrix.shape[0]-1, loc=mean, scale=std/np.sqrt(metric_matrix.shape[0]))
     axis.plot(mean)
-    axis.fill_between(range(len(mean)),interval[0], interval[1], alpha=0.3)
+    axis.fill_between(range(len(mean)),interval[0], interval[1], alpha=0.3, label=label)
 
 '''
     This function creates a plot of all the metrics specified in the given runs.
