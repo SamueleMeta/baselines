@@ -137,6 +137,7 @@ def main():
     parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--center', type=bool, default=False)
     parser.add_argument('--clipping', type=bool, default=False)
+    parser.add_argument('--warm_start', type=bool, default=True)
     parser.add_argument('--entropy', type=str, default='none')
     parser.add_argument('--reward_clustering', type=str, default='none')
     parser.add_argument('--experiment_name', type=str, default='none')
@@ -169,6 +170,7 @@ def main():
           entropy=args.entropy,
           reward_clustering=args.reward_clustering,
           capacity=args.capacity,
+          warm_start=args.warm_start
           )
 
 if __name__ == '__main__':

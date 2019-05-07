@@ -207,7 +207,8 @@ def learn(env, make_policy, *,
           entropy='none',
           positive_return=False,
           reward_clustering='none',
-          capacity=10):
+          capacity=10,
+          warm_start=True):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -395,6 +396,7 @@ def learn(env, make_policy, *,
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
+    policy_reinit = tf.variables_initializer(var_list)
 
     if sampler is None:
         seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True, gamma=gamma)
@@ -491,8 +493,10 @@ def learn(env, make_policy, *,
             file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
             pickle.dump(theta, file)
 
-        with timed("offline optimization"):
-            theta, improvement = optimize_offline(theta,
+        if not warm_start or memory.get_current_load() < capacity:
+            # Optimize
+            with timed("offline optimization"):
+                theta, improvement = optimize_offline(theta,
                                                   set_parameter,
                                                   line_search,
                                                   evaluate_loss,
@@ -500,12 +504,15 @@ def learn(env, make_policy, *,
                                                   evaluate_natural_gradient,
                                                   max_offline_ite=max_offline_iters)
 
-        set_parameter(theta)
+            set_parameter(theta)
 
-        with timed('summaries after'):
-            meanlosses = np.array(compute_losses(*args))
-            for (lossname, lossval) in zip(loss_names, meanlosses):
-                logger.record_tabular(lossname, lossval)
+            with timed('summaries after'):
+                meanlosses = np.array(compute_losses(*args))
+                for (lossname, lossval) in zip(loss_names, meanlosses):
+                    logger.record_tabular(lossname, lossval)
+        else:
+            # Reinitialize the policy
+            tf.get_default_session().run(policy_reinit)
 
         logger.dump_tabular()
 
