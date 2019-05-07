@@ -314,6 +314,7 @@ def learn(env, make_policy, *,
         # Compute also the balance-heuristic weights
         print('EEEEEH')
         print(behavioral_log_pdf_episode.shape)
+        print(tf.reduce_sum(tf.exp(behavioral_log_pdf_episode), axis=0))
         bh_weights = tf.exp(behavioral_log_pdf_episode) / tf.reduce_sum(tf.exp(behavioral_log_pdf_episode), axis=0)
         losses_with_name.append((tf.reduce_max(bh_weights), 'MaxMultiWeight'))
         print(bh_weights.shape)
