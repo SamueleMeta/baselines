@@ -493,7 +493,7 @@ def learn(env, make_policy, *,
             file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
             pickle.dump(theta, file)
 
-        if not warm_start or memory.get_current_load() < capacity:
+        if not warm_start or memory.get_current_load() == capacity:
             # Optimize
             with timed("offline optimization"):
                 theta, improvement = optimize_offline(theta,
