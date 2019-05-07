@@ -312,10 +312,13 @@ def learn(env, make_policy, *,
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
 
         # Compute also the balance-heuristic weights
-        bh_weights = tf.reduce_mean(tf.exp(behavioral_log_pdf_episode) / tf.reduce_sum(tf.exp(behavioral_log_pdf_episode), axis=0), axis=1)
-        losses_with_name.append((tf.reduce_max(bh_weights), 'MaxMultiWeight'))
-        losses_with_name.append((tf.reduce_sum(bh_weights), 'SumMultiWeight'))
-        losses_with_name.append((tf.reduce_min(bh_weights), 'MinMultiWeight'))
+        iw_split = tf.reshape(iw, (memory.capacity, -1))
+        iw_by_behavioral = tf.reduce_mean(iw_split, axis=1)
+        losses_with_name.append((tf.reduce_max(iw_by_behavioral), 'MultiIWMax'))
+        losses_with_name.append((tf.reduce_sum(iw_by_behavioral), 'MultiIWSum'))
+        losses_with_name.append((tf.reduce_min(iw_by_behavioral), 'MultiIWMin'))
+        print(iw_split.shape)
+        print(iw_by_behavioral.shape)
 
         # Get the probability by exponentiation
         #target_pdf_episode = tf.exp(target_log_pdf_episode)
