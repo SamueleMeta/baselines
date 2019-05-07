@@ -309,8 +309,13 @@ def learn(env, make_policy, *,
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
         # To avoid numerical instability, compute the inversed ratio
         log_inverse_ratio = behavioral_log_pdf_episode - target_log_pdf_episode
-        abc = tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1)
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
+
+        # Compute also the balance-heuristic weights
+        print('EEEEEH')
+        print(behavioral_log_pdf_episode.shape)
+        bh_weights = tf.exp(behavioral_log_pdf_episode) / tf.reduce_sum(tf.exp(behavioral_log_pdf_episode), axis=0)
+        print(bh_weights.shape)
 
         # Get the probability by exponentiation
         #target_pdf_episode = tf.exp(target_log_pdf_episode)
