@@ -312,7 +312,7 @@ def learn(env, make_policy, *,
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
 
         # Compute also the balance-heuristic weights
-        bh_weights = tf.exp(behavioral_log_pdf_episode) / tf.reduce_sum(tf.exp(behavioral_log_pdf_episode), axis=0)
+        bh_weights = tf.reduce_mean(tf.exp(behavioral_log_pdf_episode) / tf.reduce_sum(tf.exp(behavioral_log_pdf_episode), axis=0), axis=1)
         losses_with_name.append((tf.reduce_max(bh_weights), 'MaxMultiWeight'))
         losses_with_name.append((tf.reduce_sum(bh_weights), 'SumMultiWeight'))
         losses_with_name.append((tf.reduce_min(bh_weights), 'MinMultiWeight'))
