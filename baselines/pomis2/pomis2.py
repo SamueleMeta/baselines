@@ -315,6 +315,7 @@ def learn(env, make_policy, *,
         print('EEEEEH')
         print(behavioral_log_pdf_episode.shape)
         bh_weights = tf.exp(behavioral_log_pdf_episode) / tf.reduce_sum(tf.exp(behavioral_log_pdf_episode), axis=0)
+        losses_with_name.append((tf.reduce_max(bh_weights), 'MaxMultiWeight'))
         print(bh_weights.shape)
 
         # Get the probability by exponentiation
