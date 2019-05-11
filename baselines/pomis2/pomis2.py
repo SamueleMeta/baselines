@@ -263,6 +263,10 @@ def learn(env, make_policy, *,
     target_log_pdf_split = tf.reshape(target_log_pdf, [-1, horizon])
     behavioral_log_pdfs = tf.stack([bpi.pd.logp(ac_) * mask_ for bpi in memory.policies]) # Shape is (capacity, ntraj*horizon)
     behavioral_log_pdfs_split = tf.reshape(behavioral_log_pdfs, [memory.capacity, -1, horizon])
+    reference_behavioral_log_pdf = memory.policies[0].pd.logp(ac_)
+    reference_behavioral_log_pdf_split = tf.stack(tf.split(reference_behavioral_log_pdf * mask_, n_episodes))
+    reference_log_ratio = target_log_pdf - reference_behavioral_log_pdf
+    reference_log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
 
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
@@ -271,6 +275,11 @@ def learn(env, make_policy, *,
     emp_d2_mean = tf.reduce_mean(emp_d2_split_cum, axis=1)
     emp_d2_arithmetic = tf.reduce_sum(emp_d2_mean * active_policies) / tf.reduce_sum(active_policies)
     emp_d2_harmonic = tf.reduce_sum(active_policies) / tf.reduce_sum(1 / emp_d2_mean)
+
+    # Renyi divergence
+    reference_emp_d2_split = tf.stack(tf.split(pi.pd.renyi(memory.policies[0].pd, 2) * mask_, n_episodes))
+    reference_emp_d2_cum_split = tf.reduce_sum(reference_emp_d2_split, axis=1)
+    reference_empirical_d2 = tf.reduce_mean(tf.exp(reference_emp_d2_cum_split))
 
     # Return processing: clipping, centering, discounting
     ep_return = clustered_rew_ #tf.reduce_sum(mask_split * disc_rew_split, axis=1)
@@ -328,7 +337,7 @@ def learn(env, make_policy, *,
         iwn = iw / n_episodes
 
         # Compute the J
-        w_return_mean = tf.reduce_sum(ep_return * iwn)
+        _w_return_mean = tf.reduce_sum(ep_return * iwn)
         # Empirical D2 of the mixture and relative ESS
         ess_renyi_arithmetic = N_total / emp_d2_arithmetic
         ess_renyi_harmonic = N_total / emp_d2_harmonic
@@ -341,13 +350,20 @@ def learn(env, make_policy, *,
                                  (tf.reduce_min(behavioral_log_pdf_episode), 'MinBehavPdf'),
                                  (ess_renyi_arithmetic, 'ESSRenyiArithmetic'),
                                  (ess_renyi_harmonic, 'ESSRenyiHarmonic')])
+
+        reference_iw = tf.exp(tf.reduce_sum(reference_log_ratio_split, axis=1))
+        reference_iwn = reference_iw / n_episodes
+        w_return_mean = tf.reduce_sum(reference_iwn * ep_return)
     else:
         raise NotImplementedError()
 
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
-        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max
+        _bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max
+        # TMP
+        ess_renyi = n_episodes / reference_empirical_d2
+        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
     elif bound == 'max-d2-arithmetic':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi_arithmetic)) * return_abs_max
     else:
