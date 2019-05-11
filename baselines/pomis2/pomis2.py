@@ -266,7 +266,7 @@ def learn(env, make_policy, *,
     reference_behavioral_log_pdf = memory.policies[0].pd.logp(ac_)
     reference_behavioral_log_pdf_split = tf.stack(tf.split(reference_behavioral_log_pdf * mask_, n_episodes))
     reference_log_ratio = target_log_pdf - reference_behavioral_log_pdf
-    reference_log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
+    reference_log_ratio_split = tf.stack(tf.split(reference_log_ratio * mask_, n_episodes))
 
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
