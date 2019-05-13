@@ -105,7 +105,7 @@ class Worker(Process):
 
         env = self.make_env()
         workerseed = self.seed + 10000 * MPI.COMM_WORLD.Get_rank()
-        set_all_seeds(workerseed)
+        #set_all_seeds(workerseed)
         env.seed(workerseed)
 
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
