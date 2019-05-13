@@ -154,7 +154,7 @@ class ParallelSampler(object):
         f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
         f_rem = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process+1, horizon, stochastic)
         fun = [f] * (self.n_workers - remainder) + [f_rem] * remainder
-        self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed + i) for i in range(self.n_workers)]
+        self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed) for i in range(self.n_workers)]
 
         for w in self.workers:
             w.start()
