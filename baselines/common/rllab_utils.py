@@ -78,7 +78,6 @@ class Rllab2GymWrapper(gym.Env):
         return new_state
 
     def seed(self, seed=0):
-        print('Cojone', seed)
         pass
 
     def render(self, mode='human', close=False):
