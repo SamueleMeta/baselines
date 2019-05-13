@@ -119,6 +119,7 @@ class Worker(Process):
                 print('Worker %s - Collecting... %s' % (os.getpid(), weights))
                 pi.set_parameter(weights)
                 samples = self.traj_segment_generator(pi, env)
+                print('Worker %s - Collected: %s' % (os.getpid(), samples['ob'].shape))
                 self.output.put((os.getpid(), samples))
             elif command == 'exit':
                 print('Worker %s - Exiting...' % os.getpid())
