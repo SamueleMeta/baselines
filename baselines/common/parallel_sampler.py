@@ -116,9 +116,10 @@ class Worker(Process):
             self.event.clear()
             command, weights = self.input.get()
             if command == 'collect':
-                #print('Worker %s - Collecting...' % os.getpid())
+                #print('Worker %s - Collecting... %s' % (os.getpid(), weights))
                 pi.set_parameter(weights)
                 samples = self.traj_segment_generator(pi, env)
+                #print('Worker %s - Collected: %s' % (os.getpid(), samples['ob'].shape))
                 self.output.put((os.getpid(), samples))
             elif command == 'exit':
                 print('Worker %s - Exiting...' % os.getpid())
@@ -153,7 +154,7 @@ class ParallelSampler(object):
         f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
         f_rem = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process+1, horizon, stochastic)
         fun = [f] * (self.n_workers - remainder) + [f_rem] * remainder
-        self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed + i) for i in range(self.n_workers)]
+        self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed+i*100) for i in range(self.n_workers)]
 
         for w in self.workers:
             w.start()
