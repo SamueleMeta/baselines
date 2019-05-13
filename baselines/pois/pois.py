@@ -591,6 +591,9 @@ def learn(make_env, make_policy, *,
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
 
+        print('------')
+        print(seg['ob'])
+
         # Get clustered reward
         reward_matrix = np.reshape(seg['disc_rew'] * seg['mask'], (n_episodes, horizon))
         ep_reward = np.sum(reward_matrix, axis=1)
