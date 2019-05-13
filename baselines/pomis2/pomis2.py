@@ -328,7 +328,7 @@ def learn(env, make_policy, *,
         iwn = iw / n_episodes
 
         # Compute the J
-        _w_return_mean = tf.reduce_sum(ep_return * iwn)
+        w_return_mean = tf.reduce_sum(ep_return * iwn)
         # Empirical D2 of the mixture and relative ESS
         ess_renyi_arithmetic = N_total / emp_d2_arithmetic
         ess_renyi_harmonic = N_total / emp_d2_harmonic
