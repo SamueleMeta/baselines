@@ -592,7 +592,7 @@ def learn(make_env, make_policy, *,
         timesteps_so_far += sum(lens)
 
         print('------')
-        print(seg['ob'])
+        print(np.reshape(seg['ob'], (n_episodes, horizon, -1))[:,:,0])
 
         # Get clustered reward
         reward_matrix = np.reshape(seg['disc_rew'] * seg['mask'], (n_episodes, horizon))
