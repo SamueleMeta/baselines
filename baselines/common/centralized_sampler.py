@@ -76,7 +76,9 @@ def traj_segment_generator(pi, env, n_episodes, horizon, stochastic, gamma):
             _env_s = time.time()
             env.step_async(ac)
             ob, rew, done, _ = env.step_wait()
+            print('--------------')
             print(ob)
+            print(done)
             env_time += time.time() - _env_s
 
             # Save the reward
