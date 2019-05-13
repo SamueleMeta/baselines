@@ -105,7 +105,7 @@ class Worker(Process):
 
         env = self.make_env()
         workerseed = self.seed + 10000 * MPI.COMM_WORLD.Get_rank()
-        #set_all_seeds(workerseed)
+        set_all_seeds(workerseed)
         env.seed(workerseed)
 
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
@@ -116,7 +116,7 @@ class Worker(Process):
             self.event.clear()
             command, weights = self.input.get()
             if command == 'collect':
-                #print('Worker %s - Collecting...' % os.getpid())
+                print('Worker %s - Collecting... %s' % (os.getpid(), weights))
                 pi.set_parameter(weights)
                 samples = self.traj_segment_generator(pi, env)
                 self.output.put((os.getpid(), samples))
