@@ -1,0 +1,96 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/pois/nico/t3p/baselines/baselines/pomis",
+    "dependencies": [
+      "baselines==0.1.5",
+      "gym==0.10.8",
+      "numpy==1.14.3",
+      "sacred==0.7.4",
+      "tensorflow==1.10.1"
+    ],
+    "mainfile": "run_sacred.py",
+    "name": "pomis1_cartpole_fourjob",
+    "repositories": [
+      {
+        "commit": "5c716f8e4da1717401ac9712d0c1c80e63a5e6f3",
+        "dirty": false,
+        "url": "https://github.com/t3p/baselines.git"
+      },
+      {
+        "commit": "5c716f8e4da1717401ac9712d0c1c80e63a5e6f3",
+        "dirty": false,
+        "url": "https://github.com/t3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "pomis.py",
+        "_sources/pomis_9421cfc52f248c76cdaefd6642c8ebd3.py"
+      ],
+      [
+        "run_sacred.py",
+        "_sources/run_sacred_5c8fd04954a2ff0a660fa73e96f6700f.py"
+      ]
+    ]
+  },
+  "heartbeat": "2019-05-14T18:36:16.551161",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E7-8880 v4 @ 2.20GHz",
+    "hostname": "turing",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-145-generic-x86_64-with-Ubuntu-16.04-xenial"
+    ],
+    "python_version": "3.5.2"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": true,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "experiment_name=pomis1_cartpole_fourjob",
+        "env=rllab.cartpole",
+        "policy=linear",
+        "iw_method=is",
+        "bound=max-d2-harmonic",
+        "delta=0.4",
+        "gamma=1.0",
+        "center=False",
+        "njobs=4",
+        "seed=689",
+        "policy_init=zeros",
+        "capacity=1",
+        "num_episodes=100",
+        "warm_start=True"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2019-05-14T15:24:46.726121",
+  "status": "COMPLETED",
+  "stop_time": "2019-05-14T18:36:16.546702"
+}
