@@ -21,6 +21,7 @@ from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.common.vec_env.vec_frame_stack import VecFrameStack
 from baselines.common.cmd_util import get_env_type
+from baselines.common import set_global_seeds as set_all_seeds
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
@@ -37,6 +38,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
             def _thunk():
                 env_rllab = Rllab2GymWrapper(env_rllab_class())
                 env_rllab.seed(seed)
+                set_all_seeds(seed)
                 return env_rllab
             return _thunk
         parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
@@ -53,6 +55,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
                 def _thunk():
                     _env = make_atari(env)
                     _env.seed(seed)
+                    set_all_seeds(seed)
                     return wrap_deepmind(_env)
                 return _thunk
             parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)]), 4)
@@ -62,6 +65,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
                 def _thunk():
                     _env = gym.make(env)
                     _env.seed(seed)
+                    set_all_seeds(seed)
                     return _env
                 return _thunk
             parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
