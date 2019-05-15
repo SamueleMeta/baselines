@@ -167,10 +167,9 @@ class ParallelSampler(object):
         for e in self.events:
             e.set()
 
-        sample_batches = []
-        for i in range(self.n_workers):
-            pid, samples = self.output_queue.get()
-            sample_batches.append(samples)
+        sample_batches = [self.output_queue.get() for _ in range(self.n_workers)]
+        sample_batches = sorted(sample_batches, key=lambda x: x[0])
+        _, sample_batches = zip(*sample_batches)
 
         return self._merge_sample_batches(sample_batches)
 
