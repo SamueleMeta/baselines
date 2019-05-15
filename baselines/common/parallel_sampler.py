@@ -112,9 +112,9 @@ class Worker(Process):
         print('Worker %s - Running with seed %s' % (os.getpid(), workerseed))
 
         import random, numpy, tensorflow
-        print('Worker %s - Random number' % (os.getpid(), random.random()))
-        print('Worker %s - Numpy random number' % (os.getpid(), numpy.random.rand()))
-        print('Worker %s - TF random number' % (os.getpid(), tensorflow.random.normale((2,))))
+        print('Worker %s - Random number %s' % (os.getpid(), random.random()))
+        print('Worker %s - Numpy random number %s' % (os.getpid(), numpy.random.rand()))
+        print('Worker %s - TF random number %s' % (os.getpid(), tensorflow.random.normale((2,))))
 
         while True:
             self.event.wait()
