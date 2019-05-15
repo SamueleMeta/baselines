@@ -114,7 +114,7 @@ class Worker(Process):
         import random, numpy, tensorflow
         print('Worker %s - Random number %s' % (os.getpid(), random.random()))
         print('Worker %s - Numpy random number %s' % (os.getpid(), numpy.random.rand()))
-        print('Worker %s - TF random number %s' % (os.getpid(), tensorflow.random_normal((2,))))
+        print('Worker %s - TF random number %s' % (os.getpid(), sess.run(tensorflow.random_normal((2,)))))
 
         while True:
             self.event.wait()
