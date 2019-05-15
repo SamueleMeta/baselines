@@ -108,7 +108,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
                 set_all_seeds(seed)
                 return env_rllab
             return _thunk
-        parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
+        parallel_env = SubprocVecEnv([make_env(seed + i*100) for i in range(njobs)])
         # Used later
         env_type = 'rllab'
     else:
@@ -125,7 +125,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
                     set_all_seeds(seed)
                     return wrap_deepmind(_env)
                 return _thunk
-            parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)]), 4)
+            parallel_env = VecFrameStack(SubprocVecEnv([make_env(seed + i*100) for i in range(njobs)]), 4)
         else:
             # Not atari, standard env creation
             def make_env(seed=0):
@@ -135,7 +135,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
                     set_all_seeds(seed)
                     return _env
                 return _thunk
-            parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
+            parallel_env = SubprocVecEnv([make_env(seed + i*100) for i in range(njobs)])
 
     if policy == 'linear':
         hid_size = num_hid_layers = 0
