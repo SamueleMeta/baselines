@@ -111,11 +111,6 @@ class Worker(Process):
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
         print('Worker %s - Running with seed %s' % (os.getpid(), workerseed))
 
-        import random, numpy, tensorflow
-        print('Worker %s - Random number %s' % (os.getpid(), random.random()))
-        print('Worker %s - Numpy random number %s' % (os.getpid(), numpy.random.rand()))
-        print('Worker %s - TF random number %s' % (os.getpid(), sess.run(tensorflow.random_normal((2,)))))
-
         while True:
             self.event.wait()
             self.event.clear()
