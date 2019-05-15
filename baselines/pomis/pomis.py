@@ -454,7 +454,7 @@ def learn(make_env, make_policy, *,
                                                                                            seg_with_memory['mask'],
                                                                                            iters_so_far,
                                                                                            memory.get_active_policies_mask())
-        print(ac[0])
+        print(ac)
         def evaluate_loss():
             loss = compute_bound(*args)
             return loss[0]
