@@ -104,6 +104,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
             def _thunk():
                 env_rllab = Rllab2GymWrapper(env_rllab_class())
                 env_rllab.seed(seed)
+                set_all_seeds(seed)
                 return env_rllab
             return _thunk
         parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
@@ -120,6 +121,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
                 def _thunk():
                     _env = make_atari(env)
                     _env.seed(seed)
+                    set_all_seeds(seed)
                     return wrap_deepmind(_env)
                 return _thunk
             parallel_env = VecFrameStack(SubprocVecEnv([make_env(i + seed) for i in range(njobs)]), 4)
@@ -129,9 +131,11 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
                 def _thunk():
                     _env = gym.make(env)
                     _env.seed(seed)
+                    set_all_seeds(seed)
                     return _env
                 return _thunk
             parallel_env = SubprocVecEnv([make_env(i + seed) for i in range(njobs)])
+
     if policy == 'linear':
         hid_size = num_hid_layers = 0
         use_bias = False
