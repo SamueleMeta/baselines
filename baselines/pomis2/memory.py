@@ -57,6 +57,7 @@ class Memory():
         self.trim_batch()
         # Update with the new batch
         batch = self.unflatten_batch_dict(batch)
+        print('Memory ob shape', batch['ob'].shape)
         for k, v in self.trajectory_buffer.items():
             if v is None:
                 self.trajectory_buffer[k] = batch[k]
