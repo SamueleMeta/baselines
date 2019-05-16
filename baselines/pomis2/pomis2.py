@@ -466,8 +466,9 @@ def learn(env, make_policy, *,
                                                                                            seg_with_memory['mask'],
                                                                                            iters_so_far,
                                                                                            memory.get_active_policies_mask())
-        print(ob.shape)
-        print(ob[0])
+
+        _ob_debug = np.reshape(ob, (num_episodes, horizon, ob.shape[-1]))
+        print(_ob_debug[:,:5,0])
 
         def evaluate_loss():
             loss = compute_bound(*args)
