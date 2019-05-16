@@ -13,7 +13,9 @@ import scipy.stats as sts
 '''
 def plot_mean_ci(my_runs, metric, axis, conf=0.95, label=None):
     # Extract the metric
-    metric_matrix = np.array([value['metrics'][metric]['values'] for key, value in my_runs.items()])
+    list_of_metric = [value['metrics'][metric]['values'] for key, value in my_runs.items()]
+    min_steps = min([len(m) for m in list_of_metric])
+    metric_matrix = np.array([m[:min_steps] for m in list_of_metric])
     # Get mean and ci
     mean = np.mean(metric_matrix, axis=0)
     std = np.std(metric_matrix, axis=0)
@@ -27,7 +29,9 @@ def plot_mean_ci(my_runs, metric, axis, conf=0.95, label=None):
 def plot_all(my_runs, metric, axis, legend=True):
     # Extract the metric
     run_keys = list(my_runs.keys())
-    metric_matrix = np.array([my_runs[key]['metrics'][metric]['values'] for key in run_keys])
+    list_of_metric = [value['metrics'][metric]['values'] for key, value in my_runs.items()]
+    min_steps = min([len(m) for m in list_of_metric])
+    metric_matrix = np.array([m[:min_steps] for m in list_of_metric])
     for i in range(metric_matrix.shape[0]):
         axis.plot(metric_matrix[i], label='Seed:'+str(my_runs[run_keys[i]]['config']['seed']))
     if legend:
