@@ -454,7 +454,7 @@ def learn(make_env, make_policy, *,
                                                                                            seg_with_memory['mask'],
                                                                                            iters_so_far,
                                                                                            memory.get_active_policies_mask())
-        print(ac)
+        
         def evaluate_loss():
             loss = compute_bound(*args)
             return loss[0]
@@ -500,7 +500,6 @@ def learn(make_env, make_policy, *,
                                                   max_offline_ite=max_offline_iters)
 
             set_parameter(theta)
-            print('Params', theta)
 
             with timed('summaries after'):
                 meanlosses = np.array(compute_losses(*args))
