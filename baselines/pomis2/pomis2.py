@@ -466,6 +466,8 @@ def learn(env, make_policy, *,
                                                                                            seg_with_memory['mask'],
                                                                                            iters_so_far,
                                                                                            memory.get_active_policies_mask())
+        print(ob.shape)
+        print(ob[0])
 
         def evaluate_loss():
             loss = compute_bound(*args)
