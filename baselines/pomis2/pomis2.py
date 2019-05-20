@@ -25,7 +25,7 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
     else:
         return epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
 
-def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4, max_line_search_ite=30):
+def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4, max_line_search_ite=1):
     epsilon = 1.
     epsilon_old = 0.
     delta_bound_old = -np.inf
@@ -58,7 +58,7 @@ def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, eva
 
     return theta_old, epsilon_old, delta_bound_old, i+1
 
-def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evaluate_loss, delta_bound_tol=1e-4, max_line_search_ite=1):
+def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evaluate_loss, delta_bound_tol=1e-4, max_line_search_ite=30):
     low = 0.
     high = None
     bound_init = evaluate_loss()
