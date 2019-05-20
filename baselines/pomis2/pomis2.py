@@ -300,7 +300,6 @@ def learn(env, make_policy, *,
                              (return_std, 'InitialReturnStd'),
                              (emp_d2_arithmetic, 'EmpiricalD2Arithmetic'),
                              (emp_d2_harmonic, 'EmpiricalD2Harmonic'),
-                             (emp_d2_mean[0], 'EmpD2First'),
                              (return_step_max, 'ReturnStepMax'),
                              (return_step_maxmin, 'ReturnStepMaxmin')])
 

@@ -266,14 +266,14 @@ class DiagGaussianPd(Pd):
     def fromflat(cls, flat):
         return cls(flat)
 
-
 class GaussianVectorPd(Pd):
     def __init__(self, flat):
         self.flat = flat
         mean, logstd = tf.split(axis=len(flat.shape)-1, num_or_size_splits=2, value=flat)
-        self.mean = mean
-        self.logstd = logstd
-        self.std = tf.exp(logstd)
+        self.mean = tf.cast(mean, tf.float64)
+        self.logstd = tf.cast(logstd, tf.float64)
+        self.std = tf.exp(tf.cast(logstd, tf.float64))
+        print('Using float64')
     def flatparam(self):
         return self.flat
     def mode(self):
