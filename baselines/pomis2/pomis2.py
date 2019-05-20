@@ -264,6 +264,8 @@ def learn(env, make_policy, *,
     behavioral_log_pdfs = tf.stack([bpi.pd.logp(ac_) * mask_ for bpi in memory.policies]) # Shape is (capacity, ntraj*horizon)
     behavioral_log_pdfs_split = tf.reshape(behavioral_log_pdfs, [memory.capacity, -1, horizon])
 
+    losses_with_name.append((tf.reduce_sum(behavioral_log_pdfs_split[0][0]), 'BpdfMin0'))
+
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
     emp_d2_split_cum = tf.exp(tf.reduce_sum(emp_d2_split, axis=2))
@@ -300,7 +302,6 @@ def learn(env, make_policy, *,
                              (return_std, 'InitialReturnStd'),
                              (emp_d2_arithmetic, 'EmpiricalD2Arithmetic'),
                              (emp_d2_harmonic, 'EmpiricalD2Harmonic'),
-                             (emp_d2_mean[0], 'EmpD2First'),
                              (return_step_max, 'ReturnStepMax'),
                              (return_step_maxmin, 'ReturnStepMaxmin')])
 
