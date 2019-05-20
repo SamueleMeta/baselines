@@ -308,7 +308,7 @@ def learn(env, make_policy, *,
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
         # To avoid numerical instability, compute the inversed ratio
-        log_inverse_ratio = (behavioral_log_pdf_split - target_log_pdf_split)
+        log_inverse_ratio = (behavioral_log_pdfs_split - target_log_pdf_split)
         print(log_inverse_ratio.shape)
 
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
