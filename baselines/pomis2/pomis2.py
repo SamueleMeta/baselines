@@ -25,7 +25,7 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
     else:
         return epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
 
-def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4, max_line_search_ite=1):
+def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4, max_line_search_ite=30):
     epsilon = 1.
     epsilon_old = 0.
     delta_bound_old = -np.inf
@@ -311,12 +311,6 @@ def learn(env, make_policy, *,
         log_inverse_ratio = tf.reduce_sum(behavioral_log_pdfs_split - target_log_pdf_split, axis=2)
 
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
-
-        order_target = tf.reduce_sum(tf.cumsum(tf.reduce_sum(target_log_pdf_split, axis=1)))
-        losses_with_name.append((order_target, 'Torder'))
-        losses_with_name.append((tf.reduce_sum(behavioral_log_pdf_episode), 'Bsum'))
-        losses_with_name.append((tf.reduce_sum(target_log_pdf_episode), 'Tsum'))
-        losses_with_name.append((tf.reduce_sum(log_inverse_ratio), 'invlogratio_sum'))
 
         # Compute also the balance-heuristic weights
         iw_split = tf.reshape(iw, (memory.capacity, -1))
