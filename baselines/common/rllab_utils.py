@@ -78,8 +78,6 @@ class Rllab2GymWrapper(gym.Env):
 
     def seed(self, seed=0):
         set_all_seeds(seed)
-        import numpy as np
-        print('Generating random number', np.random.rand())
 
     def render(self, mode='human', close=False):
         #return self.rllab_env.render(mode=mode, close=close)
