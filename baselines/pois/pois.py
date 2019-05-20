@@ -648,6 +648,7 @@ def learn(make_env, make_policy, *,
                                                   max_offline_ite=max_offline_iters)
 
         set_parameter(theta)
+        print(theta)
 
         with timed('summaries after'):
             meanlosses = np.array(compute_losses(*args))
