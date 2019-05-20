@@ -26,7 +26,7 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.pois2 import pois2
 
-def train(env, policy, seed, njobs=1, **alg_args):
+def train(env, policy, policy_init, seed, njobs=1, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
