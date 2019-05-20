@@ -311,6 +311,8 @@ def learn(env, make_policy, *,
         log_inverse_ratio = - (target_log_pdf_episode - behavioral_log_pdf_episode)
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
 
+        order_target = tf.reduce_sum(tf.cumsum(tf.reduce_sum(target_log_pdf_split, axis=1)))
+        losses_with_name.append((order_target, 'Torder'))
         losses_with_name.append((tf.reduce_sum(behavioral_log_pdf_episode), 'Bsum'))
         losses_with_name.append((tf.reduce_sum(target_log_pdf_episode), 'Tsum'))
         losses_with_name.append((tf.reduce_sum(log_inverse_ratio), 'invlogratio_sum'))
