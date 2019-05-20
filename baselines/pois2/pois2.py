@@ -255,7 +255,7 @@ def learn(env, make_policy, *,
 
     losses_with_name.append((tf.reduce_sum(behavioral_log_pdf_split), 'BpdfMean0'))
     losses_with_name.append((tf.reduce_min(behavioral_log_pdf_split), 'BpdfMin0'))
-    losses_with_name.append((tf.reduce_sum(target_log_pdf), 'Tpdfsum0'))
+    losses_with_name.append((tf.reduce_sum(target_log_pdf_split), 'Tpdfsum0'))
     losses_with_name.append((tf.reduce_sum(log_ratio_split), 'logratio_sum'))
 
     # Renyi divergence
