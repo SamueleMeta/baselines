@@ -227,17 +227,16 @@ class DiagGaussianPd(Pd):
     def __init__(self, flat):
         self.flat = flat
         mean, logstd = tf.split(axis=len(flat.shape)-1, num_or_size_splits=2, value=flat)
-        self.mean = tf.cast(mean, tf.float64)
-        self.logstd = tf.cast(logstd, tf.float64)
-        self.std = tf.exp(tf.cast(logstd, tf.float64))
-        print('Using float64')
+        self.mean = mean
+        self.logstd = logstd
+        self.std = tf.exp(logstd)
     def flatparam(self):
         return self.flat
     def mode(self):
         return self.mean
     def neglogp(self, x):
-        return 0.5 * tf.reduce_sum(tf.square((x - self.mean) / self.std), axis=-1) \
-               + 0.5 * np.log(2.0 * np.pi) * tf.to_float(tf.shape(x)[-1]) \
+        return 0.5 * tf.reduce_sum(tf.square(tf.cast((x - self.mean), tf.float64) / self.std), axis=-1) \
+               + 0.5 * np.log(2.0 * np.pi) * tf.cast(tf.shape(x)[-1], tf.float64) \
                + tf.reduce_sum(self.logstd, axis=-1)
     def independent_logps(self, x):
         return - (0.5 * tf.square((x- self.mean) / self.std)
