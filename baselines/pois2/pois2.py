@@ -253,7 +253,7 @@ def learn(env, make_policy, *,
     log_ratio_split = target_log_pdf_split - behavioral_log_pdf_split
     mask_split = tf.stack(tf.split(mask_, n_episodes))
 
-    losses_with_name.append((tf.reduce_sum(log_ratio_split, axis=1)[0], 'ratio0'))
+    losses_with_name.append((tf.reduce_sum(log_ratio_split), 'ratio0'))
 
     # Renyi divergence
     emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
