@@ -23,7 +23,7 @@ def update_epsilon(delta_bound, epsilon_old, max_increase=2.):
     else:
         return epsilon_old ** 2 / (2 * (epsilon_old - delta_bound))
 
-def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4, max_line_search_ite=30):
+def line_search_parabola(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4, max_line_search_ite=1):
     epsilon = 1.
     epsilon_old = 0.
     delta_bound_old = -np.inf
@@ -252,6 +252,8 @@ def learn(env, make_policy, *,
     behavioral_log_pdf_split = tf.stack(tf.split(behavioral_log_pdf * mask_, n_episodes))
     log_ratio_split = target_log_pdf_split - behavioral_log_pdf_split
     mask_split = tf.stack(tf.split(mask_, n_episodes))
+
+    losses_with_name.append((tf.reduce_sum(log_ratio_split, axis=1)[0], 'ratio0'))
 
     # Renyi divergence
     emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
