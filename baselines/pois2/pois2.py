@@ -182,7 +182,7 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
 
     return theta, improvement
 
-def learn(make_env, make_policy, *,
+def learn(env, make_policy, *,
           n_episodes,
           horizon,
           delta,
