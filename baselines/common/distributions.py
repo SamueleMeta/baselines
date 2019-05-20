@@ -235,8 +235,8 @@ class DiagGaussianPd(Pd):
     def mode(self):
         return self.mean
     def neglogp(self, x):
-        return 0.5 * tf.reduce_sum(tf.square(tf.cast((x - self.mean), tf.float64) / self.std), axis=-1) \
-               + 0.5 * np.log(2.0 * np.pi) * tf.cast(tf.shape(x)[-1], tf.float64) \
+        return 0.5 * tf.reduce_sum(tf.square((x - self.mean) / self.std), axis=-1) \
+               + 0.5 * np.log(2.0 * np.pi) * tf.to_float(tf.shape(x)[-1]) \
                + tf.reduce_sum(self.logstd, axis=-1)
     def independent_logps(self, x):
         return - (0.5 * tf.square((x- self.mean) / self.std)
