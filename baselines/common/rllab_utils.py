@@ -3,6 +3,7 @@
 '''
 
 import gym
+from baselines.common import set_global_seeds as set_all_seeds
 
 def rllab_env_from_name(env):
     if env == 'swimmer':
@@ -66,8 +67,6 @@ class Rllab2GymWrapper(gym.Env):
         self.rllab_env = normalize(rllab_env)
         self.observation_space = convert_rllab_space(rllab_env.observation_space)
         self.action_space = convert_rllab_space(rllab_env.action_space)
-        self.seed()
-        self.reset()
 
     def step(self, action):
         res = self.rllab_env.step(action)
@@ -78,7 +77,9 @@ class Rllab2GymWrapper(gym.Env):
         return new_state
 
     def seed(self, seed=0):
-        pass
+        set_all_seeds(seed)
+        import numpy as np
+        print('Generating random number', np.random.rand())
 
     def render(self, mode='human', close=False):
         #return self.rllab_env.render(mode=mode, close=close)
