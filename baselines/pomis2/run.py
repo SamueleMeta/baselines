@@ -38,7 +38,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
             def _thunk():
                 env_rllab = Rllab2GymWrapper(env_rllab_class())
                 env_rllab.seed(seed)
-                set_all_seeds(seed)
+                #set_all_seeds(seed)
                 return env_rllab
             return _thunk
         parallel_env = SubprocVecEnv([make_env(seed + i*100) for i in range(njobs)])
