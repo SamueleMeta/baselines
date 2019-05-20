@@ -55,26 +55,36 @@ def custom_config():
     bound = 'max-d2'
     delta = 0.99
     njobs = -1
+    save_weights = 0
     policy = 'nn'
+    policy_init = 'xavier'
     max_offline_iters = 10
     gamma = 1.0
     center = False
     clipping = False
     entropy = 'none'
+    reward_clustering = 'none'
     positive_return = False
-    save_weights = 0
+    experiment_name = None
     # ENTROPY can be of 4 schemes:
-    #    - 'none'
+    #    - 'none': no entropy bonus
     #    - 'step:<height>:<duration>': step function which is <height> tall for <duration> iterations
     #    - 'lin:<max>:<min>': linearly decreasing function from <max> to <min> over all iterations, clipped to 0 for negatives
     #    - 'exp:<height>:<scale>': exponentially decreasing curve <height> tall, use <scale> to make it "spread" more
+    # REWARD_CLUSTERING can be of 4 schemes:
+    #    - 'none': do nothing
+    #    - 'manual:<N>:<min>:<max>': N classes between min and max
+    #    - 'global:<N>': N classes over global min and max (as seen so far)
+    #    - 'batch:<N>': N classes over batch min and max (as seen so far)
+    # TODO: quantiles discretization?
     # Create the filename
     if file_name == 'progress':
         file_name = '%s_iw=%s_bound=%s_delta=%s_gamma=%s_center=%s_entropy=%s_seed=%s_%s' % (env.upper(), iw_method, bound, delta, gamma, center, entropy, seed, time.time())
     else:
         file_name = file_name
 
-def train(env, policy, seed, njobs=1, **alg_args):
+
+def train(env, policy, policy_init, seed, njobs=1, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -114,7 +124,6 @@ def train(env, policy, seed, njobs=1, **alg_args):
                 return _thunk
             parallel_env = SubprocVecEnv([make_env(seed + i*100) for i in range(njobs)])
 
-    # Create the policy
     if policy == 'linear':
         hid_size = num_hid_layers = 0
         use_bias = False
@@ -127,18 +136,26 @@ def train(env, policy, seed, njobs=1, **alg_args):
         num_hid_layers = 3
         use_bias = True
 
-    if policy == 'linear' or policy == 'nn':
+    if policy_init == 'xavier':
+        policy_initializer = tf.contrib.layers.xavier_initializer()
+    elif policy_init == 'zeros':
+        policy_initializer = U.normc_initializer(0.0)
+    elif policy_init == 'small-weights':
+        policy_initializer = U.normc_initializer(0.1)
+    else:
+        raise Exception('Unrecognized policy initializer.')
+
+    if policy == 'linear' or policy == 'nn' or policy == 'simple-nn':
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                             hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                             output_W_init=tf.contrib.layers.xavier_initializer())
+                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=use_bias, use_critic=False,
+                             hidden_W_init=policy_initializer, output_W_init=policy_initializer)
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
             return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                          gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                         output_W_init=tf.contrib.layers.xavier_initializer())
+                         hidden_W_init=policy_initializer,
+                         output_W_init=policy_initializer)
     else:
         raise Exception('Unrecognized policy type.')
 

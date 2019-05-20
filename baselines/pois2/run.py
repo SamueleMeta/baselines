@@ -66,7 +66,6 @@ def train(env, policy, seed, njobs=1, **alg_args):
                 return _thunk
             parallel_env = SubprocVecEnv([make_env(seed + i*100) for i in range(njobs)])
 
-    # Create the policy
     if policy == 'linear':
         hid_size = num_hid_layers = 0
         use_bias = False
@@ -79,18 +78,26 @@ def train(env, policy, seed, njobs=1, **alg_args):
         num_hid_layers = 3
         use_bias = True
 
-    if policy == 'linear' or policy == 'nn':
+    if policy_init == 'xavier':
+        policy_initializer = tf.contrib.layers.xavier_initializer()
+    elif policy_init == 'zeros':
+        policy_initializer = U.normc_initializer(0.0)
+    elif policy_init == 'small-weights':
+        policy_initializer = U.normc_initializer(0.1)
+    else:
+        raise Exception('Unrecognized policy initializer.')
+
+    if policy == 'linear' or policy == 'nn' or policy == 'simple-nn':
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                             hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                             output_W_init=tf.contrib.layers.xavier_initializer())
+                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=use_bias, use_critic=False,
+                             hidden_W_init=policy_initializer, output_W_init=policy_initializer)
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
             return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                          gaussian_fixed_var=True, use_bias=False, use_critic=False,
-                         hidden_W_init=tf.contrib.layers.xavier_initializer(),
-                         output_W_init=tf.contrib.layers.xavier_initializer())
+                         hidden_W_init=policy_initializer,
+                         output_W_init=policy_initializer)
     else:
         raise Exception('Unrecognized policy type.')
 
@@ -123,12 +130,15 @@ def main():
     parser.add_argument('--delta', type=float, default=0.99)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='nn')
+    parser.add_argument('--policy_init', type=str, default='xavier')
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--center', type=bool, default=False)
     parser.add_argument('--clipping', type=bool, default=False)
     parser.add_argument('--entropy', type=str, default='none')
+    parser.add_argument('--reward_clustering', type=str, default='none')
+    parser.add_argument('--experiment_name', type=str, default='none')
     parser.add_argument('--save_weights', type=int, default=0)
     args = parser.parse_args()
     if args.file_name == 'progress':
@@ -138,10 +148,12 @@ def main():
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     train(env=args.env,
           policy=args.policy,
+          policy_init=args.policy_init,
           n_episodes=args.num_episodes,
           horizon=args.horizon,
           seed=args.seed,
           njobs=args.njobs,
+          save_weights=args.save_weights,
           max_iters=args.max_iters,
           iw_method=args.iw_method,
           iw_norm=args.iw_norm,
@@ -153,7 +165,7 @@ def main():
           center_return=args.center,
           clipping=args.clipping,
           entropy=args.entropy,
-          save_weights=args.save_weights)
+          reward_clustering=args.reward_clustering,)
 
 if __name__ == '__main__':
     main()
