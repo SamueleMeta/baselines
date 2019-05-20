@@ -203,7 +203,8 @@ def learn(env, make_policy, *,
           callback=None,
           clipping=False,
           entropy='none',
-          positive_return=False):
+          positive_return=False,
+          reward_clustering='none'):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
