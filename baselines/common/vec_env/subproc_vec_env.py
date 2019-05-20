@@ -7,8 +7,6 @@ def worker(remote, parent_remote, env_fn_wrapper, terminating):
     # and done flag if the episodes has ended before the horizon.
     parent_remote.close()
     env = env_fn_wrapper.x()
-    import numpy as np
-    print('Printing a random number:', np.random.rand())
     done = False
     while True:
         cmd, data = remote.recv()
