@@ -264,8 +264,6 @@ def learn(env, make_policy, *,
     behavioral_log_pdfs = tf.stack([bpi.pd.logp(ac_) * mask_ for bpi in memory.policies]) # Shape is (capacity, ntraj*horizon)
     behavioral_log_pdfs_split = tf.reshape(behavioral_log_pdfs, [memory.capacity, -1, horizon])
 
-    losses_with_name.append((tf.reduce_sum(behavioral_log_pdfs_split[0][0]), 'BpdfMin0'))
-
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
     emp_d2_split_cum = tf.exp(tf.reduce_sum(emp_d2_split, axis=2))
@@ -310,8 +308,10 @@ def learn(env, make_policy, *,
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
         # To avoid numerical instability, compute the inversed ratio
-        log_inverse_ratio = behavioral_log_pdf_episode - target_log_pdf_episode
-        iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
+        log_ratio = target_log_pdf_split - behavioral_log_pdfs_split
+        inverse_log_ratio_episode = - tf.reduce_sum(log_ratio, axis=2)
+
+        iw = 1 / tf.reduce_sum(tf.exp(inverse_log_ratio_episode) * tf.expand_dims(active_policies, -1), axis=0)
 
         # Compute also the balance-heuristic weights
         iw_split = tf.reshape(iw, (memory.capacity, -1))

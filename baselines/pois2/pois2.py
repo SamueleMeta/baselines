@@ -248,12 +248,10 @@ def learn(env, make_policy, *,
     # Split operations
     disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes))
     rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes))
-    log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
     target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes))
     behavioral_log_pdf_split = tf.stack(tf.split(behavioral_log_pdf * mask_, n_episodes))
+    log_ratio_split = target_log_pdf_split - behavioral_log_pdf_split
     mask_split = tf.stack(tf.split(mask_, n_episodes))
-
-    losses_with_name.append((tf.reduce_sum(behavioral_log_pdf_split[0]), 'BpdfMin0'))
 
     # Renyi divergence
     emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
