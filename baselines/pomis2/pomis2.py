@@ -315,6 +315,7 @@ def learn(env, make_policy, *,
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
 
         losses_with_name.append((tf.reduce_sum(log_inverse_ratio), 'invlogratio_sum'))
+        losses_with_name.append((tf.reduce_sum(target_log_pdf_episode - behavioral_log_pdf_episode[0]), 'logratio_sum'))
 
         # Compute also the balance-heuristic weights
         iw_split = tf.reshape(iw, (memory.capacity, -1))
