@@ -266,6 +266,7 @@ def learn(env, make_policy, *,
 
     losses_with_name.append((tf.reduce_sum(behavioral_log_pdfs_split), 'BpdfMean0'))
     losses_with_name.append((tf.reduce_min(behavioral_log_pdfs_split), 'BpdfMin0'))
+    losses_with_name.append((tf.reduce_sum(target_log_pdf_split), 'TpdfSum0'))
 
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
