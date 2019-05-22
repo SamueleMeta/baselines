@@ -29,10 +29,8 @@ def plot_mean_ci(my_runs, metric, axis, conf=0.95, label=None, alpha=0.3):
 def plot_all(my_runs, metric, axis, legend=True):
     # Extract the metric
     run_keys = list(my_runs.keys())
-    list_of_metric = [value['metrics'][metric]['values'] for key, value in my_runs.items()]
-    min_steps = min([len(m) for m in list_of_metric])
-    metric_matrix = np.array([m[:min_steps] for m in list_of_metric])
-    for i in range(metric_matrix.shape[0]):
+    metric_matrix = [value['metrics'][metric]['values'] for key, value in my_runs.items()]
+    for i in range(len(metric_matrix)):
         axis.plot(metric_matrix[i], label='Seed:'+str(my_runs[run_keys[i]]['config']['seed']))
     if legend:
         axis.legend()
