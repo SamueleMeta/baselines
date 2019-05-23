@@ -1,0 +1,1463 @@
+INFO - pomis2_ip_cap5 - Running command 'main'
+Logging to logs
+INFO - pomis2_ip_cap5 - Started run with ID "981"
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+2019-05-23 10:43:00.280512: I tensorflow/core/platform/cpu_feature_guard.cc:140] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+[33mWARN: gym.spaces.Box autodetected dtype as <class 'numpy.float32'>. Please provide explicit dtype.[0m
+2019-05-23 10:43:07.784105: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1356] Found device 0 with properties: 
+name: Tesla V100-DGXS-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:07:00.0
+totalMemory: 15.77GiB freeMemory: 6.59GiB
+2019-05-23 10:43:14.166104: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1356] Found device 1 with properties: 
+name: Tesla V100-DGXS-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:08:00.0
+totalMemory: 15.77GiB freeMemory: 5.50GiB
+2019-05-23 10:43:20.329176: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1356] Found device 2 with properties: 
+name: Tesla V100-DGXS-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:0e:00.0
+totalMemory: 15.77GiB freeMemory: 10.82GiB
+2019-05-23 10:43:27.844662: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1356] Found device 3 with properties: 
+name: Tesla V100-DGXS-16GB major: 7 minor: 0 memoryClockRate(GHz): 1.53
+pciBusID: 0000:0f:00.0
+totalMemory: 15.77GiB freeMemory: 5.32GiB
+2019-05-23 10:43:27.844778: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1435] Adding visible gpu devices: 0, 1, 2, 3
+2019-05-23 10:43:38.135929: I tensorflow/core/common_runtime/gpu/gpu_device.cc:923] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-05-23 10:43:38.143308: I tensorflow/core/common_runtime/gpu/gpu_device.cc:929]      0 1 2 3 
+2019-05-23 10:43:38.143362: I tensorflow/core/common_runtime/gpu/gpu_device.cc:942] 0:   N Y Y Y 
+2019-05-23 10:43:38.143382: I tensorflow/core/common_runtime/gpu/gpu_device.cc:942] 1:   Y N Y Y 
+2019-05-23 10:43:38.143399: I tensorflow/core/common_runtime/gpu/gpu_device.cc:942] 2:   Y Y N Y 
+2019-05-23 10:43:38.143439: I tensorflow/core/common_runtime/gpu/gpu_device.cc:942] 3:   Y Y Y N 
+2019-05-23 10:43:38.144291: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1053] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 2977 MB memory) -> physical GPU (device: 0, name: Tesla V100-DGXS-16GB, pci bus id: 0000:07:00.0, compute capability: 7.0)
+2019-05-23 10:43:38.164359: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1053] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:1 with 2995 MB memory) -> physical GPU (device: 1, name: Tesla V100-DGXS-16GB, pci bus id: 0000:08:00.0, compute capability: 7.0)
+2019-05-23 10:43:38.166885: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1053] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:2 with 8302 MB memory) -> physical GPU (device: 2, name: Tesla V100-DGXS-16GB, pci bus id: 0000:0e:00.0, compute capability: 7.0)
+2019-05-23 10:43:38.168976: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1053] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:3 with 3185 MB memory) -> physical GPU (device: 3, name: Tesla V100-DGXS-16GB, pci bus id: 0000:0f:00.0, compute capability: 7.0)
+[<tf.Variable 'pi/pol/final/kernel:0' shape=(4, 1) dtype=float32_ref>, <tf.Variable 'pi/pol/pol_logstd:0' shape=(1, 1) dtype=float32_ref>]
+[<tf.Variable 'behavioral_1_policy/pol/final/kernel:0' shape=(4, 1) dtype=float32_ref>, <tf.Variable 'behavioral_1_policy/pol/pol_logstd:0' shape=(1, 1) dtype=float32_ref>]
+[<tf.Variable 'behavioral_2_policy/pol/final/kernel:0' shape=(4, 1) dtype=float32_ref>, <tf.Variable 'behavioral_2_policy/pol/pol_logstd:0' shape=(1, 1) dtype=float32_ref>]
+[<tf.Variable 'behavioral_3_policy/pol/final/kernel:0' shape=(4, 1) dtype=float32_ref>, <tf.Variable 'behavioral_3_policy/pol/pol_logstd:0' shape=(1, 1) dtype=float32_ref>]
+[<tf.Variable 'behavioral_4_policy/pol/final/kernel:0' shape=(4, 1) dtype=float32_ref>, <tf.Variable 'behavioral_4_policy/pol/pol_logstd:0' shape=(1, 1) dtype=float32_ref>]
+[<tf.Variable 'behavioral_5_policy/pol/final/kernel:0' shape=(4, 1) dtype=float32_ref>, <tf.Variable 'behavioral_5_policy/pol/pol_logstd:0' shape=(1, 1) dtype=float32_ref>]
+********** Iteration 1 ************
+[35msampling[0m
+[35mdone in 8.705 seconds[0m
+[35msummaries before[0m
+[35mdone in 1.351 seconds[0m
+-------------------------------
+| EpLenMean      | 39.7       |
+| EpRewMean      | -130       |
+| EpThisIter     | 100        |
+| EpisodesSoFar  | 100        |
+| InitialBound   | -145.15965 |
+| Iteration      | 1          |
+| TimeElapsed    | 11.2       |
+| TimestepsSoFar | 3972       |
+-------------------------------
+********** Iteration 2 ************
+[35msampling[0m
+[35mdone in 5.682 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.012 seconds[0m
+-------------------------------
+| EpLenMean      | 36.9       |
+| EpRewMean      | -128       |
+| EpThisIter     | 100        |
+| EpisodesSoFar  | 200        |
+| InitialBound   | -139.70699 |
+| Iteration      | 2          |
+| TimeElapsed    | 17.1       |
+| TimestepsSoFar | 7662       |
+-------------------------------
+********** Iteration 3 ************
+[35msampling[0m
+[35mdone in 8.510 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.039 seconds[0m
+-------------------------------
+| EpLenMean      | 38.8       |
+| EpRewMean      | -130       |
+| EpThisIter     | 100        |
+| EpisodesSoFar  | 300        |
+| InitialBound   | -137.88593 |
+| Iteration      | 3          |
+| TimeElapsed    | 25.7       |
+| TimestepsSoFar | 11543      |
+-------------------------------
+********** Iteration 4 ************
+[35msampling[0m
+[35mdone in 9.141 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.037 seconds[0m
+------------------------------
+| EpLenMean      | 34.7      |
+| EpRewMean      | -126      |
+| EpThisIter     | 100       |
+| EpisodesSoFar  | 400       |
+| InitialBound   | -137.9412 |
+| Iteration      | 4         |
+| TimeElapsed    | 34.9      |
+| TimestepsSoFar | 15015     |
+------------------------------
+********** Iteration 5 ************
+[35msampling[0m
+[35mdone in 9.066 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.017 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       7.62   0.000135                  6                238               3.81               3.81
+     2       10.7   0.000207                  7                228               5.36               9.17
+     3       7.66   3.86e-05                  4                445               2.96               12.1
+     4      0.693   2.09e-05                  3                182              0.344               12.5
+     5      0.325   8.55e-05                  4               61.6              0.162               12.6
+     6      0.165   1.94e-05                  6                 92             0.0823               12.7
+     7     0.0612   5.55e-05                  5               33.2             0.0306               12.7
+     8     0.0436   2.06e-05                  5                 46             0.0218               12.8
+     9     0.0335   5.73e-05                  5               24.2             0.0167               12.8
+    10     0.0266    2.1e-05                  7               35.5             0.0133               12.8
+[35mdone in 3.997 seconds[0m
+[ 0.06   0.026 -0.085 -0.045  0.039]
+[35msummaries after[0m
+[35mdone in 0.470 seconds[0m
+----------------------------------------
+| Bound                 | -124.46024   |
+| ESSRenyiArithmetic    | 167.94754    |
+| ESSRenyiHarmonic      | 167.94753    |
+| EmpiricalD2Arithmetic | 2.9771202    |
+| EmpiricalD2Harmonic   | 2.9771204    |
+| EpLenMean             | 40.7         |
+| EpRewMean             | -130         |
+| EpThisIter            | 100          |
+| EpisodesSoFar         | 500          |
+| InitialBound          | -137.25246   |
+| InitialReturnMax      | -100.0       |
+| InitialReturnMean     | -128.77815   |
+| InitialReturnMin      | -289.4523    |
+| InitialReturnStd      | 18.800087    |
+| Iteration             | 5            |
+| MaxIW                 | 0.87233144   |
+| MeanEntropy           | 1.4576418    |
+| MeanIW                | 0.17576705   |
+| MinBehavPdf           | -338.10004   |
+| MinIW                 | 0.0054775504 |
+| MinTargetPdf          | -341.65607   |
+| MultiIWFirstRatio     | 0.1992902    |
+| MultiIWMax            | 0.18134451   |
+| MultiIWMin            | 0.16628002   |
+| MultiIWSum            | 0.8788352    |
+| ReturnMeanIW          | -109.83841   |
+| ReturnStepMax         | 100.0        |
+| ReturnStepMaxmin      | 99.56872     |
+| StdIW                 | 0.12378273   |
+| TimeElapsed           | 44           |
+| TimestepsSoFar        | 19085        |
+----------------------------------------
+********** Iteration 6 ************
+[35msampling[0m
+[35mdone in 6.937 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.049 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       2.02   0.000156                  5                114               1.01               1.01
+     2      0.693   0.000275                  4               50.2              0.346               1.35
+     3      0.353   8.11e-05                  4                 66              0.176               1.53
+     4      0.223   0.000194                  4               33.9              0.111               1.64
+     5      0.193    9.3e-05                  5               45.6             0.0966               1.74
+     6      0.168   0.000179                  4               30.6             0.0838               1.82
+     7      0.169   9.67e-05                  5               41.8             0.0847               1.91
+     8      0.168   0.000168                  4               31.6             0.0838               1.99
+     9      0.185   9.92e-05                  4               43.1             0.0922               2.08
+    10      0.188   0.000149                  4               35.6             0.0942               2.18
+[35mdone in 1.319 seconds[0m
+[ 0.044  0.062 -0.07  -0.035  0.056]
+[35msummaries after[0m
+[35mdone in 0.014 seconds[0m
+----------------------------------------
+| Bound                 | -130.85385   |
+| ESSRenyiArithmetic    | 223.12589    |
+| ESSRenyiHarmonic      | 245.06818    |
+| EmpiricalD2Arithmetic | 2.2408874    |
+| EmpiricalD2Harmonic   | 2.0402486    |
+| EpLenMean             | 35.3         |
+| EpRewMean             | -125         |
+| EpThisIter            | 100          |
+| EpisodesSoFar         | 600          |
+| InitialBound          | -133.0313    |
+| InitialReturnMax      | -100.0       |
+| InitialReturnMean     | -127.61363   |
+| InitialReturnMin      | -289.4523    |
+| InitialReturnStd      | 18.117107    |
+| Iteration             | 6            |
+| MaxIW                 | 1.2173233    |
+| MeanEntropy           | 1.4749575    |
+| MeanIW                | 0.19010617   |
+| MinBehavPdf           | -341.65607   |
+| MinIW                 | 0.0147434585 |
+| MinTargetPdf          | -340.17093   |
+| MultiIWFirstRatio     | 0.18680906   |
+| MultiIWMax            | 0.25144982   |
+| MultiIWMin            | 0.17046028   |
+| MultiIWSum            | 0.95053077   |
+| ReturnMeanIW          | -118.749405  |
+| ReturnStepMax         | 100.0        |
+| ReturnStepMaxmin      | 99.51668     |
+| StdIW                 | 0.12356425   |
+| TimeElapsed           | 55.6         |
+| TimestepsSoFar        | 22617        |
+----------------------------------------
+********** Iteration 7 ************
+[35msampling[0m
+[35mdone in 7.080 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.013 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1          8   0.000798                  4                100               4.47               4.47
+     2          8   0.000163                  4                221               3.54               8.01
+     3       2.39   0.000107                  3                149               1.16               9.17
+     4      0.671   3.46e-05                  3                139              0.334                9.5
+     5      0.741   8.51e-05                  3               93.3              0.367               9.87
+     6      0.566   3.44e-05                  3                128              0.281               10.2
+     7      0.601    7.7e-05                  3               88.4              0.294               10.4
+     8      0.463   4.26e-05                  3                104              0.227               10.7
+     9      0.486   5.68e-05                  5               92.5              0.243               10.9
+    10      0.391    4.2e-05                  4               96.5              0.195               11.1
+[35mdone in 2.334 seconds[0m
+[-0.001  0.094 -0.056 -0.083  0.046]
+[35msummaries after[0m
+[35mdone in 0.014 seconds[0m
+-----------------------------------------
+| Bound                 | -121.02376    |
+| ESSRenyiArithmetic    | 0.02145321    |
+| ESSRenyiHarmonic      | 82.21785      |
+| EmpiricalD2Arithmetic | 23306.537     |
+| EmpiricalD2Harmonic   | 6.0814047     |
+| EpLenMean             | 35.7          |
+| EpRewMean             | -126          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 700           |
+| InitialBound          | -132.13515    |
+| InitialReturnMax      | -100.0        |
+| InitialReturnMean     | -127.23795    |
+| InitialReturnMin      | -289.4523     |
+| InitialReturnStd      | 18.513903     |
+| Iteration             | 7             |
+| MaxIW                 | 1.5732775     |
+| MeanEntropy           | 1.4652944     |
+| MeanIW                | 0.16405241    |
+| MinBehavPdf           | -341.65607    |
+| MinIW                 | 0.00033471273 |
+| MinTargetPdf          | -344.95343    |
+| MultiIWFirstRatio     | 0.14050165    |
+| MultiIWMax            | 0.24438961    |
+| MultiIWMin            | 0.11306987    |
+| MultiIWSum            | 0.82026213    |
+| ReturnMeanIW          | -100.12572    |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.46874      |
+| StdIW                 | 0.18865389    |
+| TimeElapsed           | 64            |
+| TimestepsSoFar        | 26183         |
+-----------------------------------------
+********** Iteration 8 ************
+[35msampling[0m
+[35mdone in 8.130 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.045 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       4.01   0.000105                  4                196               2.01               2.01
+     2       2.24   0.000392                  5               75.6               1.12               3.13
+     3       2.08   6.46e-05                  3                179               1.04               4.16
+     4       1.71   0.000362                  4               68.8              0.856               5.02
+     5       1.16   4.26e-05                  4                165              0.581                5.6
+     6      0.814   0.000232                  2               59.2              0.386               5.99
+     7        1.2   4.42e-05                  3                165              0.601               6.59
+     8       1.01   0.000171                  2               76.8              0.504               7.09
+     9       1.17   3.96e-05                  4                172              0.586               7.68
+    10       1.24   0.000141                  5               93.8               0.62                8.3
+[35mdone in 1.653 seconds[0m
+[-0.062  0.147 -0.055 -0.101 -0.008]
+[35msummaries after[0m
+[35mdone in 0.033 seconds[0m
+-----------------------------------------
+| Bound                 | -125.96596    |
+| ESSRenyiArithmetic    | 3.1407384e-05 |
+| ESSRenyiHarmonic      | 56.716145     |
+| EmpiricalD2Arithmetic | 15919824.0    |
+| EmpiricalD2Harmonic   | 8.815832      |
+| EpLenMean             | 37.7          |
+| EpRewMean             | -125          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 800           |
+| InitialBound          | -134.2645     |
+| InitialReturnMax      | -100.0        |
+| InitialReturnMean     | -126.2725     |
+| InitialReturnMin      | -289.4523     |
+| InitialReturnStd      | 17.785324     |
+| Iteration             | 8             |
+| MaxIW                 | 2.5319657     |
+| MeanEntropy           | 1.4108013     |
+| MeanIW                | 0.16602373    |
+| MinBehavPdf           | -344.95343    |
+| MinIW                 | 5.2454374e-07 |
+| MinTargetPdf          | -351.79266    |
+| MultiIWFirstRatio     | 0.1273387     |
+| MultiIWMax            | 0.36065522    |
+| MultiIWMin            | 0.082082026   |
+| MultiIWSum            | 0.83011866    |
+| ReturnMeanIW          | -100.804535   |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.38935      |
+| StdIW                 | 0.26368764    |
+| TimeElapsed           | 74.6          |
+| TimestepsSoFar        | 29957         |
+-----------------------------------------
+********** Iteration 9 ************
+[35msampling[0m
+[35mdone in 8.026 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.027 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       8.36   0.000126                  5                257               4.17               4.17
+     2         16   0.000429                  5                193               8.01               12.2
+     3       6.43   6.23e-05                  4                321               2.76               14.9
+     4       5.63   0.000307                  4                136               2.58               17.5
+     5       0.54   1.93e-05                  3                167              0.269               17.8
+     6      0.245   8.67e-05                  5               53.1              0.122               17.9
+     7      0.146   2.29e-05                  4               79.8             0.0731                 18
+     8     0.0976   8.67e-05                  4               33.5             0.0488                 18
+     9     0.0613   2.29e-05                  4               51.7             0.0307               18.1
+    10      0.038   8.55e-05                  6               21.1              0.019               18.1
+[35mdone in 2.141 seconds[0m
+[-0.118  0.114 -0.044 -0.132 -0.059]
+[35msummaries after[0m
+[35mdone in 0.045 seconds[0m
+------------------------------------------
+| Bound                 | -108.06558     |
+| ESSRenyiArithmetic    | 6.7366723e-10  |
+| ESSRenyiHarmonic      | 22.983492      |
+| EmpiricalD2Arithmetic | 742206200000.0 |
+| EmpiricalD2Harmonic   | 21.754745      |
+| EpLenMean             | 32.5           |
+| EpRewMean             | -120           |
+| EpThisIter            | 100            |
+| EpisodesSoFar         | 900            |
+| InitialBound          | -126.14922     |
+| InitialReturnMax      | -96.55227      |
+| InitialReturnMean     | -125.06553     |
+| InitialReturnMin      | -209.50002     |
+| InitialReturnStd      | 16.07886       |
+| Iteration             | 9              |
+| MaxIW                 | 2.2655945      |
+| MeanEntropy           | 1.3602765      |
+| MeanIW                | 0.13341762     |
+| MinBehavPdf           | -235.20245     |
+| MinIW                 | 5.4551805e-07  |
+| MinTargetPdf          | -240.58455     |
+| MultiIWFirstRatio     | 0.06957023     |
+| MultiIWMax            | 0.3002761      |
+| MultiIWMin            | 0.045858506    |
+| MultiIWSum            | 0.6670881      |
+| ReturnMeanIW          | -79.45757      |
+| ReturnStepMax         | 100.0          |
+| ReturnStepMaxmin      | 99.38935       |
+| StdIW                 | 0.24588701     |
+| TimeElapsed           | 84.4           |
+| TimestepsSoFar        | 33212          |
+------------------------------------------
+********** Iteration 10 ************
+[35msampling[0m
+[35mdone in 12.121 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.039 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1         16    0.00021                  5                276               9.94               9.94
+     2       10.6    6.7e-05                  5                398               4.98               14.9
+     3       3.72   3.54e-05                  7                324               1.86               16.8
+     4       3.28   3.72e-05                  3                297               1.39               18.2
+     5       4.28   0.000108                  7                199               2.14               20.3
+     6       1.48   1.32e-05                  4                334              0.739               21.1
+     7      0.171   2.62e-05                  4               80.6             0.0853               21.1
+     8      0.126   1.34e-05                  5               96.9             0.0628               21.2
+     9     0.0864   2.24e-05                  4               62.1             0.0432               21.2
+    10     0.0671   1.35e-05                  4               70.5             0.0336               21.3
+[35mdone in 2.061 seconds[0m
+[-0.147  0.087 -0.012 -0.137 -0.09 ]
+[35msummaries after[0m
+[35mdone in 0.021 seconds[0m
+-----------------------------------------
+| Bound                 | -104.349945   |
+| ESSRenyiArithmetic    | 1.2265874e-19 |
+| ESSRenyiHarmonic      | 22.051464     |
+| EmpiricalD2Arithmetic | 4.0763504e+21 |
+| EmpiricalD2Harmonic   | 22.67423      |
+| EpLenMean             | 42.8          |
+| EpRewMean             | -121          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 1000          |
+| InitialBound          | -125.63137    |
+| InitialReturnMax      | -92.99223     |
+| InitialReturnMean     | -123.27349    |
+| InitialReturnMin      | -195.64717    |
+| InitialReturnStd      | 14.869692     |
+| Iteration             | 10            |
+| MaxIW                 | 3.8651578     |
+| MeanEntropy           | 1.3285956     |
+| MeanIW                | 0.1271789     |
+| MinBehavPdf           | -240.58455    |
+| MinIW                 | 2.4012812e-07 |
+| MinTargetPdf          | -241.42212    |
+| MultiIWFirstRatio     | 0.08347848    |
+| MultiIWMax            | 0.40264907    |
+| MultiIWMin            | 0.019902077   |
+| MultiIWSum            | 0.6358946     |
+| ReturnMeanIW          | -77.07484     |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.128555     |
+| StdIW                 | 0.32325837    |
+| TimeElapsed           | 98.8          |
+| TimestepsSoFar        | 37492         |
+-----------------------------------------
+********** Iteration 11 ************
+[35msampling[0m
+[35mdone in 13.893 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.037 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       6.14   7.35e-05                  5                289               3.07               3.07
+     2       8.67   4.48e-05                  5                440               4.31               7.38
+     3       12.8   3.97e-05                  5                567                5.5               12.9
+     4       30.5   0.000121                  6                503               11.8               24.7
+     5       3.75   1.72e-05                  6                467               1.88               26.6
+     6      0.971   1.69e-05                  3                239              0.486                 27
+     7      0.594   1.18e-05                  3                225              0.296               27.3
+     8      0.471   1.78e-05                  5                163              0.235               27.6
+     9      0.345   1.19e-05                  4                171              0.173               27.8
+    10      0.301   2.01e-05                  4                122               0.15               27.9
+[35mdone in 1.411 seconds[0m
+[-0.196  0.04  -0.006 -0.122 -0.101]
+[35msummaries after[0m
+[35mdone in 0.016 seconds[0m
+-----------------------------------------
+| Bound                 | -95.62598     |
+| ESSRenyiArithmetic    | 2.1702246e-24 |
+| ESSRenyiHarmonic      | 14.464594     |
+| EmpiricalD2Arithmetic | 2.303909e+26  |
+| EmpiricalD2Harmonic   | 34.567165     |
+| EpLenMean             | 52.5          |
+| EpRewMean             | -120          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 1100          |
+| InitialBound          | -123.52711    |
+| InitialReturnMax      | -92.99223     |
+| InitialReturnMean     | -122.294365   |
+| InitialReturnMin      | -195.64717    |
+| InitialReturnStd      | 14.584686     |
+| Iteration             | 11            |
+| MaxIW                 | 1.8911252     |
+| MeanEntropy           | 1.318176      |
+| MeanIW                | 0.100251146   |
+| MinBehavPdf           | -326.52658    |
+| MinIW                 | 5.6029683e-09 |
+| MinTargetPdf          | -285.953      |
+| MultiIWFirstRatio     | 0.010654707   |
+| MultiIWMax            | 0.3880809     |
+| MultiIWMin            | 0.0053407336  |
+| MultiIWSum            | 0.50125575    |
+| ReturnMeanIW          | -61.94908     |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.128555     |
+| StdIW                 | 0.26539096    |
+| TimeElapsed           | 115           |
+| TimestepsSoFar        | 42739         |
+-----------------------------------------
+********** Iteration 12 ************
+[35msampling[0m
+[35mdone in 25.920 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.049 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       13.1   2.01e-05                 10                808               6.56               6.56
+     2       6.97   3.14e-05                  6                471               3.48                 10
+     3       7.45   1.77e-05                  8                648               3.72               13.8
+     4       7.03   3.93e-05                  6                423               3.51               17.3
+     5       3.67   1.68e-05                  7                467               1.83               19.1
+     6          3   6.51e-05                  4                215                1.5               20.6
+     7       1.39   1.81e-05                  5                277              0.693               21.3
+     8       1.27   0.000117                  5                104              0.635                 22
+     9      0.606   2.02e-05                  3                173              0.302               22.3
+    10      0.301   0.000101                  4               54.6              0.151               22.4
+[35mdone in 2.970 seconds[0m
+[-0.159  0.1   -0.    -0.135 -0.131]
+[35msummaries after[0m
+[35mdone in 0.018 seconds[0m
+----------------------------------------
+| Bound                 | -120.43422   |
+| ESSRenyiArithmetic    | 8.118209e-20 |
+| ESSRenyiHarmonic      | 73.462326    |
+| EmpiricalD2Arithmetic | 6.158994e+21 |
+| EmpiricalD2Harmonic   | 6.80621      |
+| EpLenMean             | 110          |
+| EpRewMean             | -127         |
+| EpThisIter            | 100          |
+| EpisodesSoFar         | 1200         |
+| InitialBound          | -142.83702   |
+| InitialReturnMax      | -92.99223    |
+| InitialReturnMean     | -122.53317   |
+| InitialReturnMin      | -185.51262   |
+| InitialReturnStd      | 14.823743    |
+| Iteration             | 12           |
+| MaxIW                 | 1.8297999    |
+| MeanEntropy           | 1.2880923    |
+| MeanIW                | 0.17442057   |
+| MinBehavPdf           | -577.2055    |
+| MinIW                 | 3.052673e-08 |
+| MinTargetPdf          | -541.9531    |
+| MultiIWFirstRatio     | 0.053413417  |
+| MultiIWMax            | 0.39167866   |
+| MultiIWMin            | 0.046581995  |
+| MultiIWSum            | 0.87210286   |
+| ReturnMeanIW          | -106.26478   |
+| ReturnStepMax         | 100.0        |
+| ReturnStepMaxmin      | 99.000046    |
+| StdIW                 | 0.24260545   |
+| TimeElapsed           | 142          |
+| TimestepsSoFar        | 53757        |
+----------------------------------------
+********** Iteration 13 ************
+[35msampling[0m
+[35mdone in 12.668 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.029 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       4.56   9.77e-05                  4                216               2.25               2.25
+     2       1.68   9.14e-05                  4                136              0.841               3.09
+     3      0.583   3.09e-05                  3                137              0.283               3.37
+     4      0.362   5.67e-05                  4               79.9              0.181               3.55
+     5      0.336    2.1e-05                  5                126              0.168               3.72
+     6      0.194   2.83e-05                  5               82.9             0.0972               3.82
+     7      0.203   2.29e-05                  6               94.2              0.101               3.92
+     8      0.163   1.99e-05                  4               90.5             0.0812                  4
+     9      0.177   2.46e-05                  6               84.8             0.0884               4.09
+    10      0.151   1.67e-05                  4               94.8             0.0751               4.16
+[35mdone in 1.430 seconds[0m
+[-0.181  0.105 -0.007 -0.149 -0.13 ]
+[35msummaries after[0m
+[35mdone in 0.016 seconds[0m
+-----------------------------------------
+| Bound                 | -120.901115   |
+| ESSRenyiArithmetic    | 4.0058908e-17 |
+| ESSRenyiHarmonic      | 99.87147      |
+| EmpiricalD2Arithmetic | 1.2481619e+19 |
+| EmpiricalD2Harmonic   | 5.006435      |
+| EpLenMean             | 53.7          |
+| EpRewMean             | -121          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 1300          |
+| InitialBound          | -125.063416   |
+| InitialReturnMax      | -92.99223     |
+| InitialReturnMean     | -121.729      |
+| InitialReturnMin      | -189.3425     |
+| InitialReturnStd      | 15.446925     |
+| Iteration             | 13            |
+| MaxIW                 | 1.2119832     |
+| MeanEntropy           | 1.2892252     |
+| MeanIW                | 0.18177323    |
+| MinBehavPdf           | -577.2055     |
+| MinIW                 | 3.8114678e-07 |
+| MinTargetPdf          | -544.6975     |
+| MultiIWFirstRatio     | 0.07350836    |
+| MultiIWMax            | 0.2942569     |
+| MultiIWMin            | 0.06680926    |
+| MultiIWSum            | 0.90886617    |
+| ReturnMeanIW          | -108.497765   |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.000046     |
+| StdIW                 | 0.19715065    |
+| TimeElapsed           | 158           |
+| TimestepsSoFar        | 59130         |
+-----------------------------------------
+********** Iteration 14 ************
+[35msampling[0m
+[35mdone in 12.947 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.021 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       1.41   7.73e-05                  2                135              0.644              0.644
+     2      0.718   5.27e-05                  3                117              0.359                  1
+     3      0.556   4.29e-05                  4                114              0.278               1.28
+     4      0.415   5.61e-05                  3                 86              0.207               1.49
+     5      0.666   8.82e-05                  2               86.9              0.249               1.74
+     6      0.819   3.68e-05                  3                149              0.409               2.15
+     7      0.652   9.41e-05                  3               83.2               0.28               2.43
+     8      0.283   4.82e-05                  4               76.6              0.142               2.57
+     9      0.165   3.84e-05                  3               65.5             0.0819               2.65
+    10     0.0959   5.56e-05                  5               41.5              0.048                2.7
+[35mdone in 1.153 seconds[0m
+[-0.202  0.113 -0.004 -0.162 -0.156]
+[35msummaries after[0m
+[35mdone in 0.016 seconds[0m
+-----------------------------------------
+| Bound                 | -119.454506   |
+| ESSRenyiArithmetic    | 4.002429e-06  |
+| ESSRenyiHarmonic      | 62.24194      |
+| EmpiricalD2Arithmetic | 124924140.0   |
+| EmpiricalD2Harmonic   | 8.033169      |
+| EpLenMean             | 54            |
+| EpRewMean             | -119          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 1400          |
+| InitialBound          | -122.15237    |
+| InitialReturnMax      | -92.99223     |
+| InitialReturnMean     | -121.646774   |
+| InitialReturnMin      | -196.37352    |
+| InitialReturnStd      | 16.217152     |
+| Iteration             | 14            |
+| MaxIW                 | 1.8006967     |
+| MeanEntropy           | 1.2626952     |
+| MeanIW                | 0.17746843    |
+| MinBehavPdf           | -555.7744     |
+| MinIW                 | 3.5447587e-10 |
+| MinTargetPdf          | -551.67786    |
+| MultiIWFirstRatio     | 0.13345732    |
+| MultiIWMax            | 0.32419273    |
+| MultiIWMin            | 0.063877344   |
+| MultiIWSum            | 0.8873421     |
+| ReturnMeanIW          | -103.15956    |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.000046     |
+| StdIW                 | 0.2219828     |
+| TimeElapsed           | 172           |
+| TimestepsSoFar        | 64527         |
+-----------------------------------------
+********** Iteration 15 ************
+[35msampling[0m
+[35mdone in 14.822 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.081 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       6.53   5.69e-05                  4                339               2.77               2.77
+     2      0.435   3.75e-05                  5                108              0.217               2.99
+     3     0.0362   2.73e-05                  6               36.4             0.0181               3.01
+     4     0.0231   4.61e-05                  7               22.4             0.0115               3.02
+     5     0.0155    3.3e-05                  6               21.7            0.00774               3.03
+     6   1.46e-08   5.66e-11                  4               16.1                  0               3.03
+stopping - delta bound < bound_tol
+[35mdone in 1.746 seconds[0m
+[-0.198  0.121 -0.016 -0.16  -0.157]
+[35msummaries after[0m
+[35mdone in 0.028 seconds[0m
+-----------------------------------------
+| Bound                 | -122.14993    |
+| ESSRenyiArithmetic    | 2.74227e-07   |
+| ESSRenyiHarmonic      | 125.1747      |
+| EmpiricalD2Arithmetic | 1823307000.0  |
+| EmpiricalD2Harmonic   | 3.9944174     |
+| EpLenMean             | 60            |
+| EpRewMean             | -118          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 1500          |
+| InitialBound          | -125.178894   |
+| InitialReturnMax      | -95.28143     |
+| InitialReturnMean     | -121.0882     |
+| InitialReturnMin      | -196.37352    |
+| InitialReturnStd      | 16.195509     |
+| Iteration             | 15            |
+| MaxIW                 | 1.6217431     |
+| MeanEntropy           | 1.2617238     |
+| MeanIW                | 0.19048333    |
+| MinBehavPdf           | -551.67786    |
+| MinIW                 | 2.1350911e-12 |
+| MinTargetPdf          | -556.79       |
+| MultiIWFirstRatio     | 0.18266608    |
+| MultiIWMax            | 0.31688893    |
+| MultiIWMin            | 0.043258384   |
+| MultiIWSum            | 0.9524167     |
+| ReturnMeanIW          | -110.6595     |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.000046     |
+| StdIW                 | 0.19076358    |
+| TimeElapsed           | 189           |
+| TimestepsSoFar        | 70530         |
+-----------------------------------------
+********** Iteration 16 ************
+[35msampling[0m
+[35mdone in 12.183 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.058 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1      0.561   4.81e-05                  4                108              0.281              0.281
+     2      0.345   6.87e-05                  4               70.9              0.172              0.453
+     3      0.233   5.24e-05                  6               66.7              0.116              0.569
+     4      0.148   7.35e-05                  4               44.9              0.074              0.643
+     5     0.0998   5.34e-05                  4               43.2             0.0499              0.693
+     6     0.0621    7.3e-05                  3               29.2             0.0309              0.724
+     7       0.04   6.32e-05                  7               25.1               0.02              0.744
+     8     0.0261   6.27e-05                  4               20.4              0.013              0.757
+     9   6.85e-08   2.71e-10                  4               15.9                  0              0.757
+stopping - delta bound < bound_tol
+[35mdone in 1.535 seconds[0m
+[-0.196  0.132 -0.009 -0.163 -0.167]
+[35msummaries after[0m
+[35mdone in 0.017 seconds[0m
+-----------------------------------------
+| Bound                 | -119.02137    |
+| ESSRenyiArithmetic    | 9.196551e-09  |
+| ESSRenyiHarmonic      | 191.4007      |
+| EmpiricalD2Arithmetic | 54368207000.0 |
+| EmpiricalD2Harmonic   | 2.6123207     |
+| EpLenMean             | 43.4          |
+| EpRewMean             | -117          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 1600          |
+| InitialBound          | -119.77863    |
+| InitialReturnMax      | -95.28143     |
+| InitialReturnMean     | -120.60224    |
+| InitialReturnMin      | -196.37352    |
+| InitialReturnStd      | 16.152473     |
+| Iteration             | 16            |
+| MaxIW                 | 0.8186887     |
+| MeanEntropy           | 1.2515755     |
+| MeanIW                | 0.18860441    |
+| MinBehavPdf           | -556.79       |
+| MinIW                 | 4.9187654e-14 |
+| MinTargetPdf          | -560.56067    |
+| MultiIWFirstRatio     | 0.036181822   |
+| MultiIWMax            | 0.2715484     |
+| MultiIWMin            | 0.034120258   |
+| MultiIWSum            | 0.9430221     |
+| ReturnMeanIW          | -109.72908    |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.000046     |
+| StdIW                 | 0.15924244    |
+| TimeElapsed           | 203           |
+| TimestepsSoFar        | 74873         |
+-----------------------------------------
+********** Iteration 17 ************
+[35msampling[0m
+[35mdone in 12.941 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.053 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1      0.195    6.9e-05                  4               53.2             0.0976             0.0976
+     2      0.243   0.000287                  4               29.1              0.122              0.219
+     3      0.311   7.06e-05                  4               66.4              0.156              0.375
+     4      0.268    0.00018                  4               38.6              0.134              0.509
+     5      0.188   6.05e-05                  6               55.8              0.094              0.603
+     6      0.112   0.000166                  4               25.9              0.056              0.659
+     7     0.0715   5.67e-05                  6               35.5             0.0357              0.694
+     8      0.053   0.000166                  4               17.9             0.0265              0.721
+     9     0.0431   5.51e-05                  9                 28             0.0215              0.742
+    10      0.038   0.000168                  3                 15              0.019              0.761
+[35mdone in 2.413 seconds[0m
+[-0.19   0.113 -0.022 -0.169 -0.176]
+[35msummaries after[0m
+[35mdone in 0.033 seconds[0m
+---------------------------------------
+| Bound                 | -121.257545 |
+| ESSRenyiArithmetic    | 5.6215887   |
+| ESSRenyiHarmonic      | 251.04341   |
+| EmpiricalD2Arithmetic | 88.942825   |
+| EmpiricalD2Harmonic   | 1.9916874   |
+| EpLenMean             | 48          |
+| EpRewMean             | -118        |
+| EpThisIter            | 100         |
+| EpisodesSoFar         | 1700        |
+| InitialBound          | -122.018936 |
+| InitialReturnMax      | -95.28143   |
+| InitialReturnMean     | -118.70688  |
+| InitialReturnMin      | -196.37352  |
+| InitialReturnStd      | 14.68069    |
+| Iteration             | 17          |
+| MaxIW                 | 1.0137855   |
+| MeanEntropy           | 1.2424656   |
+| MeanIW                | 0.19511496  |
+| MinBehavPdf           | -285.06537  |
+| MinIW                 | 0.002116201 |
+| MinTargetPdf          | -285.7132   |
+| MultiIWFirstRatio     | 0.1279874   |
+| MultiIWMax            | 0.24018279  |
+| MultiIWMin            | 0.124861285 |
+| MultiIWSum            | 0.97557485  |
+| ReturnMeanIW          | -113.14382  |
+| ReturnStepMax         | 100.0       |
+| ReturnStepMaxmin      | 99.000946   |
+| StdIW                 | 0.13484052  |
+| TimeElapsed           | 217         |
+| TimestepsSoFar        | 79670       |
+---------------------------------------
+********** Iteration 18 ************
+[35msampling[0m
+[35mdone in 10.613 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.026 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       7.67   0.000213                  4                190               2.96               2.96
+     2       4.04    0.00016                  4                159               2.02               4.98
+     3      0.846   4.69e-05                  2                134              0.409               5.39
+     4      0.924   0.000188                  3               70.1              0.446               5.83
+     5       1.17   5.47e-05                  7                146              0.584               6.42
+     6        1.6   0.000115                  2                118              0.688                7.1
+     7      0.797   5.93e-05                  3                116              0.398                7.5
+     8      0.345    4.3e-05                  5               89.6              0.173               7.68
+     9     0.0896    4.7e-05                  5               43.7             0.0448               7.72
+    10     0.0403   4.94e-05                  5               28.5             0.0201               7.74
+[35mdone in 2.382 seconds[0m
+[-0.17   0.158  0.005 -0.16  -0.18 ]
+[35msummaries after[0m
+[35mdone in 0.019 seconds[0m
+-----------------------------------------
+| Bound                 | -115.843124   |
+| ESSRenyiArithmetic    | 71.629326     |
+| ESSRenyiHarmonic      | 111.71042     |
+| EmpiricalD2Arithmetic | 6.980381      |
+| EmpiricalD2Harmonic   | 4.475858      |
+| EpLenMean             | 49.1          |
+| EpRewMean             | -114          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 1800          |
+| InitialBound          | -123.58381    |
+| InitialReturnMax      | -96.01002     |
+| InitialReturnMean     | -117.29195    |
+| InitialReturnMin      | -196.37352    |
+| InitialReturnStd      | 13.456102     |
+| Iteration             | 18            |
+| MaxIW                 | 1.9700868     |
+| MeanEntropy           | 1.2388422     |
+| MeanIW                | 0.17899455    |
+| MinBehavPdf           | -285.7132     |
+| MinIW                 | 0.00065415626 |
+| MinTargetPdf          | -287.02985    |
+| MultiIWFirstRatio     | 0.17805286    |
+| MultiIWMax            | 0.25364327    |
+| MultiIWMin            | 0.15935245    |
+| MultiIWSum            | 0.89497274    |
+| ReturnMeanIW          | -103.67993    |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.000946     |
+| StdIW                 | 0.20166984    |
+| TimeElapsed           | 230           |
+| TimestepsSoFar        | 84582         |
+-----------------------------------------
+********** Iteration 19 ************
+[35msampling[0m
+[35mdone in 8.549 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.049 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       12.4   7.62e-05                  6                403               6.13               6.13
+     2          4   8.79e-05                  3                213               1.67                7.8
+     3       1.38   4.27e-05                  5                180              0.691               8.49
+     4      0.364   1.89e-05                  5                139              0.182               8.67
+     5      0.125   3.65e-05                  4               58.5             0.0622               8.74
+     6      0.113   1.97e-05                  5               75.9             0.0567               8.79
+     7     0.0777   2.96e-05                  4               51.2             0.0386               8.83
+     8     0.0745   2.09e-05                  6               59.7             0.0373               8.87
+     9     0.0565    2.9e-05                  4               44.1              0.028                8.9
+    10     0.0546    2.1e-05                  6                 51             0.0273               8.92
+[35mdone in 3.501 seconds[0m
+[-0.163  0.166 -0.022 -0.162 -0.2  ]
+[35msummaries after[0m
+[35mdone in 0.038 seconds[0m
+-----------------------------------------
+| Bound                 | -108.73822    |
+| ESSRenyiArithmetic    | 17.170675     |
+| ESSRenyiHarmonic      | 72.7289       |
+| EmpiricalD2Arithmetic | 29.119415     |
+| EmpiricalD2Harmonic   | 6.8748465     |
+| EpLenMean             | 32.7          |
+| EpRewMean             | -114          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 1900          |
+| InitialBound          | -117.66226    |
+| InitialReturnMax      | -95.53218     |
+| InitialReturnMean     | -116.165825   |
+| InitialReturnMin      | -166.26913    |
+| InitialReturnStd      | 12.1598425    |
+| Iteration             | 19            |
+| MaxIW                 | 2.849389      |
+| MeanEntropy           | 1.21909       |
+| MeanIW                | 0.16791695    |
+| MinBehavPdf           | -274.7589     |
+| MinIW                 | 2.2690561e-05 |
+| MinTargetPdf          | -275.7936     |
+| MultiIWFirstRatio     | 0.118339896   |
+| MultiIWMax            | 0.2495459     |
+| MultiIWMin            | 0.09935638    |
+| MultiIWSum            | 0.8395848     |
+| ReturnMeanIW          | -95.974724    |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.000946     |
+| StdIW                 | 0.22027335    |
+| TimeElapsed           | 241           |
+| TimestepsSoFar        | 87852         |
+-----------------------------------------
+********** Iteration 20 ************
+[35msampling[0m
+[35mdone in 8.336 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.058 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1          8   0.000178                  4                212               3.99               3.99
+     2          4   7.62e-05                  3                229               1.56               5.55
+     3       1.31   9.65e-05                  4                116              0.654                6.2
+     4      0.331   1.87e-05                  4                133              0.165               6.37
+     5      0.326   7.56e-05                  5               65.6              0.163               6.53
+     6      0.223   1.75e-05                  4                113              0.111               6.64
+     7      0.209   9.34e-05                  5               47.3              0.104               6.75
+     8      0.144   1.74e-05                  4               90.8             0.0715               6.82
+     9      0.107   9.45e-05                  6               33.7             0.0535               6.87
+    10     0.0734   1.88e-05                  4               62.4             0.0365               6.91
+[35mdone in 1.713 seconds[0m
+[-0.133  0.162 -0.006 -0.185 -0.206]
+[35msummaries after[0m
+[35mdone in 0.022 seconds[0m
+-----------------------------------------
+| Bound                 | -111.0445     |
+| ESSRenyiArithmetic    | 52.520996     |
+| ESSRenyiHarmonic      | 97.692276     |
+| EmpiricalD2Arithmetic | 9.520002      |
+| EmpiricalD2Harmonic   | 5.118112      |
+| EpLenMean             | 36.1          |
+| EpRewMean             | -116          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 2000          |
+| InitialBound          | -117.95153    |
+| InitialReturnMax      | -95.53218     |
+| InitialReturnMean     | -115.62885    |
+| InitialReturnMin      | -158.45898    |
+| InitialReturnStd      | 11.511206     |
+| Iteration             | 20            |
+| MaxIW                 | 1.2142518     |
+| MeanEntropy           | 1.2133013     |
+| MeanIW                | 0.17767464    |
+| MinBehavPdf           | -272.93018    |
+| MinIW                 | 0.00026238352 |
+| MinTargetPdf          | -269.9085     |
+| MultiIWFirstRatio     | 0.12727614    |
+| MultiIWMax            | 0.2748495     |
+| MultiIWMin            | 0.113068715   |
+| MultiIWSum            | 0.88837326    |
+| ReturnMeanIW          | -100.54912    |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.07942      |
+| StdIW                 | 0.1755364     |
+| TimeElapsed           | 253           |
+| TimestepsSoFar        | 91463         |
+-----------------------------------------
+********** Iteration 21 ************
+[35msampling[0m
+[35mdone in 7.636 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.020 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       2.22   0.000113                  7                140               1.11               1.11
+     2       1.36    0.00045                  3               54.9               1.06               2.17
+     3      0.114   3.24e-05                  7               59.3              0.057               2.23
+     4      0.067      3e-05                  5               47.2             0.0335               2.26
+     5     0.0579   3.68e-05                  8               39.6              0.029               2.29
+     6     0.0426   2.59e-05                  6               40.5             0.0213               2.31
+     7     0.0414   4.53e-05                  8               30.2             0.0206               2.33
+     8     0.0363   2.11e-05                  5               41.5             0.0182               2.35
+     9     0.0364   5.98e-05                  9               24.7             0.0182               2.37
+    10      0.032   1.89e-05                  5               41.1              0.016               2.38
+[35mdone in 2.362 seconds[0m
+[-0.125  0.149 -0.016 -0.204 -0.202]
+[35msummaries after[0m
+[35mdone in 0.022 seconds[0m
+----------------------------------------
+| Bound                 | -116.228836  |
+| ESSRenyiArithmetic    | 0.6446394    |
+| ESSRenyiHarmonic      | 62.050167    |
+| EmpiricalD2Arithmetic | 775.62744    |
+| EmpiricalD2Harmonic   | 8.057996     |
+| EpLenMean             | 32           |
+| EpRewMean             | -114         |
+| EpThisIter            | 100          |
+| EpisodesSoFar         | 2100         |
+| InitialBound          | -118.61295   |
+| InitialReturnMax      | -95.53218    |
+| InitialReturnMean     | -114.950165  |
+| InitialReturnMin      | -158.45898   |
+| InitialReturnStd      | 10.88334     |
+| Iteration             | 21           |
+| MaxIW                 | 1.6585027    |
+| MeanEntropy           | 1.216974     |
+| MeanIW                | 0.18169044   |
+| MinBehavPdf           | -272.93018   |
+| MinIW                 | 0.0003043884 |
+| MinTargetPdf          | -269.47083   |
+| MultiIWFirstRatio     | 0.13727109   |
+| MultiIWMax            | 0.32288706   |
+| MultiIWMin            | 0.12470421   |
+| MultiIWSum            | 0.90845215   |
+| ReturnMeanIW          | -103.05971   |
+| ReturnStepMax         | 100.0        |
+| ReturnStepMaxmin      | 99.07942     |
+| StdIW                 | 0.17810547   |
+| TimeElapsed           | 263          |
+| TimestepsSoFar        | 94664        |
+----------------------------------------
+********** Iteration 22 ************
+[35msampling[0m
+[35mdone in 8.559 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.033 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       3.14   5.26e-05                 10                244               1.57               1.57
+     2          2   0.000246                  2               90.1              0.871               2.44
+     3      0.755   0.000113                  3               81.9              0.352               2.79
+     4     0.0426   4.07e-05                  7               32.3             0.0213               2.82
+     5   0.000184   1.04e-06                  3               13.3           0.000122               2.82
+     6          0          0                  3               13.2                  0               2.82
+stopping - delta bound < bound_tol
+[35mdone in 1.332 seconds[0m
+[-0.127  0.155 -0.036 -0.2   -0.202]
+[35msummaries after[0m
+[35mdone in 0.019 seconds[0m
+-----------------------------------------
+| Bound                 | -115.91188    |
+| ESSRenyiArithmetic    | 0.01813275    |
+| ESSRenyiHarmonic      | 93.5258       |
+| EmpiricalD2Arithmetic | 27574.416     |
+| EmpiricalD2Harmonic   | 5.3461185     |
+| EpLenMean             | 35.8          |
+| EpRewMean             | -113          |
+| EpThisIter            | 100           |
+| EpisodesSoFar         | 2200          |
+| InitialBound          | -118.727425   |
+| InitialReturnMax      | -95.53218     |
+| InitialReturnMean     | -113.94675    |
+| InitialReturnMin      | -155.27383    |
+| InitialReturnStd      | 10.198636     |
+| Iteration             | 22            |
+| MaxIW                 | 1.457514      |
+| MeanEntropy           | 1.2171037     |
+| MeanIW                | 0.18711963    |
+| MinBehavPdf           | -272.93018    |
+| MinIW                 | 5.8249367e-05 |
+| MinTargetPdf          | -270.30502    |
+| MultiIWFirstRatio     | 0.10571722    |
+| MultiIWMax            | 0.27285865    |
+| MultiIWMin            | 0.098908834   |
+| MultiIWSum            | 0.93559813    |
+| ReturnMeanIW          | -105.40088    |
+| ReturnStepMax         | 100.0         |
+| ReturnStepMaxmin      | 99.04971      |
+| StdIW                 | 0.17545187    |
+| TimeElapsed           | 274           |
+| TimestepsSoFar        | 98246         |
+-----------------------------------------
+********** Iteration 23 ************
+[35msampling[0m
+[35mdone in 6.112 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.058 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       6.91   0.000166                 10                204               3.46               3.46
+     2       9.92    0.00016                  5                249               4.78               8.23
+     3        1.9   7.34e-05                  4                161              0.948               9.18
+     4      0.221   5.59e-05                  4               62.9              0.111               9.29
+     5      0.135   3.92e-05                  5               58.8             0.0677               9.36
+     6      0.129   5.92e-05                  5               46.7             0.0646               9.42
+     7      0.109    3.4e-05                  5               56.6             0.0545               9.48
+     8      0.114   7.08e-05                  5               40.1             0.0571               9.54
+     9        0.1   3.02e-05                  4               57.6             0.0499               9.59
+    10     0.0959   7.19e-05                  4               36.5             0.0479               9.63
+[35mdone in 3.123 seconds[0m
+[-0.136  0.117  0.002 -0.186 -0.22 ]
+[35msummaries after[0m
+[35mdone in 0.011 seconds[0m
+----------------------------------------
+| Bound                 | -109.17833   |
+| ESSRenyiArithmetic    | 4.5778522    |
+| ESSRenyiHarmonic      | 73.121666    |
+| EmpiricalD2Arithmetic | 109.22152    |
+| EmpiricalD2Harmonic   | 6.8379183    |
+| EpLenMean             | 29.5         |
+| EpRewMean             | -113         |
+| EpThisIter            | 100          |
+| EpisodesSoFar         | 2300         |
+| InitialBound          | -118.81156   |
+| InitialReturnMax      | -95.53218    |
+| InitialReturnMean     | -113.78006   |
+| InitialReturnMin      | -152.49016   |
+| InitialReturnStd      | 9.870687     |
+| Iteration             | 23           |
+| MaxIW                 | 2.042803     |
+| MeanEntropy           | 1.1991615    |
+| MeanIW                | 0.17009844   |
+| MinBehavPdf           | -234.13596   |
+| MinIW                 | 7.466679e-05 |
+| MinTargetPdf          | -226.22679   |
+| MultiIWFirstRatio     | 0.27677158   |
+| MultiIWMax            | 0.23539203   |
+| MultiIWMin            | 0.11711407   |
+| MultiIWSum            | 0.85049206   |
+| ReturnMeanIW          | -97.50404    |
+| ReturnStepMax         | 100.0        |
+| ReturnStepMaxmin      | 99.04971     |
+| StdIW                 | 0.20287165   |
+| TimeElapsed           | 281          |
+| TimestepsSoFar        | 101195       |
+----------------------------------------
+********** Iteration 24 ************
+[35msampling[0m
+[35mdone in 8.887 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.018 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       10.2   4.47e-05                  7                478                5.1                5.1
+     2        1.8   0.000108                  5                129              0.902               6.01
+     3       1.78   5.71e-05                  2                176              0.719               6.72
+     4          4   0.000304                  3                115               1.54               8.26
+     5       1.35   6.24e-05                  2                147              0.629               8.89
+     6      0.572   2.84e-05                  3                142              0.284               9.17
+     7      0.637   3.46e-05                  3                136              0.306               9.48
+     8      0.549   3.98e-05                  3                117              0.273               9.75
+     9      0.603   2.61e-05                  3                152               0.29                 10
+    10      0.733   7.85e-05                  3               96.6              0.366               10.4
+[35mdone in 1.539 seconds[0m
+[-0.184  0.112 -0.005 -0.198 -0.246]
+[35msummaries after[0m
+[35mdone in 0.016 seconds[0m
+----------------------------------------
+| Bound                 | -106.03798   |
+| ESSRenyiArithmetic    | 0.0050556194 |
+| ESSRenyiHarmonic      | 63.171284    |
+| EmpiricalD2Arithmetic | 98899.85     |
+| EmpiricalD2Harmonic   | 7.9149885    |
+| EpLenMean             | 39.5         |
+| EpRewMean             | -113         |
+| EpThisIter            | 100          |
+| EpisodesSoFar         | 2400         |
+| InitialBound          | -116.44671   |
+| InitialReturnMax      | -96.68426    |
+| InitialReturnMean     | -113.701195  |
+| InitialReturnMin      | -152.49016   |
+| InitialReturnStd      | 9.906641     |
+| Iteration             | 24           |
+| MaxIW                 | 2.7495766    |
+| MeanEntropy           | 1.1730381    |
+| MeanIW                | 0.16564493   |
+| MinBehavPdf           | -234.13596   |
+| MinIW                 | 4.890961e-06 |
+| MinTargetPdf          | -224.2236    |
+| MultiIWFirstRatio     | 0.11975119   |
+| MultiIWMax            | 0.3380228    |
+| MultiIWMin            | 0.09797327   |
+| MultiIWSum            | 0.82822466   |
+| ReturnMeanIW          | -93.47787    |
+| ReturnStepMax         | 100.0        |
+| ReturnStepMaxmin      | 99.04971     |
+| StdIW                 | 0.25026438   |
+| TimeElapsed           | 293          |
+| TimestepsSoFar        | 105150       |
+----------------------------------------
+********** Iteration 25 ************
+[35msampling[0m
+[35mdone in 11.784 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.028 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       5.59      3e-05                  7                432                2.8                2.8
+     2         16   0.000244                  5                256               8.27               11.1
+     3       3.09   1.72e-05                  5                424               1.54               12.6
+     4       1.49   1.91e-05                  4                279              0.747               13.4
+     5       1.12   1.64e-05                  2                261              0.553               13.9
+     6      0.877   2.01e-05                  4                209              0.438               14.3
+     7      0.799   1.42e-05                  3                237              0.399               14.7
+     8      0.639   1.75e-05                  3                191              0.319               15.1
+     9      0.616   1.41e-05                  3                209              0.306               15.4
+    10      0.528   1.89e-05                  3                167              0.263               15.6
+[35mdone in 2.029 seconds[0m
+[-0.211  0.081 -0.008 -0.177 -0.268]
+[35msummaries after[0m
+[35mdone in 0.021 seconds[0m
+----------------------------------------
+| Bound                 | -96.72819    |
+| ESSRenyiArithmetic    | 0.0003105691 |
+| ESSRenyiHarmonic      | 30.76344     |
+| EmpiricalD2Arithmetic | 1609947.6    |
+| EmpiricalD2Harmonic   | 16.25306     |
+| EpLenMean             | 51.7         |
+| EpRewMean             | -113         |
+| EpThisIter            | 100          |
+| EpisodesSoFar         | 2500         |
+| InitialBound          | -112.364655  |
+| InitialReturnMax      | -87.49803    |
+| InitialReturnMean     | -113.13478   |
+| InitialReturnMin      | -162.2832    |
+| InitialReturnStd      | 9.87586      |
+| Iteration             | 25           |
+| MaxIW                 | 3.0900276    |
+| MeanEntropy           | 1.1504685    |
+| MeanIW                | 0.137977     |
+| MinBehavPdf           | -276.7775    |
+| MinIW                 | 2.658496e-07 |
+| MinTargetPdf          | -269.2873    |
+| MultiIWFirstRatio     | 0.055250827  |
+| MultiIWMax            | 0.2828698    |
+| MultiIWMin            | 0.030979471  |
+| MultiIWSum            | 0.68988496   |
+| ReturnMeanIW          | -77.57382    |
+| ReturnStepMax         | 100.0        |
+| ReturnStepMaxmin      | 99.04971     |
+| StdIW                 | 0.31911454   |
+| TimeElapsed           | 307          |
+| TimestepsSoFar        | 110322       |
+----------------------------------------
+********** Iteration 26 ************
+[35msampling[0m
+[35mdone in 13.705 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.043 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       2.93   2.01e-05                  5                382               1.46               1.46
+     2       2.46   1.81e-05                  9                368               1.23               2.69
+     3        3.6   3.38e-05                  5                326                1.8               4.49
+     4       3.78   1.33e-05                  8                533               1.89               6.38
+     5       4.29   4.09e-05                  4                324               2.14               8.52
+     6       1.48   1.12e-05                  4                364              0.742               9.26
+     7       1.03   8.94e-05                  3                107              0.515               9.77
+     8      0.587   1.42e-05                  3                203              0.292               10.1
+     9      0.279   6.11e-05                  4               67.6              0.139               10.2
+    10      0.214   1.66e-05                  5                114              0.107               10.3
+[35mdone in 3.113 seconds[0m
+[-0.183  0.099  0.014 -0.199 -0.268]
+[35msummaries after[0m
+[35mdone in 0.018 seconds[0m
+----------------------------------------
+| Bound                 | -110.93466   |
+| ESSRenyiArithmetic    | 2.734673e-05 |
+| ESSRenyiHarmonic      | 77.97871     |
+| EmpiricalD2Arithmetic | 18283722.0   |
+| EmpiricalD2Harmonic   | 6.412007     |
+| EpLenMean             | 61.9         |
+| EpRewMean             | -115         |
+| EpThisIter            | 100          |
+| EpisodesSoFar         | 2600         |
+| InitialBound          | -121.24772   |
+| InitialReturnMax      | -87.49803    |
+| InitialReturnMean     | -113.42975   |
+| InitialReturnMin      | -162.2832    |
+| InitialReturnStd      | 10.0719385   |
+| Iteration             | 26           |
+| MaxIW                 | 1.3715777    |
+| MeanEntropy           | 1.150631     |
+| MeanIW                | 0.1766384    |
+| MinBehavPdf           | -276.7775    |
+| MinIW                 | 5.047381e-06 |
+| MinTargetPdf          | -266.22742   |
+| MultiIWFirstRatio     | 0.1169295    |
+| MultiIWMax            | 0.25274137   |
+| MultiIWMin            | 0.07048785   |
+| MultiIWSum            | 0.88319206   |
+| ReturnMeanIW          | -98.903786   |
+| ReturnStepMax         | 100.0        |
+| ReturnStepMaxmin      | 99.00022     |
+| StdIW                 | 0.19394955   |
+| TimeElapsed           | 323          |
+| TimestepsSoFar        | 116509       |
+----------------------------------------
+********** Iteration 27 ************
+[35msampling[0m
+[35mdone in 11.753 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.011 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       7.09   9.49e-05                  6                273               3.53               3.53
+     2       3.62   1.97e-05                  5                428               1.81               5.34
+     3       2.61   7.05e-05                  3                192               1.23               6.57
+     4      0.709   4.15e-05                  3                131              0.354               6.93
+     5      0.623   3.35e-05                  3                136              0.293               7.22
+     6      0.669   8.29e-05                  3               89.8              0.334               7.55
+     7      0.544   2.24e-05                  3                156              0.262               7.82
+     8       1.29   0.000356                  4               60.3              0.647               8.46
+     9     0.0651   1.09e-05                  5               77.2             0.0325                8.5
+    10     0.0212   2.74e-05                  4               27.8             0.0105               8.51
+[35mdone in 1.825 seconds[0m
+[-0.17   0.068  0.014 -0.208 -0.306]
+[35msummaries after[0m
+[35mdone in 0.022 seconds[0m
+----------------------------------------------
+| Bound                 | -107.69209         |
+| ESSRenyiArithmetic    | 3.383074e-13       |
+| ESSRenyiHarmonic      | 40.077114          |
+| EmpiricalD2Arithmetic | 1477945800000000.0 |
+| EmpiricalD2Harmonic   | 12.475948          |
+| EpLenMean             | 57.5               |
+| EpRewMean             | -111               |
+| EpThisIter            | 100                |
+| EpisodesSoFar         | 2700               |
+| InitialBound          | -116.19863         |
+| InitialReturnMax      | -77.97291          |
+| InitialReturnMean     | -113.08349         |
+| InitialReturnMin      | -162.2832          |
+| InitialReturnStd      | 10.276764          |
+| Iteration             | 27                 |
+| MaxIW                 | 2.240339           |
+| MeanEntropy           | 1.113144           |
+| MeanIW                | 0.16412954         |
+| MinBehavPdf           | -299.85544         |
+| MinIW                 | 9.714598e-08       |
+| MinTargetPdf          | -288.50873         |
+| MultiIWFirstRatio     | 0.044698797        |
+| MultiIWMax            | 0.28540578         |
+| MultiIWMin            | 0.036681972        |
+| MultiIWSum            | 0.82064784         |
+| ReturnMeanIW          | -90.910355         |
+| ReturnStepMax         | 100.0              |
+| ReturnStepMaxmin      | 99.00022           |
+| StdIW                 | 0.24546793         |
+| TimeElapsed           | 338                |
+| TimestepsSoFar        | 122257             |
+----------------------------------------------
+********** Iteration 28 ************
+[35msampling[0m
+[35mdone in 16.864 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.011 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1       1.59   2.06e-05                  4                278              0.792              0.792
+     2      0.292   3.92e-05                  4               86.4              0.146              0.938
+     3      0.268   1.91e-05                  4                118              0.134               1.07
+     4      0.264   2.98e-05                  4               94.1              0.132                1.2
+     5      0.335   2.21e-05                  6                123              0.168               1.37
+     6       0.37    2.5e-05                  4                122              0.185               1.56
+     7      0.492   2.52e-05                  5                140              0.246                1.8
+     8      0.552   2.01e-05                  4                166              0.276               2.08
+     9      0.765   3.02e-05                  3                159               0.38               2.46
+    10      0.817   1.69e-05                  3                220              0.408               2.87
+[35mdone in 2.054 seconds[0m
+[-0.159  0.061  0.013 -0.216 -0.321]
+[35msummaries after[0m
+[35mdone in 0.018 seconds[0m
+----------------------------------------
+| Bound                 | -114.512764  |
+| ESSRenyiArithmetic    | 5.932663e-06 |
+| ESSRenyiHarmonic      | 91.58904     |
+| EmpiricalD2Arithmetic | 84279180.0   |
+| EmpiricalD2Harmonic   | 5.4591684    |
+| EpLenMean             | 69.5         |
+| EpRewMean             | -111         |
+| EpThisIter            | 100          |
+| EpisodesSoFar         | 2800         |
+| InitialBound          | -117.3798    |
+| InitialReturnMax      | -77.97291    |
+| InitialReturnMean     | -112.79897   |
+| InitialReturnMin      | -162.2832    |
+| InitialReturnStd      | 10.553279    |
+| Iteration             | 28           |
+| MaxIW                 | 2.3424428    |
+| MeanEntropy           | 1.09759      |
+| MeanIW                | 0.18839091   |
+| MinBehavPdf           | -347.26767   |
+| MinIW                 | 5.568161e-07 |
+| MinTargetPdf          | -336.67743   |
+| MultiIWFirstRatio     | 0.111547     |
+| MultiIWMax            | 0.42770764   |
+| MultiIWMin            | 0.10471195   |
+| MultiIWSum            | 0.9419546    |
+| ReturnMeanIW          | -103.41173   |
+| ReturnStepMax         | 100.0        |
+| ReturnStepMaxmin      | 99.00007     |
+| StdIW                 | 0.25210717   |
+| TimeElapsed           | 356          |
+| TimestepsSoFar        | 129211       |
+----------------------------------------
+********** Iteration 29 ************
+[35msampling[0m
+[35mdone in 13.364 seconds[0m
+[35msummaries before[0m
+[35mdone in 0.043 seconds[0m
+[35moffline optimization[0m
+  iter    epsilon  step size    num line search      gradient norm    delta bound ite    delta bound tot
+     1          8   8.59e-05                  4                305               3.88               3.88
+     2          4   4.61e-05                  3                295               1.71               5.58
+     3       1.94   3.41e-05                  2                238              0.742               6.33
+     4       1.07    1.6e-05                  3                258              0.535               6.86
+     5       1.04   1.09e-05                  2                310              0.521               7.38
+     6      0.913   1.44e-05                  3                252              0.456               7.84
+     7      0.898   1.03e-05                  3                295              0.449               8.29
+     8      0.778   1.23e-05                  4                252              0.389               8.67
+     9      0.773   1.08e-05                  3                267              0.386               9.06
+    10       0.68   1.11e-05                  3                248               0.34                9.4
+[35mdone in 1.305 seconds[0m
+[-0.154  0.037  0.021 -0.211 -0.34 ]
+[35msummaries after[0m
+[35mdone in 0.018 seconds[0m
+------------------------------------------
+| Bound                 | -105.036545    |
+| ESSRenyiArithmetic    | 1.02202954e-07 |
+| ESSRenyiHarmonic      | 63.711845      |
+| EmpiricalD2Arithmetic | 4892226600.0   |
+| EmpiricalD2Harmonic   | 7.847834       |
+| EpLenMean             | 60.8           |
+| EpRewMean             | -110           |
+| EpThisIter            | 100            |
+| EpisodesSoFar         | 2900           |
+| InitialBound          | -114.43649     |
+| InitialReturnMax      | -77.97291      |
+| InitialReturnMean     | -112.1998      |
+| InitialReturnMin      | -162.2832      |
+| InitialReturnStd      | 10.325713      |
+| Iteration             | 29             |
+| MaxIW                 | 2.2102692      |
+| MeanEntropy           | 1.078512       |
+| MeanIW                | 0.16634785     |
+| MinBehavPdf           | -342.23984     |
+| MinIW                 | 1.5727842e-08  |
+| MinTargetPdf          | -338.22345     |
+| MultiIWFirstRatio     | 0.072061025    |
+| MultiIWMax            | 0.29927516     |
+| MultiIWMin            | 0.05993598     |
+| MultiIWSum            | 0.8317392      |
+| ReturnMeanIW          | -91.72663      |
+| ReturnStepMax         | 100.0          |
+| ReturnStepMaxmin      | 99.00007       |
+| StdIW                 | 0.25538042     |
+| TimeElapsed           | 372            |
+| TimestepsSoFar        | 135293         |
+------------------------------------------
+********** Iteration 30 ************
+[35msampling[0m
