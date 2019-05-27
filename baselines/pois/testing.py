@@ -22,7 +22,7 @@ from baselines.common.cmd_util import get_env_type
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 
-def evaluate(policy_weights, env=None, policy='linear', n_episodes=100, horizon=500, njobs=1, seed=42):
+def create_sampler(env=None, policy='linear', n_episodes=100, horizon=500, njobs=1, seed=42):
     # Create the environment
     if env.startswith('rllab.'):
         # Get env name and class
@@ -87,6 +87,10 @@ def evaluate(policy_weights, env=None, policy='linear', n_episodes=100, horizon=
     sess.__enter__()
     # Set random seed
     set_global_seeds(seed)
+    return sampler
+
+def evaluate(policy_weights, **sampler_args):
+    sampler = create_sampler(**sampler_args)
     # Collect trajectories
     seg = sampler.collect(policy_weights)
     # Close sampler when we are done
