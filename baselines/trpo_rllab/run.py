@@ -31,29 +31,9 @@ def train(env, policy, policy_init, num_episodes, episode_cap, horizon, **alg_ar
         # Get env name and class
         env_name = re.match('rllab.(\S+)', env).group(1)
         env_rllab_class = rllab_env_from_name(env_name)
-        # Define env maker
-        def make_env():
-            env_rllab = env_rllab_class()
-            _env = Rllab2GymWrapper(env_rllab)
-            return _env
-        # Used later
-        env_type = 'rllab'
+        env = normalize(env_rllab_class())
     else:
-        # Normal gym, get if Atari or not.
-        env_type = get_env_type(env)
-        assert env_type is not None, "Env not recognized."
-        # Define the correct env maker
-        if env_type == 'atari':
-            # Atari, custom env creation
-            def make_env():
-                _env = make_atari(env)
-                return wrap_deepmind(_env)
-        else:
-            # Not atari, standard env creation
-            def make_env():
-                env_rllab = gym.make(env)
-                return env_rllab
-    env = make_env()
+        raise Exception('Only working for RLLAB envs')
 
     # Policy initialization
     if policy_init == 'zeros':
