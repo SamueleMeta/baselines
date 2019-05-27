@@ -36,10 +36,11 @@ def recursive_json_selector(obj, selector):
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--dir', help='Directory of the sacred runs.', default='sacred_runs')
-parser.add_argument('--command', help='Different commands of the manager.', default='stats', choices=['stats', 'clean'])
+parser.add_argument('--command', help='Different commands of the manager.', default='stats', choices=['stats', 'clean', 'copy'])
 parser.add_argument('--groupby', help='Count groups by a specified config parameter (stats mode only).', default=None)
 parser.add_argument('--uncompleted', default=False, action='store_true')
 parser.add_argument('--cout', default=False, action='store_true')
+parser.add_argument('--output_dir', help='Directory for commands requiring an output directory.', default=None)
 parser.add_argument('--filter', help='Remove the runs filtered as specified [key1==value1#key2==value2]', default=None)
 args = parser.parse_args()
 
@@ -101,7 +102,40 @@ elif args.command == 'clean':
                 shutil.rmtree(base_directory + str(key) + '/')
                 print("Removed run:", key)
                 removed_runs += 1
-
     print("Completed. Removed a total of", removed_runs, "runs.")
+
+elif command == 'copy':
+    copied_runs = 0
+    # Copy cout file to some directory, each file with name cout_<seed>.txt
+    assert(args.output_dir is not None, "Must specify an output directory.")
+    output_dir = args.output_dir
+    if output_dir[-1] != '/':
+        output_dir += '/'
+    # Parse the filter argument
+    if args.filter is not None:
+        # Check multiple filters
+        if '#' in args.filter:
+            filters = args.filter.split('#')
+        else:
+            filters = [args.filter]
+        # Extract key and value
+        filters = [tuple(f.split('==')) for f in filters]
+    # Loop over runs
+    for key, value in my_runs.items():
+        if args.filter is not None:
+            # Check if the filter applies
+            is_selected = True
+            for (filter_key, filter_value) in filters:
+                selected_value = recursive_json_selector(value, filter_key)
+                if selected_value is None or str(selected_value) != filter_value:
+                    is_selected = False
+            if is_selected:
+                # Copy run with key
+                seed = recursive_json_selector(value, 'config.seed')
+                shutil.copyfile(base_directory + str(key) + '/cout.txt', output_dir + 'cout_' + str(seed) + '.txt')
+                print("Copied cout of run:", key)
+                copied_runs += 1
+    print("Completed. Copied a total of", copied_runs, "runs.")
+    
 else:
     raise Exception('Unrecognized command.')
