@@ -104,4 +104,4 @@ if __name__ == '__main__':
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     args = parser.parse_args()
-    evaluate(None, **vars(args))
+    evaluate(np.zeros(5), **vars(args))

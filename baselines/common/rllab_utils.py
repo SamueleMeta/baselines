@@ -4,6 +4,7 @@
 
 import gym
 from baselines.common import set_global_seeds as set_all_seeds
+import numpy as np
 
 def rllab_env_from_name(env):
     if env == 'swimmer':
@@ -51,7 +52,7 @@ def convert_rllab_space(space):
     import gym.spaces
 
     if isinstance(space, rllab.spaces.Box):
-        return gym.spaces.Box(low=space.low, high=space.high)
+        return gym.spaces.Box(low=space.low, high=space.high, dtype=np.float32)
     elif isinstance(space, rllab.spaces.Discrete):
         return gym.spaces.Discrete(n=space._n)
     elif isinstance(space, rllab.spaces.Tuple):
