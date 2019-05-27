@@ -528,7 +528,7 @@ class MlpPolicy(object):
         with tf.variable_scope('pol') as vs:
             self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                                          scope=vs.name)
-        print(self.var_list)
+        #print(self.var_list)
         self.get_parameter = U.GetFlat(self.var_list)
         self.set_parameter = U.SetFromFlat(self.var_list)
 

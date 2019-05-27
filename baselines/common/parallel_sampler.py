@@ -109,7 +109,7 @@ class Worker(Process):
         env.seed(workerseed)
 
         pi = self.make_pi('pi%s' % os.getpid(), env.observation_space, env.action_space)
-        print('Worker %s - Running with seed %s' % (os.getpid(), workerseed))
+        #print('Worker %s - Running with seed %s' % (os.getpid(), workerseed))
 
         while True:
             self.event.wait()
@@ -122,7 +122,7 @@ class Worker(Process):
                 #print('Worker %s - Collected: %s' % (os.getpid(), samples['ob'].shape))
                 self.output.put((os.getpid(), samples))
             elif command == 'exit':
-                print('Worker %s - Exiting...' % os.getpid())
+                #print('Worker %s - Exiting...' % os.getpid())
                 env.close()
                 sess.close()
                 break
@@ -139,7 +139,7 @@ class ParallelSampler(object):
         except:
             self.n_workers = max(1, n_workers)
 
-        print('Using %s CPUs' % self.n_workers)
+        #print('Using %s CPUs' % self.n_workers)
 
         if seed is None:
             seed = time.time()
