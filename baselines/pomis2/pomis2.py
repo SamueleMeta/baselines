@@ -424,6 +424,10 @@ def learn(env, make_policy, *,
     while True:
 
         iters_so_far += 1
+        if iters_so_far == 100:
+            print('=== CHANGED GAMMA TO 1.0')
+            seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True, gamma=1.0)
+            sampler = type("SequentialSampler", (object,), {"collect": lambda self, _: seg_gen.__next__()})()
 
         if render_after is not None and iters_so_far % render_after == 0:
             if hasattr(env, 'render'):
