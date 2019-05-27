@@ -111,6 +111,7 @@ elif args.command == 'copy':
     output_dir = args.output_dir
     if output_dir[-1] != '/':
         output_dir += '/'
+    os.mkdir(output_dir)
     # Parse the filter argument
     if args.filter is not None:
         # Check multiple filters
