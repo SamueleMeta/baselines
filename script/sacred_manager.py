@@ -104,10 +104,10 @@ elif args.command == 'clean':
                 removed_runs += 1
     print("Completed. Removed a total of", removed_runs, "runs.")
 
-elif command == 'copy':
+elif args.command == 'copy':
     copied_runs = 0
     # Copy cout file to some directory, each file with name cout_<seed>.txt
-    assert(args.output_dir is not None, "Must specify an output directory.")
+    assert args.output_dir is not None, "Must specify an output directory."
     output_dir = args.output_dir
     if output_dir[-1] != '/':
         output_dir += '/'
@@ -136,6 +136,6 @@ elif command == 'copy':
                 print("Copied cout of run:", key)
                 copied_runs += 1
     print("Completed. Copied a total of", copied_runs, "runs.")
-    
+
 else:
     raise Exception('Unrecognized command.')
