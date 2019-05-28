@@ -564,6 +564,8 @@ def learn(make_env, make_policy, *,
     while True:
 
         iters_so_far += 1
+        if iters_so_far == 50:
+            gamma = 1.0
 
         if render_after is not None and iters_so_far % render_after == 0:
             if hasattr(env, 'render'):
