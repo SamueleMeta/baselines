@@ -4,3 +4,8 @@ pois/run,rllab.inverted-double-pendulum,nn,is,max-d2,0.99,1.0,False,4,109,xavier
 pois/run,rllab.inverted-double-pendulum,nn,is,max-d2,0.99,1.0,False,4,904,xavier,20
 pois/run,rllab.inverted-double-pendulum,nn,is,max-d2,0.99,1.0,False,4,160,xavier,20
 pois/run,rllab.inverted-double-pendulum,nn,is,max-d2,0.99,1.0,False,4,570,xavier,20
+
+
+export PYTHONPATH='PYTHONPATH:.:/home/alberto/rllab/rllab' && python3 baselines/pois1/run_rllab.py --env=inverted-double-pendulum --delta=0.99 --max_offline_iters=20 --policy=nn --seed=10
+
+export PYTHONPATH='PYTHONPATH:.:/home/alberto/rllab/rllab' && python3 baselines/pois/run.py --env=rllab.inverted-double-pendulum --delta=0.99 --max_offline_iters=20 --policy=nn --seed=10
