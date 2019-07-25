@@ -261,7 +261,7 @@ def learn(make_env, make_policy, *,
     empirical_d2 = tf.reduce_mean(tf.exp(emp_d2_cum_split))
 
     # Return
-    ep_return = clustered_rew_ #tf.reduce_sum(mask_split * disc_rew_split, axis=1)
+    ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
     if clipping:
         rew_split = tf.clip_by_value(rew_split, -1, 1)
 
@@ -584,7 +584,9 @@ def learn(make_env, make_policy, *,
         with timed('sampling'):
             seg = sampler.collect(theta)
 
+        print(np.mean(seg['ep_rets']))
         add_disc_rew(seg, gamma)
+        print(np.mean(seg['ep_rets']))
 
         lens, rets = seg['ep_lens'], seg['ep_rets']
         lenbuffer.extend(lens)
