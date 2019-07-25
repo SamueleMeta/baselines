@@ -573,7 +573,7 @@ def learn(make_env, make_policy, *,
             callback(locals(), globals())
 
         if iters_so_far >= max_iters:
-            print('Finised...')
+            print('Finished...')
             break
 
         logger.log('********** Iteration %i ************' % iters_so_far)
