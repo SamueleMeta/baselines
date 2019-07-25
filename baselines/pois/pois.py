@@ -579,6 +579,7 @@ def learn(make_env, make_policy, *,
         logger.log('********** Iteration %i ************' % iters_so_far)
 
         theta = get_parameter()
+        print(theta)
 
         with timed('sampling'):
             seg = sampler.collect(theta)

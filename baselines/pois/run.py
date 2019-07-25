@@ -60,11 +60,11 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     elif policy == 'simple-nn':
         hid_size = [16]
         num_hid_layers = 1
-        use_bias = True
+        use_bias = False
     elif policy == 'nn':
         hid_size = [100, 50, 25]
         num_hid_layers = 3
-        use_bias = True
+        use_bias = False
 
     if policy_init == 'xavier':
         policy_initializer = tf.contrib.layers.xavier_initializer()
