@@ -1,0 +1,93 @@
+{
+  "artifacts": [],
+  "command": "main",
+  "experiment": {
+    "base_dir": "/home/pois/nico/t3p/baselines/baselines/pois",
+    "dependencies": [
+      "baselines==0.1.5",
+      "gym==0.10.8",
+      "numpy==1.14.3",
+      "sacred==0.7.4",
+      "tensorflow==1.10.1"
+    ],
+    "mainfile": "run_sacred.py",
+    "name": "is_swimmer_tuned",
+    "repositories": [
+      {
+        "commit": "7a5e3d789537b23dfd77f1510add7375a52fb8ac",
+        "dirty": false,
+        "url": "https://github.com/t3p/baselines.git"
+      },
+      {
+        "commit": "7a5e3d789537b23dfd77f1510add7375a52fb8ac",
+        "dirty": false,
+        "url": "https://github.com/t3p/baselines.git"
+      }
+    ],
+    "sources": [
+      [
+        "pois.py",
+        "_sources/pois_30553a479b3419379545b1efa2c3c26b.py"
+      ],
+      [
+        "run_sacred.py",
+        "_sources/run_sacred_b8f9ccf26fae14c820ae6e6614558121.py"
+      ]
+    ]
+  },
+  "heartbeat": "2019-08-03T15:03:09.947586",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Xeon(R) CPU E7-8880 v4 @ 2.20GHz",
+    "hostname": "turing",
+    "os": [
+      "Linux",
+      "Linux-4.4.0-157-generic-x86_64-with-Ubuntu-16.04-xenial"
+    ],
+    "python_version": "3.5.2"
+  },
+  "meta": {
+    "command": "main",
+    "options": {
+      "--beat_interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": false,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print_config": false,
+      "--priority": null,
+      "--queue": false,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "experiment_name=is_swimmer_tuned",
+        "env=rllab.swimmer",
+        "policy=nn",
+        "iw_method=is",
+        "bound=max-d2",
+        "delta=0.99",
+        "gamma=1.0",
+        "center=False",
+        "njobs=4",
+        "seed=109",
+        "policy_init=xavier",
+        "max_offline_iters=20"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2019-08-03T10:00:19.922011",
+  "status": "RUNNING"
+}
