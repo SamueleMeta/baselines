@@ -242,7 +242,7 @@ def learn(make_env, make_policy, *,
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
 
-    horizon_eff_ = tf.placeholder(dtype=tf.int32, shape=(1,), name='horizon_eff')
+    horizon_eff_ = tf.placeholder(dtype=tf.int32, shape=(), name='horizon_eff')
     n_episodes_eff_ = tf.placeholder(dtype=tf.int32, shape=(1,), name='n_episodes_eff')
     n_samples_eff_ = tf.placeholder(dtype=tf.int32, shape=(1,), name='n_samples_eff')
 
@@ -276,7 +276,7 @@ def learn(make_env, make_policy, *,
         rew_split = rew_split - (tf.reduce_sum(rew_split) / (tf.reduce_sum(mask_split) + 1e-24))
 
     #discounter = [pow(gamma, i) for i in range(0, horizon)] # Decreasing gamma
-    discounter_tf = gamma ** tf.range(horizon_eff_[0]) #tf.constant(discounter)
+    discounter_tf = gamma ** tf.range(horizon_eff_) #tf.constant(discounter)
     disc_rew_split = rew_split * discounter_tf
 
     #tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return_not_clustered', summarize=20))
@@ -543,10 +543,10 @@ def learn(make_env, make_policy, *,
     assert_ops = tf.group(*tf.get_collection('asserts'))
     print_ops = tf.group(*tf.get_collection('prints'))
 
-    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_], [bound_, assert_ops, print_ops])
-    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_], losses)
+    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_, horizon_eff_], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_, horizon_eff_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_, horizon_eff_], [bound_, assert_ops, print_ops])
+    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_, horizon_eff_], losses)
     #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
 
     set_parameter = U.SetFromFlat(var_list)
@@ -614,7 +614,7 @@ def learn(make_env, make_policy, *,
         clustered_rew = ep_reward
         iter_number = iters_so_far
 
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, [n_episodes_eff]
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, [n_episodes_eff], horizon_eff
 
         assign_old_eq_new()
 
