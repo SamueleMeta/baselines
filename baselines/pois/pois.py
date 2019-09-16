@@ -253,6 +253,8 @@ def learn(make_env, make_policy, *,
     behavioral_log_pdf = oldpi.pd.logp(ac_)
     log_ratio = target_log_pdf - behavioral_log_pdf
 
+    print(tf.split(disc_rew_ * mask_, n_episodes_eff_))
+
     # Split operations
     disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes_eff_))
     rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes_eff_))
