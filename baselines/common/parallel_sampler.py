@@ -227,11 +227,11 @@ class ParallelSampler(object):
         new_field = np.zeros(shape_tuple)
 
         for i, (start, stop) in enumerate(zip(starts, stops)):
-            new_field[i*horizon_eff:ep_lens[i]] = field[start:stop]
+            new_field[i*horizon_eff:i*horizon_eff+ep_lens[i]] = field[start:stop]
             if pad_value is None:
-                new_field[ep_lens[i]:(i + 1)*horizon_eff] = field[stop-1]
+                new_field[i*horizon_eff+ep_lens[i]:(i + 1)*horizon_eff] = field[stop-1]
             else:
-                new_field[ep_lens[i]:(i + 1) * horizon_eff] = pad_value
+                new_field[i*horizon_eff+ep_lens[i]:(i + 1) * horizon_eff] = pad_value
 
         return new_field
 
