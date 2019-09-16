@@ -25,13 +25,15 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
     ep_lens = []
 
     # Initialize history arrays
-    obs = np.array([ob for _ in range(horizon * n_episodes)])
-    rews = np.zeros(horizon * n_episodes, 'float32')
-    vpreds = np.zeros(horizon * n_episodes, 'float32')
-    news = np.zeros(horizon * n_episodes, 'int32')
-    acs = np.array([ac for _ in range(horizon * n_episodes)])
+    array_size = n_samples * horizon if n_samples is not None else horizon * n_episodes
+
+    obs = np.array([ob for _ in range(array_size)])
+    rews = np.zeros(array_size, 'float32')
+    vpreds = np.zeros(array_size, 'float32')
+    news = np.zeros(array_size, 'int32')
+    acs = np.array([ac for _ in range(array_size)])
     prevacs = acs.copy()
-    mask = np.ones(horizon * n_episodes, 'float32')
+    mask = np.ones(array_size, 'float32')
 
     i = 0
     j = 0
@@ -44,9 +46,9 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
         # terminal value
         #if t > 0 and t % horizon == 0:
         if (n_samples is None and i == n_episodes) or (n_samples is not None and i_tot == n_samples):
-            return {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
-                    "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
+            return {"ob" : obs[:i*horizon], "rew" : rews[:i*horizon], "vpred" : vpreds[:i*horizon], "new" : news[:i*horizon],
+                    "ac" : acs[:i*horizon], "prevac" : prevacs[:i*horizon], "nextvpred": vpred * (1 - new),
+                    "ep_rets" : ep_rets[:i*horizon], "ep_lens" : ep_lens[:i*horizon], "mask" : mask[:i*horizon]}
 
         obs[t] = ob
         vpreds[t] = vpred
