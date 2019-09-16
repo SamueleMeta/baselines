@@ -208,11 +208,7 @@ def learn(make_env, make_policy, *,
           reward_clustering='none'):
 
     np.set_printoptions(precision=3)
-    if n_samples is not None:
-        max_samples = n_samples * horizon
-        n_episodes = n_samples
-    else:
-        max_samples = n_episodes * horizon
+    max_samples = horizon * n_episodes
 
     if line_search_type == 'binary':
         line_search = line_search_binary
@@ -238,13 +234,18 @@ def learn(make_env, make_policy, *,
 
     # Placeholders
     ob_ = ob = U.get_placeholder_cached(name='ob')
-    ac_ = pi.pdtype.sample_placeholder([max_samples], name='ac')
-    mask_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='mask')
-    rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='rew')
-    disc_rew_ = tf.placeholder(dtype=tf.float32, shape=(max_samples), name='disc_rew')
-    clustered_rew_ = tf.placeholder(dtype=tf.float32, shape=(n_episodes))
+    ac_ = pi.pdtype.sample_placeholder([None], name='ac')
+    mask_ = tf.placeholder(dtype=tf.float32, name='mask')
+    rew_ = tf.placeholder(dtype=tf.float32,  name='rew')
+    disc_rew_ = tf.placeholder(dtype=tf.float32,  name='disc_rew')
+    clustered_rew_ = tf.placeholder(dtype=tf.float32)
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
+
+    horizon_eff_ = tf.placeholder(dtype=tf.int32, name='horizon_eff')
+    n_episodes_eff_ = tf.placeholder(dtype=tf.int32, name='n_episodes_eff')
+    n_samples_eff_ = tf.placeholder(dtype=tf.int32, name='n_samples_eff')
+
     losses_with_name = []
 
     # Policy densities
@@ -253,15 +254,15 @@ def learn(make_env, make_policy, *,
     log_ratio = target_log_pdf - behavioral_log_pdf
 
     # Split operations
-    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes))
-    rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes))
-    log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes))
-    target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes))
-    behavioral_log_pdf_split = tf.stack(tf.split(behavioral_log_pdf * mask_, n_episodes))
-    mask_split = tf.stack(tf.split(mask_, n_episodes))
+    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, n_episodes_eff_))
+    rew_split = tf.stack(tf.split(rew_ * mask_, n_episodes_eff_))
+    log_ratio_split = tf.stack(tf.split(log_ratio * mask_, n_episodes_eff_))
+    target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, n_episodes_eff_))
+    behavioral_log_pdf_split = tf.stack(tf.split(behavioral_log_pdf * mask_, n_episodes_eff_))
+    mask_split = tf.stack(tf.split(mask_, n_episodes_eff_))
 
     # Renyi divergence
-    emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
+    emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes_eff_))
     emp_d2_cum_split = tf.reduce_sum(emp_d2_split, axis=1)
     empirical_d2 = tf.reduce_mean(tf.exp(emp_d2_cum_split))
 
@@ -348,13 +349,13 @@ def learn(make_env, make_policy, *,
         ratio_reward = ratio_cumsum * disc_rew_split
         # Average on episodes
         ratio_reward_per_episode = tf.reduce_sum(ratio_reward, axis=1)
-        w_return_mean = tf.reduce_sum(ratio_reward_per_episode, axis=0) / n_episodes
+        w_return_mean = tf.reduce_sum(ratio_reward_per_episode, axis=0) / n_episodes_eff_
         # Get d2(w0:t) with mask
         d2_w_0t = tf.exp(tf.cumsum(emp_d2_split, axis=1)) * mask_split # LEAVE THIS OUTSIDE
         # Sum d2(w0:t) over timesteps
         episode_d2_0t = tf.reduce_sum(d2_w_0t, axis=1)
         # Sample variance
-        J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(ratio_reward_per_episode - w_return_mean))
+        J_sample_variance = (1/(n_episodes_eff_-1)) * tf.reduce_sum(tf.square(ratio_reward_per_episode - w_return_mean))
         losses_with_name.append((J_sample_variance, 'J_sample_variance'))
         losses_with_name.extend([(tf.reduce_max(ratio_cumsum), 'MaxIW'),
                                  (tf.reduce_min(ratio_cumsum), 'MinIW'),
@@ -386,9 +387,9 @@ def learn(make_env, make_policy, *,
     elif iw_method == 'is':
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
         if iw_norm == 'none':
-            iwn = iw / n_episodes
+            iwn = iw / n_episodes_eff_
             w_return_mean = tf.reduce_sum(iwn * ep_return)
-            J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(iw * ep_return - w_return_mean))
+            J_sample_variance = (1/(n_episodes_eff_-1)) * tf.reduce_sum(tf.square(iw * ep_return - w_return_mean))
             losses_with_name.append((J_sample_variance, 'J_sample_variance'))
         elif iw_norm == 'sn':
             iwn = iw / tf.reduce_sum(iw)
@@ -398,12 +399,12 @@ def learn(make_env, make_policy, *,
             mean_iw = tf.reduce_mean(iw)
             beta = tf.reduce_sum((iw - mean_iw) * ep_return * iw) / (tf.reduce_sum((iw - mean_iw) ** 2) + 1e-24)
             # Get the estimator
-            w_return_mean = tf.reduce_sum(ep_return * iw + beta * (iw - 1)) / n_episodes
+            w_return_mean = tf.reduce_sum(ep_return * iw + beta * (iw - 1)) / n_episodes_eff_
         else:
             raise NotImplementedError()
         ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
         sqrt_ess_classic = tf.linalg.norm(iw, 1) / tf.linalg.norm(iw, 2)
-        ess_renyi = n_episodes / empirical_d2
+        ess_renyi = n_episodes_eff_ / empirical_d2
         losses_with_name.extend([(tf.reduce_max(iwn), 'MaxIWNorm'),
                                  (tf.reduce_min(iwn), 'MinIWNorm'),
                                  (tf.reduce_mean(iwn), 'MeanIWNorm'),
@@ -429,7 +430,7 @@ def learn(make_env, make_policy, *,
         tf.add_to_collection('asserts', tf.assert_positive(behavioral_pdf_episode, name='behavioral_pdf_positive'))
         # Compute the merging matrix (reward-clustering) and the number of clusters
         reward_unique, reward_indexes = tf.unique(ep_return)
-        episode_clustering_matrix = tf.cast(tf.one_hot(reward_indexes, n_episodes), tf.float64)
+        episode_clustering_matrix = tf.cast(tf.one_hot(reward_indexes, n_episodes_eff_), tf.float64)
         max_index = tf.reduce_max(reward_indexes) + 1
         trajectories_per_cluster = tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index]
         tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
@@ -443,17 +444,17 @@ def learn(make_env, make_policy, *,
         #ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique                                                  # ---- No cluster cardinality
         ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique * tf.cast(trajectories_per_cluster, tf.float32)   # ---- Cluster cardinality
         #w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)                                         # ---- No cluster cardinality
-        w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(n_episodes, tf.float32)                                         # ---- Cluster cardinality
+        w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(n_episodes_eff_, tf.float32)                                         # ---- Cluster cardinality
         # Divergences
         ess_classic = tf.linalg.norm(ratio_reward, 1) ** 2 / tf.linalg.norm(ratio_reward, 2) ** 2
         sqrt_ess_classic = tf.linalg.norm(ratio_reward, 1) / tf.linalg.norm(ratio_reward, 2)
-        ess_renyi = n_episodes / empirical_d2
+        ess_renyi = n_episodes_eff_ / empirical_d2
         # Summaries
         losses_with_name.extend([(tf.reduce_max(ratio_clustered), 'MaxIW'),
                                  (tf.reduce_min(ratio_clustered), 'MinIW'),
                                  (tf.reduce_mean(ratio_clustered), 'MeanIW'),
                                  (U.reduce_std(ratio_clustered), 'StdIW'),
-                                 (1-(max_index / n_episodes), 'RewardCompression'),
+                                 (1-(max_index / n_episodes_eff_), 'RewardCompression'),
                                  (ess_classic, 'ESSClassic'),
                                  (ess_renyi, 'ESSRenyi')])
     else:
@@ -482,7 +483,7 @@ def learn(make_env, make_policy, *,
         mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
         discounted_d2 = mean_episode_d2 * discounter_tf # Discounted d2
         discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0) # Sum over time
-        bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*n_episodes)) * return_step_max
+        bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*n_episodes_eff_)) * return_step_max
     elif bound == 'pdis-mean-d2':
         # Discount factor
         if gamma >= 1:
@@ -495,7 +496,7 @@ def learn(make_env, make_policy, *,
         mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
         discounted_d2 = mean_episode_d2 * discounter_tf # Discounted d2
         discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0) # Sum over time
-        bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*n_episodes)) * return_step_mean
+        bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*n_episodes_eff_)) * return_step_mean
     else:
         raise NotImplementedError()
 
@@ -542,10 +543,10 @@ def learn(make_env, make_policy, *,
     assert_ops = tf.group(*tf.get_collection('asserts'))
     print_ops = tf.group(*tf.get_collection('prints'))
 
-    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
-    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], [bound_, assert_ops, print_ops])
-    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_], losses)
+    compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
+    compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_], [bound_, assert_ops, print_ops])
+    compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, n_episodes_eff_], losses)
     #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, mask_], [ratio_cumsum, discounted_ratio])
 
     set_parameter = U.SetFromFlat(var_list)
@@ -586,7 +587,7 @@ def learn(make_env, make_policy, *,
         theta = get_parameter()
 
         with timed('sampling'):
-            seg = sampler.collect(theta)
+            seg, horizon_eff, n_episodes_eff, n_samples_eff = sampler.collect(theta)
 
         add_disc_rew(seg, gamma)
 
@@ -602,21 +603,16 @@ def learn(make_env, make_policy, *,
 
 
         # Get clustered reward
-                # Get clustered reward
-        ob = np.pad(seg['ob'], ((0, max_samples - len(seg['ob'])), (0, 0)), 'edge')
-        ac = np.pad(seg['ac'], ((0, max_samples - len(seg['ac'])), (0, 0)), 'edge')
-        rew = np.pad(seg['rew'], (0, max_samples - len(seg['rew'])), 'edge')
-        disc_rew = np.pad(seg['disc_rew'], (0, max_samples - len(seg['disc_rew'])), 'edge')
-        mask = np.pad(seg['mask'], (0, max_samples - len(seg['mask'])), 'constant', constant_values=0)
-        
-        reward_matrix = np.reshape(disc_rew * mask, (n_episodes, horizon))
+        ob, ac, rew, disc_rew, mask = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask']
+
+        reward_matrix = np.reshape(disc_rew * mask, (n_episodes_eff_, -1))
         ep_reward = np.sum(reward_matrix, axis=1)
         ep_reward = cluster_rewards(ep_reward, reward_clustering)
 
         clustered_rew = ep_reward
         iter_number = iters_so_far
 
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, n_episodes_eff
 
         assign_old_eq_new()
 

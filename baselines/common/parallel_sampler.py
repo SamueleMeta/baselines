@@ -24,20 +24,19 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
     ep_rets = []
     ep_lens = []
 
-    # Initialize history arrays
-    array_size = n_samples * horizon if n_samples is not None else horizon * n_episodes
+    max_samples = n_samples if n_samples is not None else horizon * n_episodes
 
-    obs = np.array([ob for _ in range(array_size)])
-    rews = np.zeros(array_size, 'float32')
-    vpreds = np.zeros(array_size, 'float32')
-    news = np.zeros(array_size, 'int32')
-    acs = np.array([ac for _ in range(array_size)])
+    # Initialize history arrays
+    obs = np.array([ob for _ in range(max_samples)])
+    rews = np.zeros(max_samples, 'float32')
+    vpreds = np.zeros(max_samples, 'float32')
+    news = np.zeros(max_samples, 'int32')
+    acs = np.array([ac for _ in range(max_samples)])
     prevacs = acs.copy()
-    mask = np.ones(array_size, 'float32')
+    mask = np.ones(max_samples, 'float32')
 
     i = 0
     j = 0
-    i_tot = 0
     while True:
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
@@ -45,10 +44,10 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         #if t > 0 and t % horizon == 0:
-        if (n_samples is None and i == n_episodes) or (n_samples is not None and i_tot == n_samples):
-            return {"ob" : obs[:i*horizon], "rew" : rews[:i*horizon], "vpred" : vpreds[:i*horizon], "new" : news[:i*horizon],
-                    "ac" : acs[:i*horizon], "prevac" : prevacs[:i*horizon], "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask[:i*horizon]}
+        if (n_samples is None and i == n_episodes) or (n_samples is not None and t == n_samples):
+            return {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
+                    "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
 
         obs[t] = ob
         vpreds[t] = vpred
@@ -62,7 +61,6 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
         cur_ep_ret += rew
         cur_ep_len += 1
         j += 1
-        i_tot += 1
         if new or j == horizon:
             new = True
             env.done = True
@@ -74,13 +72,6 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
             cur_ep_len = 0
             ob = env.reset()
 
-            next_t = (i+1) * horizon
-
-            mask[t+1:next_t] = 0.
-            acs[t+1:next_t] = acs[t]
-            obs[t+1:next_t] = obs[t]
-
-            t = next_t - 1
             i += 1
             j = 0
         t += 1
@@ -192,21 +183,57 @@ class ParallelSampler(object):
          "ac": acs, "prevac": prevacs, "nextvpred": vpred * (1 - new),
          "ep_rets": ep_rets, "ep_lens": ep_lens, "mask": mask}
          '''
+
+        n_episodes_eff = 0
+        n_samples_eff = 0
+        horizon_eff = 0
+
+        for batch in sample_batches:
+            ep_lens = batch['ep_lens']
+            n_episodes_eff += len(ep_lens)
+            n_samples_eff += sum(ep_lens)
+            horizon_eff = max(horizon_eff, max(ep_lens))
+
         np_fields = ['ob', 'rew', 'vpred', 'new', 'ac', 'prevac', 'mask']
         list_fields = ['ep_rets', 'ep_lens']
 
-        new_dict = list(zip(np_fields, map(lambda f: sample_batches[0][f], np_fields))) + \
-                   list(zip(list_fields,map(lambda f: sample_batches[0][f], list_fields))) + \
-                   [('nextvpred', sample_batches[-1]['nextvpred'])]
-        new_dict = dict(new_dict)
-
-        for batch in sample_batches[1:]:
+        new_dict = dict()
+        for i, batch in enumerate(sample_batches):
             for f in np_fields:
-                new_dict[f] = np.concatenate((new_dict[f], batch[f]))
+                if i == 0:
+                    new_dict[f] = self._pad(batch[f], batch['ep_lens'], horizon_eff, pad_value= 0 if f == 'mask' else None)
+                else:
+                    new_dict[f] = np.concatenate((new_dict[f], self._pad(batch[f], batch['ep_lens'], horizon_eff, pad_value= 0 if f == 'mask' else None)))
             for f in list_fields:
-                new_dict[f].extend(batch[f])
+                if i == 0:
+                    new_dict[f] = batch[f]
+                else:
+                    new_dict[f].extend(batch[f])
 
-        return new_dict
+        return new_dict, horizon_eff, n_episodes_eff, n_samples_eff
+
+    def _pad(self, field, ep_lens, horizon_eff, pad_value=None):
+
+        len_cumsum = np.cumsum(ep_lens)
+
+        starts = np.concatenate(([0], len_cumsum[:-1]))
+        stops = len_cumsum
+
+        # Strange hack
+        shape_list = list(field.shape)
+        shape_list[0] = len(ep_lens) * horizon_eff
+        shape_tuple = tuple(shape_list)
+
+        new_field = np.zeros(shape_tuple)
+
+        for i, start, stop in enumerate(zip(starts, stops)):
+            new_field[i*horizon_eff:ep_lens[i]] = field[start:stop]
+            if pad_value is None:
+                new_field[ep_lens[i]:(i + 1)*horizon_eff] = field[stop-1]
+            else:
+                new_field[ep_lens[i]:(i + 1) * horizon_eff] = pad_value
+
+        return new_field
 
 
     def close(self):
