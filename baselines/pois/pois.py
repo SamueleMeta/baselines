@@ -243,8 +243,8 @@ def learn(make_env, make_policy, *,
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
 
     horizon_eff_ = tf.placeholder(dtype=tf.int32, shape=(1,), name='horizon_eff')
-    n_episodes_eff_ = tf.placeholder(dtype=tf.int32, shape=(), name='n_episodes_eff')
-    n_samples_eff_ = tf.placeholder(dtype=tf.int32, shape=(), name='n_samples_eff')
+    n_episodes_eff_ = tf.placeholder(dtype=tf.int32, shape=(1,), name='n_episodes_eff')
+    n_samples_eff_ = tf.placeholder(dtype=tf.int32, shape=(1,), name='n_samples_eff')
 
     losses_with_name = []
 
@@ -620,7 +620,7 @@ def learn(make_env, make_policy, *,
         iter_number = iters_so_far
 
         print(n_episodes_eff, horizon_eff, n_samples_eff)
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, n_episodes_eff, [horizon_eff]
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, [n_episodes_eff], [horizon_eff]
 
         assign_old_eq_new()
 
