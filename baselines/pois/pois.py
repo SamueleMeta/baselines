@@ -255,7 +255,7 @@ def learn(make_env, make_policy, *,
 
     #print(tf.split(disc_rew_ * mask_, n_episodes_eff_))
 
-    splitter = tf.tile(horizon_eff_, n_episodes_eff)
+    splitter = tf.tile(horizon_eff_, n_episodes_eff_)
 
     # Split operations
     disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, splitter))
