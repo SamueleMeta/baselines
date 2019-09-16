@@ -277,7 +277,7 @@ def learn(make_env, make_policy, *,
 
     #discounter = [pow(gamma, i) for i in range(0, horizon)] # Decreasing gamma
     #print(horizon_eff_)
-    discounter_tf = gamma ** tf.range(horizon_eff_, dtype=tf.float32) #tf.constant(discounter)
+    discounter_tf = gamma ** tf.cast(tf.range(horizon_eff_), tf.float32) #tf.constant(discounter)
     disc_rew_split = rew_split * discounter_tf
 
     #tf.add_to_collection('prints', tf.Print(ep_return, [ep_return], 'ep_return_not_clustered', summarize=20))
