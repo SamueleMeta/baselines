@@ -602,11 +602,21 @@ def learn(make_env, make_policy, *,
 
 
         # Get clustered reward
-        reward_matrix = np.reshape(seg['disc_rew'] * seg['mask'], (n_episodes, horizon))
+                # Get clustered reward
+        ob = np.pad(seg['ob'], ((0, max_samples - len(seg['ob'])), (0, 0)), 'edge')
+        ac = np.pad(seg['ac'], ((0, max_samples - len(seg['ac'])), (0, 0)), 'edge')
+        rew = np.pad(seg['rew'], (0, max_samples - len(seg['rew'])), 'edge')
+        disc_rew = np.pad(seg['disc_rew'], (0, max_samples - len(seg['disc_rew'])), 'edge')
+        mask = np.pad(seg['mask'], (0, max_samples - len(seg['mask'])), 'constant', constant_values=0)
+        
+        reward_matrix = np.reshape(disc_rew * mask, (n_episodes, horizon))
         ep_reward = np.sum(reward_matrix, axis=1)
         ep_reward = cluster_rewards(ep_reward, reward_clustering)
 
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], ep_reward, seg['mask'], iters_so_far
+        clustered_rew = ep_reward
+        iter_number = iters_so_far
+
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number
 
         assign_old_eq_new()
 
