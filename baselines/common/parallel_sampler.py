@@ -46,9 +46,9 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
         # terminal value
         #if t > 0 and t % horizon == 0:
         if (n_samples is None and i == n_episodes) or (n_samples is not None and i_tot == n_samples):
-            return {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
-                    "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
-                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
+            return {"ob" : obs[:i*horizon], "rew" : rews[:i*horizon], "vpred" : vpreds[:i*horizon], "new" : news[:i*horizon],
+                    "ac" : acs[:i*horizon], "prevac" : prevacs[:i*horizon], "nextvpred": vpred * (1 - new),
+                    "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask[:i*horizon]}
 
         obs[t] = ob
         vpreds[t] = vpred
