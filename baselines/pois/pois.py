@@ -258,7 +258,7 @@ def learn(make_env, make_policy, *,
     splitter = tf.tile(horizon_eff_, n_episodes_eff_)
 
     # Split operations
-    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, splitter, num=n_episodes_eff[0]))
+    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, splitter, num=n_episodes_eff_[0]))
     rew_split = tf.stack(tf.split(rew_ * mask_, splitter))
     log_ratio_split = tf.stack(tf.split(log_ratio * mask_, splitter))
     target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, splitter))
