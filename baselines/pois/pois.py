@@ -242,9 +242,9 @@ def learn(make_env, make_policy, *,
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
 
-    horizon_eff_ = tf.placeholder(dtype=tf.int32, name='horizon_eff')
-    n_episodes_eff_ = tf.placeholder(dtype=tf.int32, name='n_episodes_eff')
-    n_samples_eff_ = tf.placeholder(dtype=tf.int32, name='n_samples_eff')
+    horizon_eff_ = tf.placeholder(dtype=tf.int32, shape=(), name='horizon_eff')
+    n_episodes_eff_ = tf.placeholder(dtype=tf.int32, shape=(), name='n_episodes_eff')
+    n_samples_eff_ = tf.placeholder(dtype=tf.int32, shape=(), name='n_samples_eff')
 
     losses_with_name = []
 
