@@ -25,7 +25,7 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.pois import pois
 
-def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, **alg_args):
+def train(env, policy, policy_init, n_episodes, n_samples, horizon, seed, njobs=1, save_weights=0, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -89,7 +89,10 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     else:
         raise Exception('Unrecognized policy type.')
 
-    sampler = ParallelSampler(make_policy, make_env, n_episodes, horizon, True, n_workers=njobs, seed=seed)
+    if n_samples == -1:
+        n_samples = None
+
+    sampler = ParallelSampler(make_policy, make_env, n_episodes, horizon, True, n_samples=n_samples, n_workers=njobs, seed=seed)
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -113,6 +116,7 @@ def main():
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--env', type=str, default='cartpole')
     parser.add_argument('--num_episodes', type=int, default=100)
+    parser.add_argument('--num_samples', type=int, default=-1)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_method', type=str, default='is')
     parser.add_argument('--iw_norm', type=str, default='none')
@@ -143,6 +147,7 @@ def main():
           policy=args.policy,
           policy_init=args.policy_init,
           n_episodes=args.num_episodes,
+          n_samples=args.num_samples,
           horizon=args.horizon,
           seed=args.seed,
           njobs=args.njobs,

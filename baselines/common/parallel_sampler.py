@@ -8,7 +8,7 @@ from baselines.common import set_global_seeds as set_all_seeds
 import numpy as np
 from gym.wrappers.monitoring.video_recorder import VideoRecorder
 
-def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
+def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=None):
     '''
     Collects trajectories
     '''
@@ -35,6 +35,7 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
 
     i = 0
     j = 0
+    i_tot = 0
     while True:
         prevac = ac
         ac, vpred = pi.act(stochastic, ob)
@@ -42,7 +43,7 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         #if t > 0 and t % horizon == 0:
-        if i == n_episodes:
+        if (n_samples is None and i == n_episodes) or (n_samples is not None and i_tot == n_samples):
             return {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
                     "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
                     "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask}
@@ -59,6 +60,7 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic):
         cur_ep_ret += rew
         cur_ep_len += 1
         j += 1
+        i_tot += 1
         if new or j == horizon:
             new = True
             env.done = True
@@ -129,7 +131,7 @@ class Worker(Process):
 
 class ParallelSampler(object):
 
-    def __init__(self, make_pi, make_env, n_episodes, horizon, stochastic, n_workers=-1, seed=0):
+    def __init__(self, make_pi, make_env, n_episodes, horizon, stochastic, n_samples=None, n_workers=-1, seed=0):
         try:
             affinity = len(os.sched_getaffinity(0))
             if n_workers == -1:
@@ -148,13 +150,22 @@ class ParallelSampler(object):
         self.input_queues = [Queue() for _ in range(self.n_workers)]
         self.events = [Event() for _ in range(self.n_workers)]
 
-        n_episodes_per_process = n_episodes // self.n_workers
-        remainder = n_episodes % self.n_workers
+        if n_samples is None:
+            n_episodes_per_process = n_episodes // self.n_workers
+            remainder = n_episodes % self.n_workers
 
-        f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
-        f_rem = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process+1, horizon, stochastic)
-        fun = [f] * (self.n_workers - remainder) + [f_rem] * remainder
-        self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed+i*100) for i in range(self.n_workers)]
+            f = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process, horizon, stochastic)
+            f_rem = lambda pi, env: traj_segment_function(pi, env, n_episodes_per_process+1, horizon, stochastic)
+            fun = [f] * (self.n_workers - remainder) + [f_rem] * remainder
+            self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed+i*100) for i in range(self.n_workers)]
+        else:
+            n_samples_per_process = n_samples // self.n_workers
+            remainder = n_samples % self.n_workers
+
+            f = lambda pi, env: traj_segment_function(pi, env, None, horizon, stochastic, n_samples=n_samples_per_process)
+            f_rem = lambda pi, env: traj_segment_function(pi, env, None, horizon, stochastic, n_samples=n_samples_per_process+1)
+            fun = [f] * (self.n_workers - remainder) + [f_rem] * remainder
+            self.workers = [Worker(self.output_queue, self.input_queues[i], self.events[i], make_env, make_pi, fun[i], seed + i * 100) for i in range(self.n_workers)]
 
         for w in self.workers:
             w.start()

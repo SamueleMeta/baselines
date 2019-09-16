@@ -51,6 +51,7 @@ def custom_config():
     seed = 0
     env = 'rllab.cartpole'
     num_episodes = 100
+    num_samples = -1
     max_iters = 500
     horizon = 500
     iw_method = 'is'
@@ -89,7 +90,7 @@ def custom_config():
     else:
         file_name = file_name
 
-def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, **alg_args):
+def train(env, policy, policy_init, n_episodes, n_samples, horizon, seed, njobs=1, save_weights=0, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -153,7 +154,10 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     else:
         raise Exception('Unrecognized policy type.')
 
-    sampler = ParallelSampler(make_policy, make_env, n_episodes, horizon, True, n_workers=njobs, seed=seed)
+    if n_samples == -1:
+        n_samples = None
+
+    sampler = ParallelSampler(make_policy, make_env, n_episodes, horizon, True, n_samples=n_samples, n_workers=njobs, seed=seed)
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -172,7 +176,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     sampler.close()
 
 @ex.automain
-def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural,
+def main(seed, env, num_episodes, num_samples, horizon, iw_method, iw_norm, natural,
             file_name, logdir, bound, delta, njobs, save_weights, policy,
             policy_init, max_offline_iters, gamma, center, clipping, entropy,
             max_iters, positive_return, reward_clustering, _run):
@@ -182,6 +186,7 @@ def main(seed, env, num_episodes, horizon, iw_method, iw_norm, natural,
           policy=policy,
           policy_init=policy_init,
           n_episodes=num_episodes,
+          n_samples=num_samples,
           horizon=horizon,
           seed=seed,
           njobs=njobs,
