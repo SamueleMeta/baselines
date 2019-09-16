@@ -605,9 +605,9 @@ def learn(make_env, make_policy, *,
         # Get clustered reward
         ob, ac, rew, disc_rew, mask = seg['ob'], seg['ac'], seg['rew'], seg['disc_rew'], seg['mask']
 
-        new_shape = tf.concat([n_episodes_eff_, horizon_eff_], axis=0)
-        print(new_shape)
-        reward_matrix = np.reshape(disc_rew * mask, new_shape)
+        #new_shape = tf.concat([n_episodes_eff_, horizon_eff_], axis=0)
+        #print(new_shape)
+        reward_matrix = np.reshape(disc_rew * mask, (n_episodes_eff, horizon_eff))
         ep_reward = np.sum(reward_matrix, axis=1)
         ep_reward = cluster_rewards(ep_reward, reward_clustering)
 
