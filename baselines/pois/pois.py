@@ -614,7 +614,7 @@ def learn(make_env, make_policy, *,
         clustered_rew = ep_reward
         iter_number = iters_so_far
 
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, n_episodes_eff
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, [n_episodes_eff]
 
         assign_old_eq_new()
 
