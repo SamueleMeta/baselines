@@ -188,6 +188,7 @@ def learn(make_env, make_policy, *,
           delta,
           gamma,
           max_iters,
+          n_samples=None,
           sampler=None,
           use_natural_gradient=False, #can be 'exact', 'approximate'
           fisher_reg=1e-2,
@@ -207,7 +208,11 @@ def learn(make_env, make_policy, *,
           reward_clustering='none'):
 
     np.set_printoptions(precision=3)
-    max_samples = horizon * n_episodes
+    if n_samples is not None:
+        max_samples = n_samples * horizon
+        n_episodes = n_samples
+    else:
+        max_samples = n_episodes * horizon
 
     if line_search_type == 'binary':
         line_search = line_search_binary
