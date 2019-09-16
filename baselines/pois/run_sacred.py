@@ -170,7 +170,7 @@ def train(env, policy, policy_init, n_episodes, n_samples, horizon, seed, njobs=
 
     gym.logger.setLevel(logging.WARN)
 
-    pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
+    pois.learn(make_env, make_policy, n_episodes=n_episodes, n_samples=n_samples, horizon=horizon,
                 sampler=sampler, save_weights=save_weights, **alg_args)
 
     sampler.close()
