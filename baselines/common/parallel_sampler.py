@@ -45,7 +45,7 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
         # terminal value
         #if t > 0 and t % horizon == 0:
         if (n_samples is None and i == n_episodes) or (n_samples is not None and t == n_samples):
-           print(t, sum(ep_lens)) 
+           #print(t, sum(ep_lens)) 
            return {"ob" : obs[:t], "rew" : rews[:t], "vpred" : vpreds[:t], "new" : news[:t],
                     "ac" : acs[:t], "prevac" : prevacs[:t], "nextvpred": vpred * (1 - new),
                     "ep_rets" : ep_rets, "ep_lens" : ep_lens, "mask" : mask[:t]}
@@ -62,7 +62,7 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
         cur_ep_ret += rew
         cur_ep_len += 1
         j += 1
-        if new or j == horizon or (n_samples is not None and t == n_samples):
+        if new or j == horizon or (n_samples is not None and t+1 == n_samples):
             new = True
             env.done = True
 
