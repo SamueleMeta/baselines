@@ -61,7 +61,7 @@ def traj_segment_function(pi, env, n_episodes, horizon, stochastic, n_samples=No
         cur_ep_ret += rew
         cur_ep_len += 1
         j += 1
-        if new or j == horizon:
+        if new or j == horizon or (n_samples is not None and t == n_samples):
             new = True
             env.done = True
 
