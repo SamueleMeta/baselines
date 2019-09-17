@@ -242,9 +242,9 @@ def learn(make_env, make_policy, *,
     gradient_ = tf.placeholder(dtype=tf.float32, shape=(n_parameters, 1), name='gradient')
     iter_number_ = tf.placeholder(dtype=tf.int32, name='iter_number')
 
-    horizon_eff_ = tf.placeholder(dtype=tf.int32, shape=(1,), name='horizon_eff')
-    n_episodes_eff_ = tf.placeholder(dtype=tf.int32, shape=(1,), name='n_episodes_eff')
-    n_samples_eff_ = tf.placeholder(dtype=tf.int32, shape=(1,), name='n_samples_eff')
+    horizon_eff_ = tf.placeholder(dtype=tf.int32, shape=(), name='horizon_eff')
+    n_episodes_eff_ = tf.placeholder(dtype=tf.int32, shape=(), name='n_episodes_eff')
+    n_samples_eff_ = tf.placeholder(dtype=tf.int32, shape=(), name='n_samples_eff')
 
     losses_with_name = []
 
@@ -255,19 +255,21 @@ def learn(make_env, make_policy, *,
 
     #print(tf.split(disc_rew_ * mask_, n_episodes_eff_))
 
-    splitter = n_episodes_eff_[0] #tf.tile(horizon_eff_, n_episodes_eff_)
-    print(splitter)
+    #splitter = n_episodes_eff_[0] #tf.tile(horizon_eff_, n_episodes_eff_)
+    #print(splitter)
+    new_shape_2 = tf.stack((n_episodes_eff_, horizon_eff_))
+    new_shape_3 = tf.stack((n_episodes_eff_, horizon_eff_, -1))
 
     # Split operations
-    disc_rew_split = tf.stack(tf.split(disc_rew_ * mask_, tf.constant(1))) #splitter))
-    rew_split = tf.stack(tf.split(rew_ * mask_, splitter))
-    log_ratio_split = tf.stack(tf.split(log_ratio * mask_, splitter))
-    target_log_pdf_split = tf.stack(tf.split(target_log_pdf * mask_, splitter))
-    behavioral_log_pdf_split = tf.stack(tf.split(behavioral_log_pdf * mask_, splitter))
-    mask_split = tf.stack(tf.split(mask_, splitter))
+    disc_rew_split = tf.reshape(disc_rew_ * mask_, new_shape_2) #splitter))
+    rew_split = tf.reshape(rew_ * mask_, new_shape_2)
+    log_ratio_split = tf.reshape(log_ratio * mask_, new_shape_2)
+    target_log_pdf_split = tf.reshape(target_log_pdf * mask_, new_shape_2)
+    behavioral_log_pdf_split = tf.reshape(behavioral_log_pdf * mask_, new_shape_2)
+    mask_split = tf.reshape(mask_, new_shape_2)
 
     # Renyi divergence
-    emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, splitter))
+    emp_d2_split = tf.reshape(pi.pd.renyi(oldpi.pd, 2) * mask_, new_shape_2)
     emp_d2_cum_split = tf.reduce_sum(emp_d2_split, axis=1)
     empirical_d2 = tf.reduce_mean(tf.exp(emp_d2_cum_split))
 
@@ -621,7 +623,7 @@ def learn(make_env, make_policy, *,
         iter_number = iters_so_far
 
         print(n_episodes_eff, horizon_eff, n_samples_eff)
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, [n_episodes_eff], [horizon_eff]
+        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, n_episodes_eff, horizon_eff
 
         assign_old_eq_new()
 
