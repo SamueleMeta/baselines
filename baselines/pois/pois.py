@@ -489,7 +489,7 @@ def learn(make_env, make_policy, *,
             discounter = [f(t) for t in range(0, horizon)]
         discounter_tf = tf.constant(discounter)
         mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
-        discounted_d2 = mean_episode_d2 * discounter_tf # Discounted d2
+        discounted_d2 = mean_episode_d2 * discounter_tf[:horizon_eff_] # Discounted d2
         discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0) # Sum over time
         bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*tf.cast(n_episodes_eff_, tf.float32))) * return_step_max
     elif bound == 'pdis-mean-d2':
