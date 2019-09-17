@@ -204,9 +204,9 @@ class ParallelSampler(object):
         for i, batch in enumerate(sample_batches):
             for f in np_fields:
                 if i == 0:
-                    new_dict[f] = self._pad(batch[f], batch['ep_lens'], horizon_eff, pad_value= 0 if f == 'mask' else None)
+                    new_dict[f] = self._pad(batch[f], batch['ep_lens'], horizon_eff, pad_value= 0 if f in ['mask', 'new'] else None)
                 else:
-                    new_dict[f] = np.concatenate((new_dict[f], self._pad(batch[f], batch['ep_lens'], horizon_eff, pad_value= 0 if f == 'mask' else None)))
+                    new_dict[f] = np.concatenate((new_dict[f], self._pad(batch[f], batch['ep_lens'], horizon_eff, pad_value= 0 if f in ['mask', 'new'] else None)))
             for f in list_fields:
                 if i == 0:
                     new_dict[f] = batch[f]
