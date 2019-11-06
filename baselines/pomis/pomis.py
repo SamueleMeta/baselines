@@ -236,7 +236,7 @@ def learn(make_env, make_policy, *,
     n_parameters = sum(shapes)
 
     # Building a set of behavioral policies
-    behavioral_policies = memory.build_policies(make_policy, pi)
+    memory.build_policies(make_policy, pi)
 
     # Placeholders
     ob_ = ob = U.get_placeholder_cached(name='ob')
@@ -302,6 +302,10 @@ def learn(make_env, make_policy, *,
                              (emp_d2_harmonic, 'EmpiricalD2Harmonic'),
                              (return_step_max, 'ReturnStepMax'),
                              (return_step_maxmin, 'ReturnStepMaxmin')])
+
+    # Add D2 statistics for each memory cell
+    for i in range(capacity):
+        losses_with_name.extend([(tf.reduce_mean(emp_d2_split_cum, axis=1)[i], 'MeanD2-'+str(i))])
 
     if iw_method == 'is':
         # Sum the log prob over time. Shapes: target(Nep, H), behav (Cap, Nep, H)
