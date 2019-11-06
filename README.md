@@ -10,19 +10,7 @@ We provide 3 different flavours of the POIS algorithm:
 - **POIS2**: control-based POIS (gpu optimized, used in complex environments or complex policies)
 - **PBPOIS**: parameter-based POIS
 
-This repository also contains a version of the algorithm controlled using [sacred](https://sacred.readthedocs.io/en/latest/). The POIS algorithms can be run using a single script, both from gym and rllab. To use rllab environments, use the prefix "*rllab.*". You should always set the *SACRED_RUNS_DIRECTORY* env variable to tell sacred where to log the run. For example:
-
-```bash
-export SACRED_RUNS_DIRECTORY=sacred_runs
-python baselines/pois/run_sacred.py with env=rllab.swimmer
-```
-will run the POIS algorithm over the RLLAB swimmer environment logging into the *sacred_runs* directory.
-
-We also provide an [*experiment_manager*](baselines/experiment_manager.py) script, which can be used to launch multiple runs of the algorithm in different screen and to manage them, using a CSV file to specify the parameters of each run. An example CSV is contained in the [experiments](experiments) directory. To run the sample:
-
-```bash
-python baselines/experiment_manager.py --command=launch --dir=experiments --name=sample_experiment --sacred --sacred_dir=sacred_runs
-```
+This repository also contains a version of the algorithm controlled using [sacred](https://sacred.readthedocs.io/en/latest/). More info on how to launch experiments with sacred are available in the section *Launching experiments* of this readme.
 
 ## Installation
 You can install it by typing:
@@ -69,3 +57,32 @@ To cite the POIS paper:
       archivePrefix={arXiv},
       primaryClass={cs.LG}
     }
+
+## Launching experiments
+
+In this framework, we allow launching experiments, i.e. a collection of runs with specific parameters. Run parameters are specified in CSV files and placed inside the `experiments` directory. See that directory for an example of the content.
+Launching the experiment is done by calling:
+```python3 baselines/experiment_manager --command=launch --dir=experiments --name=mujoco```
+This command launches an experiment named *mujoco*, searching for the relative `experiments/mujoco.csv` file. 
+
+Running the experiment is a completely parallelized task, so multiple runs are spread over multiple processors. This is done by instantiating one virtual screen for each of the single runs. The `experiment_manager`, when launching an experiment, creates one screen for every run and issues to it a script to run with all the requested parameters (as specified in the experiment CSV).
+
+The `experiment_manager` script can be also used to print statistics or even to stop a particular experiment, making it easier to manage a lot of virtual screens simultaneously.
+
+Inside the 4 POIS directories, namely:
+- `baselines/pois`: single policy POIS, decentralized policies for each worker
+- `baselines/pois2`: single policy POIS, centralized policy for every worker
+- `baselines/pomis`: multiple POIS, decentralized policies for each worker
+- `baselines/pomis2`: multiple POIS, centralized policy for every worker, 
+
+we can find 2 type of scripts to launch single runs:
+- `run.py`: run with basic logging, i.e. tensorboard and csv
+- `run_sacred.py`: run with sacred logging.
+
+All the experiments contained in the paper are logged using sacred, so we can recover the exact parameters and exact code that generated that result. To enable sacred using the `experiment_manager`, add the keywords `--sacred --sacred_dir=sacred_runs`; in this way, the output of sacred will be saved inside `sacred_runs`.
+
+The script `script/sacred_manager` contains many utility functions to manage these logging directories, e.g. for deleting or selecting runs.
+
+## Using RL-LAB
+
+To use rllab environments, use the prefix "*rllab.*" in the environment name. A list of all the environments can be found [here](baselines/common/rllab_utils.py).
