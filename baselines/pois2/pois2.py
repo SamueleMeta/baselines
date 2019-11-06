@@ -405,7 +405,7 @@ def learn(env, make_policy, *,
             discounter = [float(1+2*(horizon-t-1)) for t in range(0, horizon)]
         else:
             def f(t):
-                return pow(gamma, 2*t) + (2*pow(gamma,t)*(pow(gamma, t+1) - pow(gamma, horizon))) / (1-gamma)
+                return pow(gamma, t) * (pow(gamma, t) + pow(gamma, t+1) - 2*pow(gamma, horizon)) / (1-gamma)
             discounter = [f(t) for t in range(0, horizon)]
         discounter_tf = tf.constant(discounter)
         mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
@@ -418,7 +418,7 @@ def learn(env, make_policy, *,
             discounter = [float(1+2*(horizon-t-1)) for t in range(0, horizon)]
         else:
             def f(t):
-                return pow(gamma, 2*t) + (2*pow(gamma,t)*(pow(gamma, t+1) - pow(gamma, horizon))) / (1-gamma)
+                return pow(gamma, t) * (pow(gamma, t) + pow(gamma, t+1) - 2*pow(gamma, horizon)) / (1-gamma)
             discounter = [f(t) for t in range(0, horizon)]
         discounter_tf = tf.constant(discounter)
         mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
