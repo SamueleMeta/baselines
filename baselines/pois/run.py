@@ -28,10 +28,10 @@ from baselines.pois import pois
 def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, **alg_args):
 
     if env.startswith('rllab.'):
-        # Get env name and class
+        # Get env name and class
         env_name = re.match('rllab.(\S+)', env).group(1)
         env_rllab_class = rllab_env_from_name(env_name)
-        # Define env maker
+        # Define env maker
         def make_env():
             env_rllab = env_rllab_class()
             _env = Rllab2GymWrapper(env_rllab)
@@ -44,7 +44,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
         assert env_type is not None, "Env not recognized."
         # Define the correct env maker
         if env_type == 'atari':
-            # Atari, custom env creation
+            # Atari, custom env creation
             def make_env():
                 _env = make_atari(env)
                 return wrap_deepmind(_env)

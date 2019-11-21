@@ -18,7 +18,6 @@ from contextlib import contextmanager
 import time
 from baselines.common import colorize
 
-#just to display computation times
 @contextmanager
 def timed(msg, verbose=True):
     if verbose: print(colorize(msg, color='magenta'))
@@ -26,7 +25,6 @@ def timed(msg, verbose=True):
     yield
     if verbose: print(colorize("done in %.3f seconds"%(time.time() - tstart), color='magenta'))
 
-#simple sequential sampler
 def eval_trajectory(env, pol, gamma, horizon, feature_fun):
     ret = disc_ret = 0
     t = 0
@@ -42,7 +40,7 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
         
     return ret, disc_ret, t
 
-#binary search for offline step size
+#BINARY line search
 def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad, 
                 normalize=True,
                 use_rmax=True,
@@ -53,6 +51,7 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
     high = None
     bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
+    #old_delta_bound = 0.
     rho_opt = rho_init
     i_opt = 0.
     delta_bound_opt = 0.
@@ -86,7 +85,6 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
     
     return rho_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
-#parabolic search for offline step size
 def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad, 
                 normalize=True,
                 use_rmax=True,
@@ -133,7 +131,6 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
 
     return rho_old, epsilon_old, delta_bound_old, i+1
 
-#offline optimizer
 def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
                      normalize=True, 
                      use_rmax=True,
@@ -171,6 +168,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
             natgrad = grad/(newpol.eval_fisher() + 1e-24)
         else:
             raise NotImplementedError
+        #assert np.dot(grad, natgrad) >= 0
 
         grad_norm = np.sqrt(np.dot(grad, natgrad))
         if grad_norm < grad_tol:
@@ -204,25 +202,26 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
     return rho, improvement
 
 
-#the learning algorithm itself
 def learn(env_maker, pol_maker, sampler,
           gamma, n_episodes, horizon, max_iters, 
           feature_fun=None, 
-          iw_norm='sn',
-          bound='max-d2',
-          max_offline_iters=10, 
+          iw_norm='sn', 
+          bound='max-ess',
+          max_offline_iters=100, 
           max_search_ite=30,
           verbose=True, 
           save_weights=True,
-          delta=0.4,
+          delta=0.2,
           center_return=False,
-          line_search_type='parabola'):
+          line_search_type='parabola',
+          adaptive_batch=False):
     
     #Initialization
     env = env_maker()
     pol = pol_maker('pol', env.observation_space, env.action_space)
     newpol = pol_maker('newpol', env.observation_space, env.action_space)
     newpol.set_params(pol.eval_params())
+    old_rho = pol.eval_params()
     batch_size = n_episodes
     normalize = True if iw_norm=='sn' else False
     episodes_so_far = 0
@@ -251,6 +250,10 @@ def learn(env_maker, pol_maker, sampler,
     else:
         raise NotImplementedError
     
+    promise = -np.inf
+    actor_params, rets, disc_rets, lens = [], [], [], []    
+    old_actor_params, old_rets, old_disc_rets, old_lens = [], [], [], []
+
     #Learning
     for it in range(max_iters):
         logger.log('\n********** Iteration %i ************' % it)
@@ -260,15 +263,18 @@ def learn(env_maker, pol_maker, sampler,
         if save_weights: 
             w_to_save = rho
             
-        #Sampling (fixed batchsize)
+        #Add 100 trajectories to the batch
         with timed('Sampling', verbose):
             if sampler:
                 seg = sampler.collect(rho)
                 seg = sampler.collect(rho)
-                lens, rets, disc_rets, actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
+                _lens, _rets, _disc_rets, _actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
+                lens.extend(_lens)
+                rets.extend(_rets)
+                disc_rets.extend(_disc_rets)
+                actor_params.extend(_actor_params)
             else:
                 frozen_pol = pol.freeze()
-                actor_params, rets, disc_rets, lens = [], [], [], []
                 for ep in range(n_episodes):
                     theta = frozen_pol.resample()
                     actor_params.append(theta)
@@ -276,13 +282,14 @@ def learn(env_maker, pol_maker, sampler,
                     rets.append(ret)
                     disc_rets.append(disc_ret)
                     lens.append(ep_len)
-
+        complete = len(rets)>=batch_size #Is the batch complete?
         #Normalize reward
         norm_disc_rets = np.array(disc_rets)
         if center_return:
             norm_disc_rets = norm_disc_rets - np.mean(norm_disc_rets)
         rmax = np.max(abs(norm_disc_rets))
         #Estimate online performance
+        perf = np.mean(norm_disc_rets)
         episodes_so_far+=n_episodes
         timesteps_so_far+=sum(lens[-n_episodes:])
         
@@ -301,20 +308,50 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular("BatchSize", batch_size)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
         
-        #Optimization
-        iter_type = 1
-        with timed('offline optimization', verbose):
-            rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
-                                                normalize=normalize,
-                                                use_rmax=use_rmax,
-                                                use_renyi=use_renyi,
-                                                max_offline_ite=max_offline_iters,
-                                                max_search_ite=max_search_ite,
-                                                rmax=rmax,
-                                                delta=delta,
-                                                use_parabola=use_parabola,
-                                                verbose=verbose)
-            newpol.set_params(rho)
+        if adaptive_batch and complete and perf<promise and batch_size<5*n_episodes:
+            #The policy is rejected (unless batch size is already maximal)
+            iter_type = 0
+            if verbose: logger.log('Rejecting policy (expected at least %f, got %f instead)!\nIncreasing batch_size' % 
+                                   (promise, perf))
+            batch_size+=n_episodes #Increase batch size
+            newpol.set_params(old_rho) #Reset to last accepted policy
+            promise = -np.inf #No need to test last accepted policy
+            #Reuse old trajectories
+            actor_params = old_actor_params
+            rets = old_rets
+            disc_rets = old_disc_rets
+            lens = old_lens
+            if verbose: logger.log('Must collect more data (have %d/%d)' % (len(rets), batch_size))
+            complete = False
+        elif complete:
+            #The policy is accepted, optimization is performed
+            iter_type = 1
+            old_rho = rho #Save as last accepted policy (and its trajectories)
+            old_actor_params = actor_params
+            old_rets = rets
+            old_disc_rets = disc_rets
+            old_lens = lens
+            with timed('offline optimization', verbose):
+                rho, improvement = optimize_offline(pol, newpol, actor_params, norm_disc_rets,
+                                                    normalize=normalize,
+                                                    use_rmax=use_rmax,
+                                                    use_renyi=use_renyi,
+                                                    max_offline_ite=max_offline_iters,
+                                                    max_search_ite=max_search_ite,
+                                                    rmax=rmax,
+                                                    delta=delta,
+                                                    use_parabola=use_parabola,
+                                                    verbose=verbose)
+                newpol.set_params(rho)
+                #assert(improvement>=0.)
+                #Expected performance
+                promise = newpol.eval_bound(actor_params, norm_disc_rets, pol, rmax,
+                                                         normalize, use_rmax, use_renyi, delta)
+        else:
+            #The batch is incomplete, more data will be collected
+            iter_type = 2
+            if verbose: logger.log('Must collect more data (have %d/%d)' % (len(rets), batch_size))
+            newpol.set_params(rho) #Policy stays the same
             
         #Save data
         if save_weights:
@@ -369,3 +406,6 @@ def learn(env_maker, pol_maker, sampler,
         
         #Update behavioral
         pol.set_params(newpol.eval_params())
+        if complete:
+            #Start new batch
+            actor_params, rets, disc_rets, lens = [], [], [], []
