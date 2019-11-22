@@ -17,6 +17,7 @@ class PeMlpPolicy(object):
     def __init__(self, name, *args, **kwargs):
         with tf.variable_scope(name):
             self._init(*args, **kwargs)
+            self.name = name
             self.scope = tf.get_variable_scope().name
             U.initialize()
             #Sample initial actor params
@@ -24,7 +25,7 @@ class PeMlpPolicy(object):
 
     def _init(self, ob_space, ac_space, hid_layers=[],
               deterministic=True, diagonal=True,
-              use_bias=True, use_critic=False, 
+              use_bias=False, use_critic=False, 
               seed=None, verbose=True):
         """Params:
             ob_space: task observation space
@@ -42,8 +43,13 @@ class PeMlpPolicy(object):
         self.diagonal = diagonal
         self.use_bias = use_bias
         batch_length = None #Accepts a sequence of episodes of arbitrary length
+        self.observation_space = ob_space
+        self.action_space = ac_space
         self.ac_dim = ac_space.shape[0]
         self.ob_dim = ob_space.shape[0]
+        self.hid_layers = hid_layers
+        self.deterministic = deterministic
+        self.use_critic = use_critic
         self.linear = not hid_layers
         self.verbose = verbose
 
@@ -174,7 +180,7 @@ class PeMlpPolicy(object):
         self._get_score_norm = U.function([one_actor_param_in], [score_norm])
 
         #Batch off-policy PGPE
-        self._probs = tf.exp(logprobs) 
+        self._probs = tf.exp(logprobs)
         self._behavioral = None
         self._renyi_other = None
     
@@ -190,6 +196,17 @@ class PeMlpPolicy(object):
         self._fisher_diag = tf.concat([mean_fisher_diag, cov_fisher_diag], axis=0)
         self._get_fisher_diag = U.function([], [self._fisher_diag])
         
+    def make_another(self, name, seed=None, verbose=False):
+        return type(self)(name, self.observation_space, 
+                       self.action_space, 
+                       hid_layers=self.hid_layers,
+                       deterministic=self.deterministic, 
+                       diagonal=self.diagonal,
+                       use_bias=self.use_bias, 
+                       use_critic=self.use_critic, 
+                       seed=seed, 
+                       verbose=verbose)
+    
     #Black box usage
     def act(self, ob, resample=False):
         """
