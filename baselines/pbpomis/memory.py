@@ -7,21 +7,23 @@ Created on Fri Nov 22 10:36:50 2019
 """
 import numpy as np
 
-
 class Memory:
     """
     Storage of behavioral hyperpolicies with their samples.
     Behaving as a FIFO queue by default (implemented by a circular array)
     Currently supports only fixed batch size.
+    Builds a graph for each behavioral
     """
     def __init__(self, capacity=10, strategy='fifo'):
         self.capacity = capacity
 
         self.strategy = strategy
         
-        self.hpolicies = []
+        self.hpolicies = [None for _ in range(self.capacity)]
+        self.mask = np.zeros(self.capacity)
         self.params = None
         self.rets = None
+        self._built = False
         
         self._len = 0
         self._current = -1
@@ -32,14 +34,21 @@ class Memory:
     def isfull(self):
         return len(self) == self.capacity
     
-    def add_batch(self, target, params, rets):
+    def add_batch(self, behavioral, params, rets):
+        if not self._built:
+            self.build_policies(behavioral)
         if self.strategy == 'fifo':
-            self._add_batch_fifo(target, params, rets)
+            self._add_batch_fifo(behavioral, params, rets)
         else:
             raise NotImplementedError('only supports fifo strategy')
         
         assert len(self) <= self.capacity
-    
+        
+    def build_policies(self, template):
+        for k in range(self.capacity):
+            name = 'behavioral_' + str(k+1) + '_hyperpolicy'
+            self.hpolicies[k] = template.make_another(name)
+        
     def _add_batch_fifo(self, behavioral, params, rets):
         #compute next position in the circular array
         succ = (self._current + 1) % self.capacity
@@ -50,10 +59,6 @@ class Memory:
             self.rets[succ] = rets
         else:
             #lazy initialization
-            #build next behavioral
-            name = 'behavioral_' + str(succ+1) + '_hyperpolicy'
-            self.hpolicies.append(behavioral.make_another(name))
-            
             if not self:
                 #initialize data
                 self.params = np.expand_dims(params, axis=0)
@@ -67,9 +72,14 @@ class Memory:
                                             np.expand_dims(rets, axis=0)), 
                                            axis=0)    
                 
-        self.hpolicies[succ].set_params(behavioral.eval_params())    
+        #update hyperparameters    
+        self.hpolicies[succ].set_params(behavioral.eval_params())
+        self.mask[succ] = 1
+        
         self._len = min(self._len + 1, self.capacity)
         self._current = succ
+        
+        self._built = True
     
     def __getitem__(self, index):
         if index >= self._len:
@@ -99,7 +109,10 @@ if __name__ == '__main__':
     pol = PeMlpPolicy('test', sspace, aspace)
     n = 5
     
+    
     mem = Memory(3)
+    #mem.build_policies(pol)
+    
     for i in range(4):   
         params = np.concatenate([np.expand_dims(pol.resample(), axis=0) 
                                     for _ in range(n)], axis=0)
@@ -108,4 +121,5 @@ if __name__ == '__main__':
         for i, (pol, par, ret) in enumerate(mem):
             print('%s: %s %s' % (pol.scope, par[0,0],
                                 '*' if i==mem._current else ''))
+        print(mem.mask)
         print()

@@ -590,5 +590,60 @@ class PeMlpPolicy(object):
         self._get_bound = [U.function(inputs, [bounds[i]]) for i in range(len(bounds))]
         self._get_bound_grad = [U.function(inputs, [bounds[i], 
                                                     U.flatgrad(bounds[i], self._higher_params)]) for i in range(len(bounds))]
-    
+
+    def _build_miw_graph(self, memory, batch_size):
+        #preparation
+        if not memory._built:
+            memory.build_policies(template=self)
+        if self.verbose: print('Building mis graph')
+        self._memory_mask = tf.placeholder(name='mask', dtype=tf.float32, shape=[memory.capacity])
+        self._multi_params_in = U.get_placeholder(name='multi_actor_params_in',
+                                  dtype=tf.float32,
+                                  shape=[memory.capacity, batch_size, self._n_actor_weights]) #K * N * m
+        self._multi_rets_in = U.get_placeholder(name='multi_rets_in',
+                          dtype=tf.float32,
+                          shape=[memory.capacity, batch_size]) #K * N * m
+        
+        #self-normalized importance weights
+        behavioral_ps = tf.stack([behavioral.pd.logp(self._multi_params_in) for behavioral in memory.hpolicies]) #K * K * N
+        mask = tf.broadcast_to(self._memory_mask, behavioral_ps.shape)
+        behavioral_ps = behavioral_ps * mask
+        miw_dens = tf.reduce_sum(behavioral_ps, axis=0) / tf.reduce_sum(mask, axis=0) # K * N
+        miw_nums = self.pd.logp(self._multi_in) #K * N
+        unn_miws = miw_nums / miw_dens
+        miws = unn_miws / tf.reduce_sum(unn_miws, keepdims=True)
+        self._get_unn_miws = U.function([self._multi_in], [unn_miws])
+        self._get_miws = U.function([self._multi_in], [miws])
+        
+        #Offline performance
+        ret_mean = tf.reduce_sum(self._multi_rets_in * miws)
+        
+        self._get_multi_ret_mean = U.function([self._multi_rets_in, self._multi_params_in], [ret_mean])
+        ret_std = tf.sqrt(tf.reduce_sum(miws ** 2 * (self._multi_rets_in - ret_mean) ** 2) * batch_size)
+        self._get_multi_ret_std = U.function([self._multi_rets_in, self._multi_params_in], [ret_std])
+        
+        #Offline gradient
+        #multiple pgpe not yet implemented
+        
+        #Renyi
+        renyis = tf.stack([self.pd.renyi(behavioral.pd) for behavioral in memory.hpolicies]) #K
+        renyis = tf.cond(tf.is_nan(renyis), lambda: tf.constant(np.inf), lambda: renyis)
+        renyis = tf.cond(renyis<0., lambda: tf.constant(np.inf), lambda: renyis)
+        n_behaviorals = tf.reduce_sum(self._memory_mask)
+        exp_renyi_bound = n_behaviorals / tf.reduce_sum(tf.exp(-renyis))
+        self._get_renyi_bound = U.function([self._multi_params_in], [exp_renyi_bound])
+              
+        #Return properties
+        self._rmax = tf.placeholder(name='R_max', dtype=tf.float32, shape=[])
+        
+        #Penalization coefficient
+        self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
+        
+        #All the bounds
+        bound = ret_mean - self._ppf * tf.sqrt(exp_renyi_bound / tf.sqrt(batch_size * n_behaviorals))
+        
+        inputs = [self._multi_params_in, self._multi_rets_in, self._ppf, self._rmax]
+        self._get_bound = U.function(inputs, [bound]) 
+        self._get_bound_grad = U.function(inputs, [bound, 
+                                                    U.flatgrad(bound, self._higher_params)])
     
