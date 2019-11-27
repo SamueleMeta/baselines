@@ -44,16 +44,12 @@ def eval_trajectory(env, pol, gamma, horizon, feature_fun):
     return ret, disc_ret, t
 
 #binary search for offline step size
-def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad, 
-                normalize=True,
-                use_rmax=True,
-                use_renyi=True,
+def line_search_binary(target, memory, alpha, natgrad, 
                 max_search_ite=30, rmax=None, delta=0.2):
-    rho_init = newpol.eval_params()
+    rho_init = target.eval_params()
     low = 0.
     high = None
-    bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta)
+    bound_init = target.eval_bound_multi(memory, rmax, delta)
     rho_opt = rho_init
     i_opt = 0.
     delta_bound_opt = 0.
@@ -62,9 +58,8 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
     
     for i in range(max_search_ite):
         rho = rho_init + epsilon * natgrad * alpha
-        newpol.set_params(rho)
-        bound = newpol.eval_bound(actor_params, rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta)
+        target.set_params(rho)
+        bound = target.eval_bound_multi(memory, rmax, delta)
         delta_bound = bound - bound_init        
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -88,27 +83,22 @@ def line_search_binary(pol, newpol, actor_params, rets, alpha, natgrad,
     return rho_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
 #parabolic search for offline step size
-def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad, 
-                normalize=True,
-                use_rmax=True,
-                use_renyi=True,
+def line_search_parabola(target, memory, alpha, natgrad, 
                 max_search_ite=30, rmax=None, delta=0.2):
     epsilon = 1.
     epsilon_old = 0.
     max_increase=2. 
     delta_bound_tol=1e-4
     delta_bound_old = -np.inf
-    bound_init = newpol.eval_bound(actor_params, rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta)
-    rho_old = rho_init = newpol.eval_params()
+    bound_init = target.eval_bound_multi(memory, rmax, delta)
+    rho_old = rho_init = target.eval_params()
 
     for i in range(max_search_ite):
 
         rho = rho_init + epsilon * alpha * natgrad
-        newpol.set_params(rho)
+        target.set_params(rho)
 
-        bound = newpol.eval_bound(actor_params, rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta)
+        bound = target.eval_bound(memory, rmax, delta)
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -135,14 +125,11 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
     return rho_old, epsilon_old, delta_bound_old, i+1
 
 #offline optimizer
-def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
-                     normalize=True, 
-                     use_rmax=True,
-                     use_renyi=True,
+def optimize_offline(target, memory, grad_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, 
                      max_search_ite=30,
                      rmax=None, delta=0.2, use_parabola=False, verbose=True):
     improvement = 0.
-    rho = pol.eval_params()
+    rho = target.eval_params()
     
     
     fmtstr = "%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g"
@@ -154,11 +141,11 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
     
     for i in range(max_offline_ite):
         #Candidate policy
-        newpol.set_params(rho)
+        target.set_params(rho)
         
         #Bound with gradient
-        bound, grad = newpol.eval_bound_and_grad(actor_params, rets, pol, rmax,
-                                                         normalize, use_rmax, use_renyi, delta)
+        bound, grad = target.eval_bound_and_grad_multi(memory, rmax, delta)
+        
         if np.any(np.isnan(grad)):
             warnings.warn('Got NaN gradient! Stopping!')
             return rho, improvement
@@ -168,8 +155,8 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
 
             
         #Natural gradient
-        if newpol.diagonal: 
-            natgrad = grad/(newpol.eval_fisher() + 1e-24)
+        if target.diagonal: 
+            natgrad = grad/(target.eval_fisher() + 1e-24)
         else:
             raise NotImplementedError
 
@@ -182,19 +169,14 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
         #Step size search
         alpha = 1. / grad_norm ** 2
         line_search = line_search_parabola if use_parabola else line_search_binary
-        rho, epsilon, delta_bound, num_line_search = line_search(pol, 
-                                                                 newpol, 
-                                                                 actor_params, 
-                                                                 rets, 
+        rho, epsilon, delta_bound, num_line_search = line_search(target, 
+                                                                 memory, 
                                                                  alpha, 
                                                                  natgrad, 
-                                                                 normalize=normalize,
-                                                                 use_rmax=use_rmax,
-                                                                 use_renyi=use_renyi,
-                                                                 max_search_ite=max_search_ite,
-                                                                 rmax=rmax,
-                                                                 delta=delta)
-        newpol.set_params(rho)
+                                                                 max_search_ite, 
+                                                                 rmax, 
+                                                                 delta=0.2)
+        target.set_params(rho)
         improvement+=delta_bound
         if verbose: print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, grad_norm, delta_bound, improvement))
         if delta_bound < bound_tol:
@@ -209,8 +191,7 @@ def optimize_offline(pol, newpol, actor_params, rets, grad_tol=1e-4, bound_tol=1
 def learn(env_maker, pol_maker, sampler,
           gamma, n_episodes, horizon, max_iters, 
           feature_fun=None, 
-          iw_norm='sn',
-          bound='max-d2',
+          iw_norm='rows',
           max_offline_iters=10, 
           max_search_ite=30,
           verbose=True, 
@@ -221,32 +202,19 @@ def learn(env_maker, pol_maker, sampler,
           capacity=10):
     
     #initialization
-    env = env_maker()
-    target = pol_maker('target', env.observation_space, env.action_space)
-    behavioral = pol_maker('behavioral', env.observation_space, env.action_space)
-    memory = Memory(capacity)
-    batch_size = n_episodes
-    normalize = True if iw_norm=='sn' else False
-    episodes_so_far = 0
-    timesteps_so_far = 0
-    tstart = time.time()
-    
-    #select penalty
-    if bound == 'std-d2':
-        use_rmax = False
-        use_renyi = True
-    elif bound == 'max-d2':
-        use_rmax = True
-        use_renyi = True
-    elif bound == 'max-ess':
-        use_rmax = True
-        use_renyi = False
-    elif bound == 'std-ess':
-        use_rmax = False
-        use_renyi = False
-    else: 
-        raise ValueError('unknown bound %s' % bound)
-        
+    with timed('P-POMIS\n\nCompiling', verbose):
+        env = env_maker()
+        target = pol_maker('target', env.observation_space, env.action_space)
+        behavioral = pol_maker('behavioral', env.observation_space, env.action_space)
+        memory = Memory(capacity)
+        memory.build_policies(template=behavioral)
+        batch_size = n_episodes
+        target.build_miw_graph(memory, batch_size, iw_norm)
+        episodes_so_far = 0
+        timesteps_so_far = 0
+        tstart = time.time()
+        if iw_norm == 'sn': iw_norm = 'rows'
+            
     #select step strategy
     if line_search_type == 'parabola':
         use_parabola = True
@@ -296,8 +264,7 @@ def learn(env_maker, pol_maker, sampler,
         with timed('summaries before'):
             logger.log("Performance (plain, undiscounted): ", np.mean(rets[-n_episodes:]))
             logger.record_tabular("Iteration", it)
-            logger.record_tabular("InitialBound", eval_bound(target, memory, rmax,
-                                                         normalize, use_rmax, use_renyi, delta))
+            logger.record_tabular("InitialBound", target.eval_bound_multi(memory, rmax, delta))
             logger.record_tabular("EpLenMean", np.mean(lens[-n_episodes:]))
             logger.record_tabular("EpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
             logger.record_tabular("UndEpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
@@ -311,9 +278,6 @@ def learn(env_maker, pol_maker, sampler,
         iter_type = 1
         with timed('offline optimization', verbose):
             rho, improvement = optimize_offline(memory, target,
-                                                normalize=normalize,
-                                                use_rmax=use_rmax,
-                                                use_renyi=use_renyi,
                                                 max_offline_ite=max_offline_iters,
                                                 max_search_ite=max_search_ite,
                                                 rmax=rmax,
@@ -327,12 +291,12 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('Weights', str(w_to_save))
         
         with timed('summaries after'):
-            unn_iws = eval_iws(target, memory, normalize=False)
-            iws = unn_iws/np.sum(unn_iws)
+            unn_iws = target.eval_miws(memory, normalize=False)
+            iws = target.eval_miws(memory, normalize=True)
             ess = np.linalg.norm(unn_iws, 1) ** 2 / np.linalg.norm(unn_iws, 2) ** 2
-            J, varJ = eval_performance(target, memory)
-            renyi = eval_renyi(target, memory)
-            bound = eval_bound(target, memory, rmax, normalize, use_rmax, use_renyi, delta)
+            J, varJ = target.eval_performance_multi(memory)
+            renyi_bound = target.eval_renyi_bound(memory)
+            bound = target.eval_bound_multi(memory, rmax, delta)
             
             #Data regarding the whole batch
             logger.record_tabular('BatchSize', batch_size)
@@ -357,7 +321,7 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('PlainReturnStd', np.std(rets))
             logger.record_tabular('PlainReturnMin', np.min(rets))
             #Iws
-            logger.record_tabular('D2', renyi)
+            logger.record_tabular('D2Bound', renyi_bound)
             logger.record_tabular('ReturnMeanIw', J)
             logger.record_tabular('MaxIWNorm', np.max(iws))
             logger.record_tabular('MinIWNorm', np.min(iws))
@@ -368,7 +332,6 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('MeanIW', np.mean(unn_iws))
             logger.record_tabular('StdIW', np.std(unn_iws))
             logger.record_tabular('ESSClassic', ess)
-            logger.record_tabular('ESSRenyi', batch_size/np.exp(renyi))
                     
         logger.dump_tabular()
         

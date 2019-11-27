@@ -196,6 +196,9 @@ class PeMlpPolicy(object):
         self._fisher_diag = tf.concat([mean_fisher_diag, cov_fisher_diag], axis=0)
         self._get_fisher_diag = U.function([], [self._fisher_diag])
         
+        #Multiple importance sampling
+        self._memory = None
+        
     def make_another(self, name, seed=None, verbose=False):
         return type(self)(name, self.observation_space, 
                        self.action_space, 
@@ -591,8 +594,10 @@ class PeMlpPolicy(object):
         self._get_bound_grad = [U.function(inputs, [bounds[i], 
                                                     U.flatgrad(bounds[i], self._higher_params)]) for i in range(len(bounds))]
 
-    def _build_miw_graph(self, memory, batch_size):
+    #differntly from the iw case, this function must be called explicitly
+    def build_miw_graph(self, memory, batch_size, normalize='rows'):
         #preparation
+        self._memory = memory
         if not memory._built:
             memory.build_policies(template=self)
         if self.verbose: print('Building mis graph')
@@ -611,14 +616,22 @@ class PeMlpPolicy(object):
         miw_dens = tf.reduce_sum(behavioral_ps, axis=0) / tf.reduce_sum(mask, axis=0) # K * N
         miw_nums = self.pd.logp(self._multi_in) #K * N
         unn_miws = miw_nums / miw_dens
-        miws = unn_miws / tf.reduce_sum(unn_miws, keepdims=True)
+        if normalize == 'all':
+            miws = unn_miws / tf.reduce_sum(unn_miws, keepdims=True)
+        elif normalize == 'rows':
+            miws = unn_miws / tf.reduce_sum(unn_miws, axis=1, keepdims=True)
+        elif normalize == 'none':
+            miws = unn_miws
+        else:
+            raise ValueError('unknown normalization strategy')
         self._get_unn_miws = U.function([self._multi_in], [unn_miws])
         self._get_miws = U.function([self._multi_in], [miws])
         
         #Offline performance
         ret_mean = tf.reduce_sum(self._multi_rets_in * miws)
+        unn_ret_mean = tf.reduce_sum(self._multi_rets_in * unn_miws)
         
-        self._get_multi_ret_mean = U.function([self._multi_rets_in, self._multi_params_in], [ret_mean])
+        self._get_multi_ret_mean = U.function([self._multi_rets_in, self._multi_params_in], [unn_ret_mean])
         ret_std = tf.sqrt(tf.reduce_sum(miws ** 2 * (self._multi_rets_in - ret_mean) ** 2) * batch_size)
         self._get_multi_ret_std = U.function([self._multi_rets_in, self._multi_params_in], [ret_std])
         
@@ -643,7 +656,31 @@ class PeMlpPolicy(object):
         bound = ret_mean - self._ppf * tf.sqrt(exp_renyi_bound / tf.sqrt(batch_size * n_behaviorals))
         
         inputs = [self._multi_params_in, self._multi_rets_in, self._ppf, self._rmax]
-        self._get_bound = U.function(inputs, [bound]) 
-        self._get_bound_grad = U.function(inputs, [bound, 
+        self._get_bound_multi = U.function(inputs, [bound]) 
+        self._get_bound_grad_multi = U.function(inputs, [bound, 
                                                     U.flatgrad(bound, self._higher_params)])
+
+    def eval_bound_multi(self, memory, rmax, delta):
+        assert self._memory is not None
+        ppf = np.sqrt(1./delta - 1)
+        
+        return self._get_bound_multi(memory.params, memory.rets, ppf, rmax)[0]
     
+    def eval_miws(self, memory, normalize=True):
+        assert self._memory is not None
+        if normalize:
+            return self._get_miws(memory.params)[0]
+        else:
+            return self._get_unn_miws(memory.params)[0]
+        
+    def eval_performance_multi(self, memory):
+        assert self._memory is not None
+        return self._get_multi_ret_mean(memory.rets, memory.params)[0], self._get_multi_ret_std(memory.rets, memory.params)[0]
+    
+    def eval_renyi_bound(self, memory):
+        return self._get_renyi_bound(memory.params)[0]
+    
+    def eval_bound_and_grad_multi(self, memory, rmax, delta):
+        ppf = np.sqrt(1./delta - 1)
+        
+        return self._get_bound_grad_multi(memory.params, memory.rets, ppf, rmax)
