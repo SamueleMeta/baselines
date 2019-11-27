@@ -91,7 +91,8 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, delta, gamma, seed, po
                       use_bias=use_bias,
                       seed=seed)
 
-    sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
+    #sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
+    sampler = None
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -130,7 +131,7 @@ def main():
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--experiment_name', type=str, default='none')
     parser.add_argument('--env', type=str, default='rllab.cartpole')
-    parser.add_argument('--batchsize', type=int, default=100)
+    parser.add_argument('--batchsize', type=int, default=10)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_norm', type=str, default='rows')
     parser.add_argument('--file_name', type=str, default='progress')

@@ -611,10 +611,10 @@ class PeMlpPolicy(object):
         
         #self-normalized importance weights
         behavioral_ps = tf.stack([behavioral.pd.logp(self._multi_params_in) for behavioral in memory.hpolicies]) #K * K * N
-        mask = tf.broadcast_to(self._memory_mask, behavioral_ps.shape)
+        mask = tf.reshape(self._memory_mask, [behavioral_ps.shape[0],1,1]) #check!
         behavioral_ps = behavioral_ps * mask
         miw_dens = tf.reduce_sum(behavioral_ps, axis=0) / tf.reduce_sum(mask, axis=0) # K * N
-        miw_nums = self.pd.logp(self._multi_in) #K * N
+        miw_nums = self.pd.logp(self._multi_params_in) #K * N
         unn_miws = miw_nums / miw_dens
         if normalize == 'all':
             miws = unn_miws / tf.reduce_sum(unn_miws, keepdims=True)
@@ -624,27 +624,27 @@ class PeMlpPolicy(object):
             miws = unn_miws
         else:
             raise ValueError('unknown normalization strategy')
-        self._get_unn_miws = U.function([self._multi_in], [unn_miws])
-        self._get_miws = U.function([self._multi_in], [miws])
+        self._get_unn_miws = U.function([self._multi_params_in, self._memory_mask], [unn_miws])
+        self._get_miws = U.function([self._multi_params_in, self._memory_mask], [miws])
         
         #Offline performance
         ret_mean = tf.reduce_sum(self._multi_rets_in * miws)
         unn_ret_mean = tf.reduce_sum(self._multi_rets_in * unn_miws)
         
-        self._get_multi_ret_mean = U.function([self._multi_rets_in, self._multi_params_in], [unn_ret_mean])
+        self._get_multi_ret_mean = U.function([self._multi_rets_in, self._multi_params_in, self._memory_mask], [unn_ret_mean])
         ret_std = tf.sqrt(tf.reduce_sum(miws ** 2 * (self._multi_rets_in - ret_mean) ** 2) * batch_size)
-        self._get_multi_ret_std = U.function([self._multi_rets_in, self._multi_params_in], [ret_std])
+        self._get_multi_ret_std = U.function([self._multi_rets_in, self._multi_params_in, self._memory_mask], [ret_std])
         
         #Offline gradient
         #multiple pgpe not yet implemented
         
         #Renyi
         renyis = tf.stack([self.pd.renyi(behavioral.pd) for behavioral in memory.hpolicies]) #K
-        renyis = tf.cond(tf.is_nan(renyis), lambda: tf.constant(np.inf), lambda: renyis)
-        renyis = tf.cond(renyis<0., lambda: tf.constant(np.inf), lambda: renyis)
+        renyis = tf.where(tf.is_nan(renyis), tf.constant(np.inf, shape=renyis.shape), renyis)
+        renyis = tf.where(renyis<0., tf.constant(np.inf, shape=renyis.shape), renyis)
         n_behaviorals = tf.reduce_sum(self._memory_mask)
         exp_renyi_bound = n_behaviorals / tf.reduce_sum(tf.exp(-renyis))
-        self._get_renyi_bound = U.function([self._multi_params_in], [exp_renyi_bound])
+        self._get_renyi_bound = U.function([self._multi_params_in, self._memory_mask], [exp_renyi_bound])
               
         #Return properties
         self._rmax = tf.placeholder(name='R_max', dtype=tf.float32, shape=[])
@@ -655,7 +655,7 @@ class PeMlpPolicy(object):
         #All the bounds
         bound = ret_mean - self._ppf * tf.sqrt(exp_renyi_bound / tf.sqrt(batch_size * n_behaviorals))
         
-        inputs = [self._multi_params_in, self._multi_rets_in, self._ppf, self._rmax]
+        inputs = [self._multi_params_in, self._multi_rets_in, self._ppf, self._rmax, self._memory_mask]
         self._get_bound_multi = U.function(inputs, [bound]) 
         self._get_bound_grad_multi = U.function(inputs, [bound, 
                                                     U.flatgrad(bound, self._higher_params)])
@@ -664,23 +664,23 @@ class PeMlpPolicy(object):
         assert self._memory is not None
         ppf = np.sqrt(1./delta - 1)
         
-        return self._get_bound_multi(memory.params, memory.rets, ppf, rmax)[0]
+        return self._get_bound_multi(memory.params, memory.rets, ppf, rmax, memory.mask)[0]
     
     def eval_miws(self, memory, normalize=True):
         assert self._memory is not None
         if normalize:
-            return self._get_miws(memory.params)[0]
+            return self._get_miws(memory.params, memory.mask)[0]
         else:
-            return self._get_unn_miws(memory.params)[0]
+            return self._get_unn_miws(memory.params, memory.mask)[0]
         
     def eval_performance_multi(self, memory):
         assert self._memory is not None
-        return self._get_multi_ret_mean(memory.rets, memory.params)[0], self._get_multi_ret_std(memory.rets, memory.params)[0]
+        return self._get_multi_ret_mean(memory.rets, memory.params, memory.mask)[0], self._get_multi_ret_std(memory.rets, memory.params, memory.mask)[0]
     
     def eval_renyi_bound(self, memory):
-        return self._get_renyi_bound(memory.params)[0]
+        return self._get_renyi_bound(memory.params, memory.mask)[0]
     
     def eval_bound_and_grad_multi(self, memory, rmax, delta):
         ppf = np.sqrt(1./delta - 1)
         
-        return self._get_bound_grad_multi(memory.params, memory.rets, ppf, rmax)
+        return self._get_bound_grad_multi(memory.params, memory.rets, ppf, rmax, memory.mask)

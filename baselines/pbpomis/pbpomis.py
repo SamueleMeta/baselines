@@ -98,7 +98,7 @@ def line_search_parabola(target, memory, alpha, natgrad,
         rho = rho_init + epsilon * alpha * natgrad
         target.set_params(rho)
 
-        bound = target.eval_bound(memory, rmax, delta)
+        bound = target.eval_bound_multi(memory, rmax, delta)
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -236,9 +236,8 @@ def learn(env_maker, pol_maker, sampler,
         with timed('Sampling', verbose):
             if sampler:
                 seg = sampler.collect(rho)
-                seg = sampler.collect(rho)
                 lens, rets, disc_rets, actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
-            else:
+            else:   
                 frozen_pol = behavioral.freeze()
                 actor_params, rets, disc_rets, lens = [], [], [], []
                 for ep in range(n_episodes):
@@ -277,7 +276,7 @@ def learn(env_maker, pol_maker, sampler,
         #Optimization
         iter_type = 1
         with timed('offline optimization', verbose):
-            rho, improvement = optimize_offline(memory, target,
+            rho, improvement = optimize_offline(target, memory,
                                                 max_offline_ite=max_offline_iters,
                                                 max_search_ite=max_search_ite,
                                                 rmax=rmax,

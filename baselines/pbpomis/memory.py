@@ -48,29 +48,24 @@ class Memory:
         for k in range(self.capacity):
             name = 'behavioral_' + str(k+1) + '_hyperpolicy'
             self.hpolicies[k] = template.make_another(name)
+            
+        self._built = True
         
     def _add_batch_fifo(self, behavioral, params, rets):
         #compute next position in the circular array
         succ = (self._current + 1) % self.capacity
         
-        if self.isfull():
-            #overwrite oldest data
-            self.params[succ] = params
-            self.rets[succ] = rets
+        #lazy initialization
+        if not self:
+            #initialize data
+            params = np.array(params)
+            self.params = np.broadcast_to(params, (self.capacity,) + params.shape).copy()
+            rets = np.array(rets)
+            self.rets = np.broadcast_to(rets, (self.capacity,) + rets.shape).copy()
         else:
-            #lazy initialization
-            if not self:
-                #initialize data
-                self.params = np.expand_dims(params, axis=0)
-                self.rets = np.expand_dims(rets, axis=0)
-            else:
-                #expand data
-                self.params = np.concatenate((self.params,
-                                              np.expand_dims(params, axis=0)), 
-                                             axis=0)
-                self.rets = np.concatenate((self.rets, 
-                                            np.expand_dims(rets, axis=0)), 
-                                           axis=0)    
+            #expand data
+            self.params[succ] = params
+            self.rets[succ] = rets  
                 
         #update hyperparameters    
         self.hpolicies[succ].set_params(behavioral.eval_params())
@@ -78,8 +73,6 @@ class Memory:
         
         self._len = min(self._len + 1, self.capacity)
         self._current = succ
-        
-        self._built = True
     
     def __getitem__(self, index):
         if index >= self._len:
