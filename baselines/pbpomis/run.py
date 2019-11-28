@@ -131,7 +131,7 @@ def main():
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--experiment_name', type=str, default='none')
     parser.add_argument('--env', type=str, default='rllab.cartpole')
-    parser.add_argument('--batchsize', type=int, default=10)
+    parser.add_argument('--batchsize', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_norm', type=str, default='rows')
     parser.add_argument('--file_name', type=str, default='progress')
@@ -145,7 +145,7 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
-    parser.add_argument('--capacity', type=int, default=5)
+    parser.add_argument('--capacity', type=int, default=10)
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_norm=%s_%s' % (args.env.upper(), args.delta, args.seed, args.iw_norm, time.time())

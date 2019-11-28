@@ -92,7 +92,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
                       use_bias=use_bias,
                       seed=seed)
 
-    sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
+    sampler = None#ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -123,14 +123,14 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
           center_return=center,
           line_search_type='parabola')
 
-    sampler.close()
+    #sampler.close()
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--experiment_name', type=str, default='none')
-    parser.add_argument('--env', type=str, default='cartpole')
+    parser.add_argument('--env', type=str, default='rllab.cartpole')
     parser.add_argument('--batchsize', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_norm', type=str, default='sn')
@@ -140,10 +140,10 @@ def main():
     parser.add_argument('--aggregate', type=str, default='none')
     parser.add_argument('--center', type=bool, default=False)
     parser.add_argument('--use_bias', type=int, default=0)
-    parser.add_argument('--delta', type=float, default=0.99)
-    parser.add_argument('--njobs', type=int,     default=-1)
+    parser.add_argument('--delta', type=float, default=0.4)
+    parser.add_argument('--njobs', type=int,     default=1)
     parser.add_argument('--policy', type=str, default='linear')
-    parser.add_argument('--max_offline_iters', type=int, default=100)
+    parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
     args = parser.parse_args()

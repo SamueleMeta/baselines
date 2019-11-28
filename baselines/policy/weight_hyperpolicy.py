@@ -26,7 +26,7 @@ class PeMlpPolicy(object):
     def _init(self, ob_space, ac_space, hid_layers=[],
               deterministic=True, diagonal=True,
               use_bias=False, use_critic=False, 
-              seed=None, verbose=True):
+              seed=None, verbose=True, zero_init=False):
         """Params:
             ob_space: task observation space
             ac_space : task action space
@@ -73,12 +73,12 @@ class PeMlpPolicy(object):
                 #Mlp feature extraction
                 last_out = tf.nn.tanh(tf.layers.dense(last_out, hid_size,
                                                       name='fc%i'%(i+1),
-                                                      kernel_initializer=U.normc_initializer(1),use_bias=use_bias))
+                                                      kernel_initializer=tf.initializers.constant(0.),use_bias=use_bias))
             if deterministic and isinstance(ac_space, gym.spaces.Box):
                 #Determinisitc action selection
                 self.actor_mean = actor_mean = tf.layers.dense(last_out, ac_space.shape[0],
                                        name='action',
-                                       kernel_initializer=U.normc_initializer(0.01),
+                                       kernel_initializer=tf.initializers.constant(0.),
                                        use_bias=use_bias)
             else: 
                 raise NotImplementedError #Currently supports only deterministic action policies
@@ -92,9 +92,13 @@ class PeMlpPolicy(object):
             self._n_actor_weights = n_actor_weights = self.flat_actor_weights.shape[0]
 
         with tf.variable_scope('higher'):
+            if zero_init:
+                higher_mean_init = tf.where(tf.not_equal(self.flat_actor_weights, tf.constant(0, dtype=tf.float32)),
+                            tf.zeros(shape=[n_actor_weights.value]), tf.zeros(shape=[n_actor_weights]))
+            else:
             #Initial means sampled from a normal distribution N(0,1)
-            higher_mean_init = tf.where(tf.not_equal(self.flat_actor_weights, tf.constant(0, dtype=tf.float32)),
-                        tf.random_normal(shape=[n_actor_weights.value], stddev=0.01), tf.zeros(shape=[n_actor_weights]))
+                higher_mean_init = tf.where(tf.not_equal(self.flat_actor_weights, tf.constant(0, dtype=tf.float32)),
+                            tf.random_normal(shape=[n_actor_weights.value], stddev=0.01), tf.zeros(shape=[n_actor_weights]))
             self.higher_mean = higher_mean = tf.get_variable(name='higher_mean',
                                                initializer=higher_mean_init)
             
@@ -208,7 +212,8 @@ class PeMlpPolicy(object):
                        use_bias=self.use_bias, 
                        use_critic=self.use_critic, 
                        seed=seed, 
-                       verbose=verbose)
+                       verbose=verbose,
+                       zero_init=True)
     
     #Black box usage
     def act(self, ob, resample=False):
@@ -628,7 +633,8 @@ class PeMlpPolicy(object):
         self._get_miws = U.function([self._multi_params_in, self._memory_mask], [miws])
         
         #Offline performance
-        ret_mean = tf.reduce_sum(self._multi_rets_in * miws)
+        mask = tf.reshape(self._memory_mask, [miws.shape[0],1])
+        ret_mean = tf.reduce_sum(self._multi_rets_in * miws * mask)
         unn_ret_mean = tf.reduce_sum(self._multi_rets_in * unn_miws)
         
         self._get_multi_ret_mean = U.function([self._multi_rets_in, self._multi_params_in, self._memory_mask], [unn_ret_mean])
@@ -643,7 +649,7 @@ class PeMlpPolicy(object):
         renyis = tf.where(tf.is_nan(renyis), tf.constant(np.inf, shape=renyis.shape), renyis)
         renyis = tf.where(renyis<0., tf.constant(np.inf, shape=renyis.shape), renyis)
         n_behaviorals = tf.reduce_sum(self._memory_mask)
-        exp_renyi_bound = n_behaviorals / tf.reduce_sum(tf.exp(-renyis))
+        exp_renyi_bound = n_behaviorals / tf.reduce_sum(tf.exp(-renyis) * self._memory_mask)
         self._get_renyi_bound = U.function([self._multi_params_in, self._memory_mask], [exp_renyi_bound])
               
         #Return properties
@@ -652,7 +658,7 @@ class PeMlpPolicy(object):
         #Penalization coefficient
         self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
         
-        #All the bounds
+        #Bound
         bound = ret_mean - self._ppf * tf.sqrt(exp_renyi_bound / tf.sqrt(batch_size * n_behaviorals))
         
         inputs = [self._multi_params_in, self._multi_rets_in, self._ppf, self._rmax, self._memory_mask]

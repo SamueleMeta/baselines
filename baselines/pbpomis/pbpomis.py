@@ -203,9 +203,11 @@ def learn(env_maker, pol_maker, sampler,
     
     #initialization
     with timed('P-POMIS\n\nCompiling', verbose):
+        if iw_norm == 'sn': iw_norm = 'rows'
         env = env_maker()
-        target = pol_maker('target', env.observation_space, env.action_space)
         behavioral = pol_maker('behavioral', env.observation_space, env.action_space)
+        target = pol_maker('target', env.observation_space, env.action_space)
+        target.set_params(behavioral.eval_params())
         memory = Memory(capacity)
         memory.build_policies(template=behavioral)
         batch_size = n_episodes
@@ -213,7 +215,6 @@ def learn(env_maker, pol_maker, sampler,
         episodes_so_far = 0
         timesteps_so_far = 0
         tstart = time.time()
-        if iw_norm == 'sn': iw_norm = 'rows'
             
     #select step strategy
     if line_search_type == 'parabola':
@@ -255,18 +256,18 @@ def learn(env_maker, pol_maker, sampler,
         rmax = np.max(abs(norm_disc_rets))
         
         #update memory (current policy is also most recent proposal)
-        memory.add_batch(target, actor_params, norm_disc_rets)
+        memory.add_batch(behavioral, actor_params, norm_disc_rets)
         
         #log data of the episodes collected in this iteration
         episodes_so_far+=n_episodes
         timesteps_so_far+=sum(lens[-n_episodes:])
         with timed('summaries before'):
-            logger.log("Performance (plain, undiscounted): ", np.mean(rets[-n_episodes:]))
+            logger.log("Performance (plain, undiscounted): ", np.mean(rets))
             logger.record_tabular("Iteration", it)
             logger.record_tabular("InitialBound", target.eval_bound_multi(memory, rmax, delta))
-            logger.record_tabular("EpLenMean", np.mean(lens[-n_episodes:]))
-            logger.record_tabular("EpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
-            logger.record_tabular("UndEpRewMean", np.mean(norm_disc_rets[-n_episodes:]))
+            logger.record_tabular("EpLenMean", np.mean(lens))
+            logger.record_tabular("EpRewMean", np.mean(norm_disc_rets))
+            logger.record_tabular("UndEpRewMean", np.mean(norm_disc_rets))
             logger.record_tabular("EpThisIter", n_episodes)
             logger.record_tabular("EpisodesSoFar", episodes_so_far)
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
@@ -276,6 +277,7 @@ def learn(env_maker, pol_maker, sampler,
         #Optimization
         iter_type = 1
         with timed('offline optimization', verbose):
+            print(memory)
             rho, improvement = optimize_offline(target, memory,
                                                 max_offline_ite=max_offline_iters,
                                                 max_search_ite=max_search_ite,

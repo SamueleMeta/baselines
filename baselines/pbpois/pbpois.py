@@ -221,6 +221,7 @@ def learn(env_maker, pol_maker, sampler,
     #Initialization
     env = env_maker()
     pol = pol_maker('pol', env.observation_space, env.action_space)
+    print(pol.draw_actor_params())
     newpol = pol_maker('newpol', env.observation_space, env.action_space)
     newpol.set_params(pol.eval_params())
     batch_size = n_episodes
@@ -228,7 +229,7 @@ def learn(env_maker, pol_maker, sampler,
     episodes_so_far = 0
     timesteps_so_far = 0
     tstart = time.time()
-    
+        
     if bound == 'std-d2':
         use_rmax = False
         use_renyi = True
@@ -264,7 +265,6 @@ def learn(env_maker, pol_maker, sampler,
         with timed('Sampling', verbose):
             if sampler:
                 seg = sampler.collect(rho)
-                seg = sampler.collect(rho)
                 lens, rets, disc_rets, actor_params = seg['lens'], seg['rets'], seg['disc_rets'], seg['actor_params']
             else:
                 frozen_pol = pol.freeze()
@@ -284,7 +284,7 @@ def learn(env_maker, pol_maker, sampler,
         rmax = np.max(abs(norm_disc_rets))
         #Estimate online performance
         episodes_so_far+=n_episodes
-        timesteps_so_far+=sum(lens[-n_episodes:])
+        timesteps_so_far+=sum(lens)
         
         with timed('summaries before'):
             logger.log("Performance (plain, undiscounted): ", np.mean(rets[-n_episodes:]))
