@@ -146,6 +146,7 @@ def main():
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
+    parser.add_argument('--capacity', type=float, default=1) #dummy
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_norm=%s_%s' % (args.env.upper(), args.delta, args.seed, args.iw_norm, time.time())

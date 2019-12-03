@@ -108,6 +108,7 @@ def line_search_parabola(pol, newpol, actor_params, rets, alpha, natgrad,
 
         bound = newpol.eval_bound(actor_params, rets, pol, rmax,
                                                          normalize, use_rmax, use_renyi, delta)
+        
 
         if np.isnan(bound):
             warnings.warn('Got NaN bound value: rolling back!')
@@ -285,7 +286,7 @@ def learn(env_maker, pol_maker, sampler,
         #Estimate online performance
         episodes_so_far+=n_episodes
         timesteps_so_far+=sum(lens)
-        
+                        
         with timed('summaries before'):
             logger.log("Performance (plain, undiscounted): ", np.mean(rets[-n_episodes:]))
             #Data regarding the episodes collected in this iteration
@@ -300,7 +301,7 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("BatchSize", batch_size)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
-        
+
         #Optimization
         iter_type = 1
         with timed('offline optimization', verbose):

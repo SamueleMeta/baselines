@@ -588,7 +588,7 @@ class PeMlpPolicy(object):
         bounds.append(unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #000
         bounds.append(unn_ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #001
         bounds.append(unn_ret_mean - self._ppf * self._rmax * iws2norm) #010
-        bounds.append(unn_ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #011
+        bounds.append(unn_ret_mean - self._ppf * self._rmax * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #011 <- THE ONE
         bounds.append(ret_mean - self._ppf * tf.sqrt(on_ret_var) * iws2norm) #100
         bounds.append(ret_mean - self._ppf * tf.sqrt(on_ret_var) * tf.exp(0.5*renyi)/tf.sqrt(batch_size)) #101
         bounds.append(ret_mean - self._ppf * self._rmax * iws2norm) #110
@@ -613,13 +613,14 @@ class PeMlpPolicy(object):
         self._multi_rets_in = U.get_placeholder(name='multi_rets_in',
                           dtype=tf.float32,
                           shape=[memory.capacity, batch_size]) #K * N * m
+        n_behaviorals = tf.reduce_sum(self._memory_mask)
         
         #self-normalized importance weights
-        behavioral_ps = tf.stack([behavioral.pd.logp(self._multi_params_in) for behavioral in memory.hpolicies]) #K * K * N
+        behavioral_ps = tf.stack([tf.exp(behavioral.pd.logp(self._multi_params_in)) for behavioral in memory.hpolicies]) #K * K * N
         mask = tf.reshape(self._memory_mask, [behavioral_ps.shape[0],1,1]) #check!
         behavioral_ps = behavioral_ps * mask
         miw_dens = tf.reduce_sum(behavioral_ps, axis=0) / tf.reduce_sum(mask, axis=0) # K * N
-        miw_nums = self.pd.logp(self._multi_params_in) #K * N
+        miw_nums = tf.exp(self.pd.logp(self._multi_params_in)) #K * N
         unn_miws = miw_nums / miw_dens
         if normalize == 'all':
             miws = unn_miws / tf.reduce_sum(unn_miws, keepdims=True)
@@ -634,10 +635,15 @@ class PeMlpPolicy(object):
         
         #Offline performance
         mask = tf.reshape(self._memory_mask, [miws.shape[0],1])
-        ret_mean = tf.reduce_sum(self._multi_rets_in * miws * mask)
         unn_ret_mean = tf.reduce_sum(self._multi_rets_in * unn_miws)
+        if normalize == 'all':
+            ret_mean = tf.reduce_sum(self._multi_rets_in * miws * mask)
+        elif normalize == 'rows':
+            ret_mean = tf.reduce_sum(self._multi_rets_in * miws * mask) / n_behaviorals
+        else: 
+            ret_mean = unn_ret_mean
         
-        self._get_multi_ret_mean = U.function([self._multi_rets_in, self._multi_params_in, self._memory_mask], [unn_ret_mean])
+        self._get_multi_ret_mean = U.function([self._multi_rets_in, self._multi_params_in, self._memory_mask], [ret_mean])
         ret_std = tf.sqrt(tf.reduce_sum(miws ** 2 * (self._multi_rets_in - ret_mean) ** 2) * batch_size)
         self._get_multi_ret_std = U.function([self._multi_rets_in, self._multi_params_in, self._memory_mask], [ret_std])
         
@@ -648,7 +654,6 @@ class PeMlpPolicy(object):
         renyis = tf.stack([self.pd.renyi(behavioral.pd) for behavioral in memory.hpolicies]) #K
         renyis = tf.where(tf.is_nan(renyis), tf.constant(np.inf, shape=renyis.shape), renyis)
         renyis = tf.where(renyis<0., tf.constant(np.inf, shape=renyis.shape), renyis)
-        n_behaviorals = tf.reduce_sum(self._memory_mask)
         exp_renyi_bound = n_behaviorals / tf.reduce_sum(tf.exp(-renyis) * self._memory_mask)
         self._get_renyi_bound = U.function([self._multi_params_in, self._memory_mask], [exp_renyi_bound])
               
@@ -659,7 +664,7 @@ class PeMlpPolicy(object):
         self._ppf = tf.placeholder(name='penal_coeff', dtype=tf.float32, shape=[])
         
         #Bound
-        bound = ret_mean - self._ppf * tf.sqrt(exp_renyi_bound / tf.sqrt(batch_size * n_behaviorals))
+        bound = ret_mean - self._ppf * self._rmax * tf.sqrt(exp_renyi_bound / (batch_size * n_behaviorals))
         
         inputs = [self._multi_params_in, self._multi_rets_in, self._ppf, self._rmax, self._memory_mask]
         self._get_bound_multi = U.function(inputs, [bound]) 

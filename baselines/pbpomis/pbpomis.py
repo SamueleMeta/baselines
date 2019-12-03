@@ -18,6 +18,7 @@ from contextlib import contextmanager
 import time
 from baselines.common import colorize
 from baselines.pbpomis.memory import Memory
+import math
 
 #just to display computation times
 @contextmanager
@@ -175,7 +176,7 @@ def optimize_offline(target, memory, grad_tol=1e-4, bound_tol=1e-4, max_offline_
                                                                  natgrad, 
                                                                  max_search_ite, 
                                                                  rmax, 
-                                                                 delta=0.2)
+                                                                 delta)
         target.set_params(rho)
         improvement+=delta_bound
         if verbose: print(fmtstr % (i+1, epsilon, alpha*epsilon, num_line_search, grad_norm, delta_bound, improvement))
@@ -257,7 +258,7 @@ def learn(env_maker, pol_maker, sampler,
         
         #update memory (current policy is also most recent proposal)
         memory.add_batch(behavioral, actor_params, norm_disc_rets)
-        
+                        
         #log data of the episodes collected in this iteration
         episodes_so_far+=n_episodes
         timesteps_so_far+=sum(lens[-n_episodes:])
@@ -273,7 +274,7 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("BatchSize", batch_size)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
-        
+
         #Optimization
         iter_type = 1
         with timed('offline optimization', verbose):
@@ -323,6 +324,7 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('PlainReturnMin', np.min(rets))
             #Iws
             logger.record_tabular('D2Bound', renyi_bound)
+            logger.record_tabular('D2', math.log(renyi_bound))
             logger.record_tabular('ReturnMeanIw', J)
             logger.record_tabular('MaxIWNorm', np.max(iws))
             logger.record_tabular('MinIWNorm', np.min(iws))
