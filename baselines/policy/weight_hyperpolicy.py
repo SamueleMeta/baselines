@@ -616,18 +616,19 @@ class PeMlpPolicy(object):
         n_behaviorals = tf.reduce_sum(self._memory_mask)
         
         #self-normalized importance weights
-        behavioral_ps = tf.stack([tf.exp(behavioral.pd.logp(self._multi_params_in)) for behavioral in memory.hpolicies]) #K * K * N
-        mask = tf.reshape(self._memory_mask, [behavioral_ps.shape[0],1,1]) #check!
-        behavioral_ps = behavioral_ps * mask
-        miw_dens = tf.reduce_sum(behavioral_ps, axis=0) / tf.reduce_sum(mask, axis=0) # K * N
-        miw_nums = tf.exp(self.pd.logp(self._multi_params_in)) #K * N
-        unn_miws = miw_nums / miw_dens
+        behavioral_logps = tf.stack([behavioral.pd.logp(self._multi_params_in) for behavioral in memory.hpolicies]) #K * K * N
+        mask = tf.reshape(self._memory_mask, [behavioral_logps.shape[0],1,1]) #check!
+        behavioral_logps = behavioral_logps * mask
+        miw_dens = tf.reduce_sum(tf.exp(behavioral_logps - tf.reduce_min(behavioral_logps)), axis=0) / tf.reduce_sum(mask, axis=0) # K * N
+        pds = self.pd.logp(self._multi_params_in)
+        miw_nums = tf.exp(pds) #K * N
+        unn_miws = miw_nums / miw_dens #n.b. modified for numerical stability
         if normalize == 'all':
             miws = unn_miws / tf.reduce_sum(unn_miws, keepdims=True)
         elif normalize == 'rows':
             miws = unn_miws / tf.reduce_sum(unn_miws, axis=1, keepdims=True)
         elif normalize == 'none':
-            miws = unn_miws
+            miws = unn_miws / tf.exp(tf.reduce_min(behavioral_logps))
         else:
             raise ValueError('unknown normalization strategy')
         self._get_unn_miws = U.function([self._multi_params_in, self._memory_mask], [unn_miws])

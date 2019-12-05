@@ -91,8 +91,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, delta, gamma, seed, po
                       use_bias=use_bias,
                       seed=seed)
 
-    #sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
-    sampler = None
+    sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
 
     try:
         affinity = len(os.sched_getaffinity(0))

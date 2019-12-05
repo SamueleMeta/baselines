@@ -7,7 +7,7 @@ from baselines.common import set_global_seeds
 import tensorflow as tf
 import numpy as np
 
-def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size):
+def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size):    
     '''
     Collects trajectories
     '''
@@ -29,15 +29,14 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
     # Initialize history arrays
     i = 0
     j = 0
-    samples_to_get = task_horizon*batch_size
-    tot_samples = 0
+    tot_eps = 0
     while True:
         ac = pol.act(ob)
         # Slight weirdness here because we need value function at time T
         # before returning segment [0, T-1] so we get the correct
         # terminal value
         #if t > 0 and t % horizon == 0:
-        if tot_samples>0 and tot_samples % samples_to_get == 0:
+        if tot_eps>0 and tot_eps % batch_size == 0:
             return {"rets" : ep_rets, "disc_rets": disc_ep_rets, "lens" : ep_lens,
                     "actor_params": actor_params}
 
@@ -47,10 +46,9 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
         cur_ep_ret += rew
         cur_disc_ep_ret += rew * gamma**cur_ep_len
         cur_ep_len += 1
-        tot_samples+=1
         
         j += 1
-        if new or j == task_horizon or (tot_samples>0 and tot_samples % samples_to_get == 0):
+        if new or j == task_horizon:
             new = True
             env.done = True
 
@@ -58,6 +56,7 @@ def traj_segment_function(env, pol, gamma, task_horizon, feature_fun, batch_size
             ep_lens.append(cur_ep_len)
             disc_ep_rets.append(cur_disc_ep_ret)
             actor_params.append(np.array(theta))
+            tot_eps+=1
 
             cur_ep_ret = 0
             cur_disc_ep_ret = 0

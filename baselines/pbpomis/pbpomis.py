@@ -274,6 +274,7 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("BatchSize", batch_size)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
+            logger.record_tabular("NBehaviorals", len(memory))
 
         #Optimization
         iter_type = 1

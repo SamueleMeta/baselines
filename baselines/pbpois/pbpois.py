@@ -226,7 +226,7 @@ def learn(env_maker, pol_maker, sampler,
     newpol = pol_maker('newpol', env.observation_space, env.action_space)
     newpol.set_params(pol.eval_params())
     batch_size = n_episodes
-    normalize = True if iw_norm=='sn' else False
+    normalize = True if iw_norm in ('sn', 'rows', 'all') else False
     episodes_so_far = 0
     timesteps_so_far = 0
     tstart = time.time()
@@ -365,6 +365,8 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('StdIW', np.std(unn_iws))
             logger.record_tabular('ESSClassic', ess)
             logger.record_tabular('ESSRenyi', batch_size/np.exp(renyi))
+            
+            logger.record_tabular("NBehaviorals", 1) #dummy
                     
         logger.dump_tabular()
         

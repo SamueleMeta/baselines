@@ -92,7 +92,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, bound, delta, gamma, s
                       use_bias=use_bias,
                       seed=seed)
 
-    sampler = None#ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
+    sampler = ParallelSampler(make_env, make_policy, gamma, horizon, np.ravel, num_episodes, njobs, seed)
 
     try:
         affinity = len(os.sched_getaffinity(0))
@@ -141,7 +141,7 @@ def main():
     parser.add_argument('--center', type=bool, default=False)
     parser.add_argument('--use_bias', type=int, default=0)
     parser.add_argument('--delta', type=float, default=0.4)
-    parser.add_argument('--njobs', type=int,     default=1)
+    parser.add_argument('--njobs', type=int,     default=-1)
     parser.add_argument('--policy', type=str, default='linear')
     parser.add_argument('--max_offline_iters', type=int, default=10)
     parser.add_argument('--max_iters', type=int, default=500)
