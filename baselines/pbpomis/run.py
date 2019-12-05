@@ -151,7 +151,14 @@ def main():
     parser.add_argument('--capacity', type=int, default=10)
     args = parser.parse_args()
     if args.file_name == 'progress':
-        file_name = '%s_delta=%s_seed=%s_norm=%s_%s' % (args.env.upper(), args.delta, args.seed, args.iw_norm, time.time())
+        file_name = '%s_env=%s_norm=%s_batchsize=%d_cap=%d_delta=%.4f_seed=%d_%d' % (args.experiment_name,
+                                                                       args.env.upper(),  
+                                                                       args.iw_norm,
+                                                                       args.num_episodes,
+                                                                       args.capacity,
+                                                                       args.delta,
+                                                                       args.seed,
+                                                                       time.time())
     else:
         file_name = args.file_name
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
