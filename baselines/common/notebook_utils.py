@@ -15,8 +15,7 @@ import scipy.stats as sts
 def read_data(path, iters=None, default_batchsize=100, scale='Eps'):
     df = pd.read_csv(path, encoding='utf-8')
     if iters: df = df.loc[:iters, :]
-    if not 'BatchSize' in df: df['BatchSize'] = default_batchsize
-    if not 'AvgRet' in df: df['AvgRet'] = df['AverageReturn']
+    if not 'AvgRet' in df: df['AvgRet'] = df['EpRewMean']
     if not 'EpsThisIter' in df: df['EpsThisIter'] = df['BatchSize'] 
     df['EpsSoFar'] = np.cumsum(df['EpsThisIter'])
     if 'SamplesThisIter' in df: df['SamplesSoFar'] = np.cumsum(df['SamplesThisIter'])
@@ -82,7 +81,7 @@ def plot_data(path, key='VanillaAvgRet'):
 def print_ci(dfs, conf=0.95, key='CumAvgRet'):
     n_runs = len(dfs)
     mean_df, std_df = moments(dfs)
-    total_horizon = np.sum(mean_df['AvgEpLen'])
+    total_horizon = np.sum(mean_df['EpLenMean'])
     mean = mean_df[key][len(mean_df)-1]
     std = std_df[key][len(mean_df)-1]
     interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
