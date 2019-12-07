@@ -8,7 +8,7 @@ env = ['rllab.cartpole']#,
 
 policy = ['linear']
 
-delta = [0.05, 0.1, 0.2, 0.3, 0.4]
+delta = [0.01, 0.02, 0.05, 0.1, 0.2]
 
 gamma = [1.]
 
@@ -18,7 +18,7 @@ seed = [10, 109, 904, 160, 570]
 
 capacity = [1, 10]
 
-num_episodes = [10]
+num_episodes = [5]
 
 max_iters = [500]
 
