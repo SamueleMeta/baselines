@@ -43,7 +43,7 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, delta, gamma, seed, po
 
     if env.startswith('rllab.'):
         # Get env name and class
-        env_name = re.match('rllab.(\w+)', env).group(1)
+        env_name = re.match('rllab.(\S+)', env).group(1)
         env_rllab_class = rllab_env_from_name(env_name)
         # Define env maker
         def make_env():
