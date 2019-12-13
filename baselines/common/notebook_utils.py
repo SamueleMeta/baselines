@@ -11,6 +11,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as sts
 
+def bootstrap_ci(x, conf=0.95, resamples=10000):
+    means = [np.mean(x[np.random.choice(x.shape[0], size=x.shape[0], replace=True), :], axis=0) for _ in range(resamples)]
+    low = np.percentile(means, (1-conf)/2 * 100, axis=0)
+    high = np.percentile(means, (1 - (1-conf)/2) * 100, axis=0)
+    return low, high
+    
+
 
 def read_data(path, iters=None, default_batchsize=100, scale='Eps'):
     df = pd.read_csv(path, encoding='utf-8')
@@ -36,7 +43,7 @@ def plot_all(dfs, key='AvgRet', ylim=None, scale='Samples'):
         ax.plot(df[scale+'SoFar'], value)
     return fig
 
-def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None, scale='Eps'):
+def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None, scale='Eps', bootstrap=False, resamples=10000):
     n_runs = len(dfs)
     mean_df, std_df = moments(dfs)
     mean = mean_df[key]
@@ -44,12 +51,16 @@ def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None, scale='Eps'):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(mean_df[scale+'SoFar'], mean)
-    interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
+    if bootstrap:
+        x = np.array([df[key] for df in dfs])
+        interval = bootstrap_ci(x, conf, resamples)
+    else:
+        interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
     ax.fill_between(mean_df[scale+'SoFar'], interval[0], interval[1], alpha=0.3)
     if ylim: ax.set_ylim(ylim)
     return fig
 
-def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Eps'):
+def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Eps', bootstrap=False, resamples=10000):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     entries = []
@@ -61,7 +72,11 @@ def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Ep
         mean = mean_df[key]
         std = std_df[key]
         ax.plot(mean_df[scale+'SoFar'], mean)
-        interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
+        if bootstrap:
+            x = np.array([df[key] for df in dfs])
+            interval = bootstrap_ci(x, conf, resamples)
+        else:
+            interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
         ax.fill_between(mean_df[scale+'SoFar'], interval[0], interval[1], alpha=0.3)
         print(candidate_name, end=': ')
         print_ci(dfs, conf)
