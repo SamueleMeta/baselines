@@ -1,24 +1,26 @@
-script = ['pbpomis/run']
+script = ['pbpois/run']
 
 env = ['rllab.cartpole']#,
-        #'rllab.mountain-car',
-        #'rllab.inverted-pendulum',
-        #'rllab.acrobot',
-        #'rllab.inverted-double-pendulum']
+"""
+env=['rllab.mountain-car',
+        'rllab.inverted-pendulum',
+        'rllab.acrobot',
+        'rllab.inverted-double-pendulum']
+"""
 
 policy = ['linear']
 
-delta = [0.01, 0.02, 0.05, 0.1, 0.2]
+delta = [0.2]
 
 gamma = [1.]
 
 njobs = [1]
 
-seed = [10, 109, 904, 160, 570]
+seed = [10, 109, 904, 160, 570, 662, 963, 100, 746, 236, 247, 689, 153, 947, 307, 42, 950, 315, 545, 178]
 
-capacity = [1, 10]
+capacity = [1]
 
-num_episodes = [5]
+num_episodes = [10]
 
 max_iters = [500]
 

@@ -131,7 +131,7 @@ def main():
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--experiment_name', type=str, default='none')
     parser.add_argument('--env', type=str, default='rllab.cartpole')
-    parser.add_argument('--batchsize', type=int, default=100)
+    parser.add_argument('--num_episodes', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_norm', type=str, default='sn')
     parser.add_argument('--file_name', type=str, default='progress')
@@ -155,7 +155,7 @@ def main():
     logger.configure(dir=args.logdir, format_strs=['stdout', 'csv', 'tensorboard'], file_name=file_name)
     train(env=args.env,
           max_iters=args.max_iters,
-          num_episodes=args.batchsize,
+          num_episodes=args.num_episodes,
           horizon=args.horizon,
           iw_norm=args.iw_norm,
           bound=args.bound,
