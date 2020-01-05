@@ -60,13 +60,16 @@ def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None, scale='Eps', bootstrap=Fals
     if ylim: ax.set_ylim(ylim)
     return fig
 
-def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Eps', bootstrap=False, resamples=10000):
+def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Eps', bootstrap=False, resamples=10000, roll=1):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     entries = []
-    for candidate_name in candidates:
+    if type(roll) is int:
+        roll = [roll]*len(candidates)
+    for i, candidate_name in enumerate(candidates):
         entries.append(candidate_name)
         dfs = candidates[candidate_name]
+        dfs = [dfs[j].rolling(roll[i]).mean() for j in range(len(dfs))]
         n_runs = len(dfs)
         mean_df, std_df = moments(dfs)
         mean = mean_df[key]
@@ -81,8 +84,8 @@ def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Ep
         print(candidate_name, end=': ')
         print_ci(dfs, conf)
     ax.legend(entries)
-    if ylim: ax.set_ylim(ylim)
-    if xlim: ax.set_xlim(xlim)
+    if ylim: ax.set_ylim(None,ylim)
+    if xlim: ax.set_xlim(0,xlim)
     return fig
 
 def plot_data(path, key='VanillaAvgRet'):
