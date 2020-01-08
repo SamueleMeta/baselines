@@ -39,7 +39,7 @@ def get_env_type(env_id):
             break
     return env_type
 
-def train(env, max_iters, num_episodes, horizon, iw_norm, delta, gamma, seed, policy, max_offline_iters, aggregate, center, use_bias, capacity, njobs=1):
+def train(env, max_iters, num_episodes, horizon, iw_norm, delta, gamma, seed, policy, max_offline_iters, aggregate, center, use_bias, capacity, log_freq, njobs=1):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -123,7 +123,8 @@ def train(env, max_iters, num_episodes, horizon, iw_norm, delta, gamma, seed, po
           delta=delta,
           center_return=center,
           line_search_type='parabola',
-          capacity=capacity)
+          capacity=capacity,
+          log_freq=log_freq)
 
     if sampler:
         sampler.close()
@@ -149,6 +150,7 @@ def main():
     parser.add_argument('--max_iters', type=int, default=500)
     parser.add_argument('--gamma', type=float, default=1.0)
     parser.add_argument('--capacity', type=int, default=10)
+    parser.add_argument('--log_freq', type=int, default=100)
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_env=%s_norm=%s_batchsize=%d_cap=%d_delta=%.4f_seed=%d_%d' % (args.experiment_name,
@@ -176,7 +178,8 @@ def main():
           aggregate=args.aggregate,
           center=args.center,
           use_bias=args.use_bias,
-          capacity=args.capacity)
+          capacity=args.capacity,
+          log_freq=args.log_freq)
 
 if __name__ == '__main__':
     main()

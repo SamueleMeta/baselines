@@ -200,7 +200,8 @@ def learn(env_maker, pol_maker, sampler,
           delta=0.4,
           center_return=False,
           line_search_type='parabola',
-          capacity=10):
+          capacity=10,
+          log_freq=1):
     
     #initialization
     with timed('P-POMIS\n\nCompiling', verbose):
@@ -215,8 +216,10 @@ def learn(env_maker, pol_maker, sampler,
         target.build_miw_graph(memory, batch_size, iw_norm)
         episodes_so_far = 0
         timesteps_so_far = 0
+        window_sum = 0
+        window_eps = 0
         tstart = time.time()
-            
+        
     #select step strategy
     if line_search_type == 'parabola':
         use_parabola = True
@@ -262,12 +265,17 @@ def learn(env_maker, pol_maker, sampler,
         #log data of the episodes collected in this iteration
         episodes_so_far+=n_episodes
         timesteps_so_far+=sum(lens[-n_episodes:])
+        window_sum += np.sum(norm_disc_rets)
+        window_eps += n_episodes
+        if verbose and episodes_so_far % log_freq != 0:
+            print('Return:', np.mean(norm_disc_rets))
         with timed('summaries before'):
             logger.log("Performance (plain, undiscounted): ", np.mean(rets))
             logger.record_tabular("Iteration", it)
             logger.record_tabular("InitialBound", target.eval_bound_multi(memory, rmax, delta))
             logger.record_tabular("EpLenMean", np.mean(lens))
             logger.record_tabular("EpRewMean", np.mean(norm_disc_rets))
+            logger.record_tabular("WindowRewMean", window_sum / window_eps)
             logger.record_tabular("UndEpRewMean", np.mean(norm_disc_rets))
             logger.record_tabular("EpThisIter", n_episodes)
             logger.record_tabular("EpisodesSoFar", episodes_so_far)
@@ -337,7 +345,10 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('StdIW', np.std(unn_iws))
             logger.record_tabular('ESSClassic', ess)
                     
-        logger.dump_tabular()
+        if episodes_so_far % log_freq == 0:
+            logger.dump_tabular()
+            window_sum = 0
+            window_eps = 0
         
         #Update behavioral
         behavioral.set_params(target.eval_params())

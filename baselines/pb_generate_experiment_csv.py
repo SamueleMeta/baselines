@@ -1,30 +1,30 @@
-script = ['pbpois/run']
+script = ['pbpomis/run']
 
-env = ['rllab.cartpole']#,
+env = ['rllab.cartpole']
 """
-env=['rllab.mountain-car',
-        'rllab.inverted-pendulum',
-        'rllab.acrobot',
-        'rllab.inverted-double-pendulum']
+       'rllab.mountain-car'
+       'rllab.inverted-pendulum'
+       'rllab.acrobot'
+       'rllab.inverted-double-pendulum'
 """
 
 policy = ['linear']
 
-delta = [0.2]
+delta = [0.0001]
 
 gamma = [1.]
 
 njobs = [1]
 
-seed = [10, 109, 904, 160, 570, 662, 963, 100, 746, 236, 247, 689, 153, 947, 307, 42, 950, 315, 545, 178]
+seed = [749,	728,	524,	215,	455,	920,	635,	930,	402,	705,	938,	563,	925,	29,	173,	542,	899,	175,	152,	210]
 
-capacity = [1]
+capacity = [1,10]
 
-num_episodes = [10]
+num_episodes = [1]
 
-max_iters = [500]
+max_iters = [50000]
 
-iw_norm = ['rows']
+iw_norm = ['all']
 
 vars = dict(filter(lambda k: not k[0].startswith('__'), globals().items()))
 
@@ -37,7 +37,7 @@ import csv
 
 tuples = product(*values)
 
-with open('pbpomis_grid.csv', mode='w') as file:
+with open('pbpomis_cartpole.csv', mode='w') as file:
     employee_writer = csv.writer(file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     employee_writer.writerow(keys)
     for t in tuples:
