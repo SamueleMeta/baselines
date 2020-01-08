@@ -267,7 +267,7 @@ def learn(env_maker, pol_maker, sampler,
         timesteps_so_far+=sum(lens[-n_episodes:])
         window_sum += np.sum(norm_disc_rets)
         window_eps += n_episodes
-        if verbose and episodes_so_far % log_freq != 0:
+        if verbose and it > 0 and episodes_so_far % log_freq != 0:
             print('Return:', np.mean(norm_disc_rets))
         with timed('summaries before'):
             logger.log("Performance (plain, undiscounted): ", np.mean(rets))
@@ -345,7 +345,7 @@ def learn(env_maker, pol_maker, sampler,
             logger.record_tabular('StdIW', np.std(unn_iws))
             logger.record_tabular('ESSClassic', ess)
                     
-        if episodes_so_far % log_freq == 0:
+        if it==0 or episodes_so_far % log_freq == 0:
             logger.dump_tabular()
             window_sum = 0
             window_eps = 0
