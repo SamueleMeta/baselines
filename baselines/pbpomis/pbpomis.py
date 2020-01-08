@@ -347,6 +347,7 @@ def learn(env_maker, pol_maker, sampler,
                     
         if it==0 or episodes_so_far % log_freq == 0:
             logger.dump_tabular()
+        if episodes_so_far % log_freq == 0:
             window_sum = 0
             window_eps = 0
         
