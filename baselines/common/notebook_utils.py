@@ -60,7 +60,7 @@ def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None, scale='Eps', bootstrap=Fals
     if ylim: ax.set_ylim(ylim)
     return fig
 
-def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Eps', bootstrap=False, resamples=10000, roll=1):
+def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Episodes', bootstrap=False, resamples=10000, roll=1):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     entries = []
