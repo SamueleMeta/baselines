@@ -60,9 +60,11 @@ def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None, scale='Eps', bootstrap=Fals
     if ylim: ax.set_ylim(ylim)
     return fig
 
-def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Episodes', bootstrap=False, resamples=10000, roll=1):
+def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Episodes', bootstrap=False, resamples=10000, roll=1, separate=False, opacity=1):
     fig = plt.figure()
     ax = fig.add_subplot(111)
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    colors = prop_cycle.by_key()['color']
     entries = []
     if type(roll) is int:
         roll = [roll]*len(candidates)
@@ -74,16 +76,25 @@ def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Ep
         mean_df, std_df = moments(dfs)
         mean = mean_df[key]
         std = std_df[key]
-        ax.plot(mean_df[scale+'SoFar'], mean)
-        if bootstrap:
-            x = np.array([df[key] for df in dfs])
-            interval = bootstrap_ci(x, conf, resamples)
+        if not separate:
+            ax.plot(mean_df[scale+'SoFar'], mean)   
+            if bootstrap:
+                x = np.array([df[key] for df in dfs])
+                interval = bootstrap_ci(x, conf, resamples)
+            else:
+                interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
+            ax.fill_between(mean_df[scale+'SoFar'], interval[0], interval[1], alpha=0.3)
+            print(candidate_name, end=': ')
+            print_ci(dfs, conf)
         else:
-            interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
-        ax.fill_between(mean_df[scale+'SoFar'], interval[0], interval[1], alpha=0.3)
-        print(candidate_name, end=': ')
-        print_ci(dfs, conf)
+            for d in dfs:
+                ax.plot(d[scale+'SoFar'], d[key], color=colors[i], alpha=opacity)
     ax.legend(entries)
+    leg = ax.get_legend()
+    if separate:
+        for i in range(len(entries)):
+            leg.legendHandles[i].set_color(colors[i])
+            leg.legendHandles[i].set_alpha(1)
     if ylim: ax.set_ylim(None,ylim)
     if xlim: ax.set_xlim(0,xlim)
     return fig
