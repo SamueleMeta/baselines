@@ -10,14 +10,28 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as sts
+import math
 
 def bootstrap_ci(x, conf=0.95, resamples=10000):
     means = [np.mean(x[np.random.choice(x.shape[0], size=x.shape[0], replace=True), :], axis=0) for _ in range(resamples)]
     low = np.percentile(means, (1-conf)/2 * 100, axis=0)
     high = np.percentile(means, (1 - (1-conf)/2) * 100, axis=0)
     return low, high
-    
 
+def nonparam_ti(x, conf=0.95, prop=0.95):
+    srt = np.sort(x, axis=0)
+    n = x.shape[0]
+    nu = n - sts.binom.ppf(conf, n, prop)
+    if nu <= 1:
+        raise ValueError('T.I. does not exist')
+    if nu % 2 == 0:
+        nu_1 = nu_2 = int(nu / 2)
+    else:
+        nu_1 = int(nu / 2  - 1 / 2)
+        nu_2 = nu_1 + 1
+    low = srt[nu_1 - 1, :]
+    high = srt[n - nu_2, :]
+    return low, high
 
 def read_data(path, iters=None, default_batchsize=100, scale='Eps'):
     df = pd.read_csv(path, encoding='utf-8')
@@ -60,7 +74,7 @@ def plot_ci(dfs, conf=0.95, key='AvgRet', ylim=None, scale='Eps', bootstrap=Fals
     if ylim: ax.set_ylim(ylim)
     return fig
 
-def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Episodes', bootstrap=False, resamples=10000, roll=1, separate=False, opacity=1):
+def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Episodes', bootstrap=False, resamples=10000, roll=1, separate=False, opacity=1, tolerance=False, prop=0.95):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     prop_cycle = plt.rcParams['axes.prop_cycle']
@@ -81,11 +95,14 @@ def compare(candidates, conf=0.95, key='AvgRet', ylim=None, xlim=None, scale='Ep
             if bootstrap:
                 x = np.array([df[key] for df in dfs])
                 interval = bootstrap_ci(x, conf, resamples)
+            elif tolerance:
+                x = np.array([df[key] for df in dfs])
+                interval = nonparam_ti(x, conf, prop)
             else:
                 interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
+                print(candidate_name, end=': ')
+                print_ci(dfs, conf)
             ax.fill_between(mean_df[scale+'SoFar'], interval[0], interval[1], alpha=0.3)
-            print(candidate_name, end=': ')
-            print_ci(dfs, conf)
         else:
             for d in dfs:
                 ax.plot(d[scale+'SoFar'], d[key], color=colors[i], alpha=opacity)
@@ -115,3 +132,38 @@ def print_ci(dfs, conf=0.95, key='CumAvgRet'):
     std = std_df[key][len(mean_df)-1]
     interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/np.sqrt(n_runs))
     print('%f \u00B1 %f\t[%f, %f]\t total horizon: %d' % (mean, std, interval[0], interval[1], int(total_horizon)))
+
+def save_ci(dfs, key, name='foo', conf=0.95, path='.', rows=501, xkey='EpisodesSoFar', bootstrap=False, resamples=10000, mult=1., header=True):
+    n_runs = len(dfs)
+    mean_df, std_df = moments(dfs)
+    mean = mean_df[key].values * mult
+    std = std_df[key].values * mult + 1e-24
+    if bootstrap:
+        data = np.array([df[key] * mult for df in dfs])
+        interval = bootstrap_ci(data, conf, resamples)     
+    else:
+        interval = sts.t.interval(conf, n_runs-1,loc=mean,scale=std/math.sqrt(n_runs))
+    low, high = interval
+    if rows is not None:
+        mean = mean[:rows]
+        low = low[:rows]
+        high = high[:rows]
+    xx = range(1,len(mean)+1) if xkey is None else mean_df[xkey]
+    plotdf = pd.DataFrame({"iteration": xx, "mean" : mean, "low" : low, "up": high})
+    plotdf = plotdf.iloc[0:-1:1]
+    plotdf.to_csv(name + '.csv', index=False, header=header)
+    
+def save_ti(dfs, key, name='foo', conf=0.95, prop=0.95, path='.', rows=501, xkey='EpisodesSoFar', mult=1., header=True):
+    mean_df, std_df = moments(dfs)
+    mean = mean_df[key].values * mult
+    x = np.array([df[key] for df in dfs])
+    interval = nonparam_ti(x, conf=conf, prop=prop)
+    low, high = interval
+    if rows is not None:
+        mean = mean[:rows]
+        low = low[:rows]
+        high = high[:rows]
+    xx = range(1,len(mean)+1) if xkey is None else mean_df[xkey]
+    plotdf = pd.DataFrame({"iteration": xx, "mean" : mean, "low" : low, "up": high})
+    plotdf = plotdf.iloc[0:-1:1]
+    plotdf.to_csv(name + '.csv', index=False, header=header)
