@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
-from baselines.pois.utils import add_disc_rew, cluster_rewards
+from baselines.optimalIs.utils import add_disc_rew, cluster_rewards
 
 @contextmanager
 def timed(msg):

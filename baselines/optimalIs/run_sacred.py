@@ -26,7 +26,7 @@ from baselines.common.cmd_util import get_env_type
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
-from baselines.pois import pois
+from baselines.optimalIs import optimal_pois
 
 # Sacred
 from sacred import Experiment

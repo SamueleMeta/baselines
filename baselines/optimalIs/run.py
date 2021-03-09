@@ -23,7 +23,7 @@ from baselines.common.cmd_util import get_env_type
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
-from baselines.pois import pois
+from baselines.optimalIs import optimal_pois
 
 def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, **alg_args):
 
@@ -102,8 +102,8 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
 
     gym.logger.setLevel(logging.DEBUG)
 
-    pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
-                sampler=sampler, save_weights=save_weights, **alg_args)
+    optimal_pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
+                       sampler=sampler, save_weights=save_weights, **alg_args)
 
     sampler.close()
 
