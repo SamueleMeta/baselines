@@ -243,8 +243,8 @@ def learn(make_env, make_policy, *,
     losses_with_name = []
 
     # Policy densities
-    target_log_pdf = pi.pd.logp(ac_)
-    behavioral_log_pdf = oldpi.pd.logp(ac_)
+    target_log_pdf = oldpi.pd.logp(ac_)
+    behavioral_log_pdf = pi.pd.logp(ac_)
     log_ratio = target_log_pdf - behavioral_log_pdf
 
     # Split operations
@@ -256,7 +256,7 @@ def learn(make_env, make_policy, *,
     mask_split = tf.stack(tf.split(mask_, n_episodes))
 
     # Renyi divergence
-    emp_d2_split = tf.stack(tf.split(pi.pd.renyi(oldpi.pd, 2) * mask_, n_episodes))
+    emp_d2_split = tf.stack(tf.split(oldpi.pd.renyi(pi.pd, 2) * mask_, n_episodes))
     emp_d2_cum_split = tf.reduce_sum(emp_d2_split, axis=1)
     empirical_d2 = tf.reduce_mean(tf.exp(emp_d2_cum_split))
 
@@ -382,18 +382,18 @@ def learn(make_env, make_policy, *,
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
         if iw_norm == 'none':
             iwn = iw / n_episodes
-            w_return_mean = tf.reduce_sum(iwn * ep_return)
+            w_return_mean = tf.reduce_sum(iwn * ep_return**2)
             J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(iw * ep_return - w_return_mean))
             losses_with_name.append((J_sample_variance, 'J_sample_variance'))
         elif iw_norm == 'sn':
             iwn = iw / tf.reduce_sum(iw)
-            w_return_mean = tf.reduce_sum(iwn * ep_return)
+            w_return_mean = tf.reduce_sum(iwn * ep_return**2)
         elif iw_norm == 'regression':
             # Get optimized beta
             mean_iw = tf.reduce_mean(iw)
             beta = tf.reduce_sum((iw - mean_iw) * ep_return * iw) / (tf.reduce_sum((iw - mean_iw) ** 2) + 1e-24)
             # Get the estimator
-            w_return_mean = tf.reduce_sum(ep_return * iw + beta * (iw - 1)) / n_episodes
+            w_return_mean = tf.reduce_sum(iw * ep_return**2 + beta * (iw - 1)) / n_episodes
         else:
             raise NotImplementedError()
         ess_classic = tf.linalg.norm(iw, 1) ** 2 / tf.linalg.norm(iw, 2) ** 2
@@ -436,7 +436,7 @@ def learn(make_env, make_policy, *,
         # Compute the J
         ratio_clustered = clustered_target_pdf / clustered_behavioral_pdf
         #ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique                                                  # ---- No cluster cardinality
-        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique * tf.cast(trajectories_per_cluster, tf.float32)   # ---- Cluster cardinality
+        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique**2 * tf.cast(trajectories_per_cluster, tf.float32)   # ---- Cluster cardinality
         #w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)                                         # ---- No cluster cardinality
         w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(n_episodes, tf.float32)                                         # ---- Cluster cardinality
         # Divergences
@@ -460,7 +460,7 @@ def learn(make_env, make_policy, *,
         bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_std
     elif bound == 'max-d2':
         var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
-        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
+        bound_ = - w_return_mean - tf.sqrt(1/delta * return_abs_max**4/n_episodes**2 * empirical_d2)
     elif bound == 'max-ess':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
     elif bound == 'std-ess':
