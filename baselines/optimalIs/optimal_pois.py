@@ -460,7 +460,7 @@ def learn(make_env, make_policy, *,
         bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_std
     elif bound == 'max-d2':
         var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
-        bound_ = - w_return_mean - tf.sqrt(1/delta * return_abs_max**4/n_episodes**2 * empirical_d2)
+        bound_ = - w_return_mean - tf.sqrt(1/delta * return_abs_max**4/n_episodes * empirical_d2)
     elif bound == 'max-ess':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
     elif bound == 'std-ess':
