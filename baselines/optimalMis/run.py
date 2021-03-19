@@ -23,7 +23,7 @@ from baselines.common.cmd_util import get_env_type
 # Self imports: algorithm
 from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
-from baselines.pomis import pomis
+from baselines.optimalMis import opt_pomis
 
 def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, **alg_args):
 
@@ -102,7 +102,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
 
     gym.logger.setLevel(logging.DEBUG)
 
-    pomis.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
+    opt_pomis.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
                 sampler=sampler, save_weights=save_weights, **alg_args)
 
     sampler.close()
@@ -111,7 +111,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--env', type=str, default='cartpole')
+    parser.add_argument('--env', type=str, default='CartPole-v0')
     parser.add_argument('--num_episodes', type=int, default=100)
     parser.add_argument('--horizon', type=int, default=500)
     parser.add_argument('--iw_method', type=str, default='is')
@@ -119,7 +119,7 @@ def main():
     parser.add_argument('--natural', type=bool, default=False)
     parser.add_argument('--file_name', type=str, default='progress')
     parser.add_argument('--logdir', type=str, default='logs')
-    parser.add_argument('--bound', type=str, default='max-d2')
+    parser.add_argument('--bound', type=str, default='max-d2-harmonic')
     parser.add_argument('--delta', type=float, default=0.99)
     parser.add_argument('--njobs', type=int, default=-1)
     parser.add_argument('--policy', type=str, default='nn')

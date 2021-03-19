@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from collections import deque
 from baselines import logger
 from baselines.common.cg import cg
-from baselines.pomis.memory import Memory
+from baselines.optimalMis.memory import Memory
 from baselines.pois.utils import add_disc_rew, cluster_rewards
 
 @contextmanager
@@ -230,13 +230,15 @@ def learn(make_env, make_policy, *,
 
     # Building the target policy and saving its parameters
     pi = make_policy('pi', ob_space, ac_space)
-    all_var_list = pi.get_trainable_variables()
+
+    nu = make_policy('nu', ob_space, ac_space)
+    all_var_list = nu.get_trainable_variables()
     var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
     n_parameters = sum(shapes)
 
     # Building a set of behavioral policies
-    memory.build_policies(make_policy, pi)
+    memory.build_policies(make_policy, nu)
 
     # Placeholders
     ob_ = ob = U.get_placeholder_cached(name='ob')
@@ -263,6 +265,8 @@ def learn(make_env, make_policy, *,
     target_log_pdf_split = tf.reshape(target_log_pdf, [-1, horizon])
     behavioral_log_pdfs = tf.stack([bpi.pd.logp(ac_) * mask_ for bpi in memory.policies]) # Shape is (capacity, ntraj*horizon)
     behavioral_log_pdfs_split = tf.reshape(behavioral_log_pdfs, [memory.capacity, -1, horizon])
+    new_behavioural_log_pdf = nu.pd.log(ac_) * mask_
+    new_behavioural_log_pdf_split = tf.reshape(new_behavioural_log_pdf, [-1, horizon])
 
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
@@ -311,14 +315,15 @@ def learn(make_env, make_policy, *,
         # Sum the log prob over time. Shapes: target(Nep, H), behav (Cap, Nep, H)
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
+        new_behavioural_log_pdf_episode = tf.reduce_sum(new_behavioural_log_pdf_split, axis=1)
         # To avoid numerical instability, compute the inversed ratio
-        log_inverse_ratio = behavioral_log_pdf_episode - target_log_pdf_episode
+        log_inverse_ratio = behavioral_log_pdf_episode + new_behavioural_log_pdf_episode - target_log_pdf_episode
         abc = tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1)
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
         iwn = iw / n_episodes
 
         # Compute the J
-        w_return_mean = tf.reduce_sum(ep_return * iwn)
+        w_return_mean = tf.reduce_sum(ep_return**2 * iwn)
         # Empirical D2 of the mixture and relative ESS
         ess_renyi_arithmetic = N_total / emp_d2_arithmetic
         ess_renyi_harmonic = N_total / emp_d2_harmonic
@@ -337,9 +342,9 @@ def learn(make_env, make_policy, *,
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
-        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max
+        bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_harmonic)) * return_abs_max**4
     elif bound == 'max-d2-arithmetic':
-        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi_arithmetic)) * return_abs_max
+        bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max**4
     else:
         raise NotImplementedError()
 
@@ -409,9 +414,9 @@ def learn(make_env, make_policy, *,
     lenbuffer = deque(maxlen=n_episodes)
     rewbuffer = deque(maxlen=n_episodes)
 
-    while True:
+    while True: #outer loop
 
-        iters_so_far += 1
+        iters_so_far += 1 #index i
 
         if render_after is not None and iters_so_far % render_after == 0:
             if hasattr(env, 'render'):
@@ -426,94 +431,111 @@ def learn(make_env, make_policy, *,
 
         logger.log('********** Iteration %i ************' % iters_so_far)
 
-        theta = get_parameter()
+        nu = mu # to do like assign_old_eq_new, POIS 534 ?
 
-        with timed('sampling'):
-            seg = sampler.collect(theta)
+        iters_so_far_inner = 0
 
-        add_disc_rew(seg, gamma)
+        while True: #inner loop
 
-        lens, rets = seg['ep_lens'], seg['ep_rets']
-        lenbuffer.extend(lens)
-        rewbuffer.extend(rets)
-        episodes_so_far += len(lens)
-        timesteps_so_far += sum(lens)
+            iters_so_far_inner += 1 #index j
 
-        # Adding batch of trajectories to memory
-        memory.add_trajectory_batch(seg)
+            # Here stopping condition?
 
-        # Get multiple batches from memory
-        seg_with_memory = memory.get_trajectories()
+            theta = get_parameter()
 
-        # Get clustered reward
-        reward_matrix = np.reshape(seg_with_memory['disc_rew'] * seg_with_memory['mask'], (-1, horizon))
-        ep_reward = np.sum(reward_matrix, axis=1)
-        ep_reward = cluster_rewards(ep_reward, reward_clustering)
+            with timed('sampling'):
+                seg = sampler.collect(theta)
 
-        args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, active_policies = (seg_with_memory['ob'],
-                                                                                           seg_with_memory['ac'],
-                                                                                           seg_with_memory['rew'],
-                                                                                           seg_with_memory['disc_rew'],
-                                                                                           ep_reward,
-                                                                                           seg_with_memory['mask'],
-                                                                                           iters_so_far,
-                                                                                           memory.get_active_policies_mask())
+            add_disc_rew(seg, gamma)
 
-        def evaluate_loss():
-            loss = compute_bound(*args)
-            return loss[0]
+            lens, rets = seg['ep_lens'], seg['ep_rets']
+            lenbuffer.extend(lens)
+            rewbuffer.extend(rets)
+            episodes_so_far += len(lens)
+            timesteps_so_far += sum(lens)
 
-        def evaluate_gradient():
-            gradient = compute_grad(*args)
-            return gradient[0]
+            # Adding batch of trajectories to memory
+            memory.add_trajectory_batch(seg)
 
-        if use_natural_gradient:
-            def evaluate_fisher_vector_prod(x):
-                return compute_linear_operator(x, *args)[0] + fisher_reg * x
+            # Get multiple batches from memory
+            seg_with_memory = memory.get_trajectories()
 
-            def evaluate_natural_gradient(g):
-                return cg(evaluate_fisher_vector_prod, g, cg_iters=10, verbose=0)
-        else:
-            evaluate_natural_gradient = None
+            # Get clustered reward
+            reward_matrix = np.reshape(seg_with_memory['disc_rew'] * seg_with_memory['mask'], (-1, horizon))
+            ep_reward = np.sum(reward_matrix, axis=1)
+            ep_reward = cluster_rewards(ep_reward, reward_clustering)
 
-        with timed('summaries before'):
-            logger.record_tabular("Iteration", iters_so_far)
-            logger.record_tabular("InitialBound", evaluate_loss())
-            logger.record_tabular("EpLenMean", np.mean(lenbuffer))
-            logger.record_tabular("EpRewMean", np.mean(rewbuffer))
-            logger.record_tabular("EpThisIter", len(lens))
-            logger.record_tabular("EpisodesSoFar", episodes_so_far)
-            logger.record_tabular("TimestepsSoFar", timesteps_so_far)
-            logger.record_tabular("TimeElapsed", time.time() - tstart)
+            args = ob, ac, rew, disc_rew, clustered_rew, mask, iter_number, active_policies = (seg_with_memory['ob'],
+                                                                                               seg_with_memory['ac'],
+                                                                                               seg_with_memory['rew'],
+                                                                                               seg_with_memory[
+                                                                                                   'disc_rew'],
+                                                                                               ep_reward,
+                                                                                               seg_with_memory['mask'],
+                                                                                               iters_so_far,
+                                                                                               memory.get_active_policies_mask())
 
-        if save_weights > 0 and iters_so_far % save_weights == 0:
-            logger.record_tabular('Weights', str(get_parameter()))
-            import pickle
-            file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
-            pickle.dump(theta, file)
+            def evaluate_loss():
+                loss = compute_bound(*args)
+                return loss[0]
 
-        if not warm_start or memory.get_current_load() == capacity:
-            # Optimize
-            with timed("offline optimization"):
-                theta, improvement = optimize_offline(theta,
-                                                  set_parameter,
-                                                  line_search,
-                                                  evaluate_loss,
-                                                  evaluate_gradient,
-                                                  evaluate_natural_gradient,
-                                                  max_offline_ite=max_offline_iters)
+            def evaluate_gradient():
+                gradient = compute_grad(*args)
+                return gradient[0]
 
-            set_parameter(theta)
-            print(theta)
+            if use_natural_gradient:
+                def evaluate_fisher_vector_prod(x):
+                    return compute_linear_operator(x, *args)[0] + fisher_reg * x
 
-            with timed('summaries after'):
-                meanlosses = np.array(compute_losses(*args))
-                for (lossname, lossval) in zip(loss_names, meanlosses):
-                    logger.record_tabular(lossname, lossval)
-        else:
-            # Reinitialize the policy
-            tf.get_default_session().run(policy_reinit)
+                def evaluate_natural_gradient(g):
+                    return cg(evaluate_fisher_vector_prod, g, cg_iters=10, verbose=0)
+            else:
+                evaluate_natural_gradient = None
 
-        logger.dump_tabular()
+            with timed('summaries before'):
+                logger.record_tabular("Iteration", iters_so_far)
+                logger.record_tabular("InitialBound", evaluate_loss())
+                logger.record_tabular("EpLenMean", np.mean(lenbuffer))
+                logger.record_tabular("EpRewMean", np.mean(rewbuffer))
+                logger.record_tabular("EpThisIter", len(lens))
+                logger.record_tabular("EpisodesSoFar", episodes_so_far)
+                logger.record_tabular("TimestepsSoFar", timesteps_so_far)
+                logger.record_tabular("TimeElapsed", time.time() - tstart)
+
+            if save_weights > 0 and iters_so_far % save_weights == 0:
+                logger.record_tabular('Weights', str(get_parameter()))
+                import pickle
+                file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
+                pickle.dump(theta, file)
+
+            if not warm_start or memory.get_current_load() == capacity:
+                # Optimize
+                with timed("offline optimization"):
+                    theta, improvement = optimize_offline(theta,
+                                                          set_parameter,
+                                                          line_search,
+                                                          evaluate_loss,
+                                                          evaluate_gradient,
+                                                          evaluate_natural_gradient,
+                                                          max_offline_ite=max_offline_iters)
+
+                set_parameter(theta)
+                print(theta)
+
+                with timed('summaries after'):
+                    meanlosses = np.array(compute_losses(*args))
+                    for (lossname, lossval) in zip(loss_names, meanlosses):
+                        logger.record_tabular(lossname, lossval)
+            else:
+                # Reinitialize the policy
+                tf.get_default_session().run(policy_reinit)
+
+            logger.dump_tabular()
+
+        mu = nu # assign_old_eq_new
+
+
+
+
 
     env.close()

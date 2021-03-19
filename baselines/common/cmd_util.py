@@ -20,7 +20,7 @@ def get_env_type(env_id):
     _game_envs = defaultdict(set)
     for env in gym.envs.registry.all():
         # TODO: solve this with regexes
-        env_type = env.entry_point.split(':')[0].split('.')[-1]
+        env_type = env._entry_point.split(':')[0].split('.')[-1]
         _game_envs[env_type].add(env.id)
     # Get env type
     env_type = None
