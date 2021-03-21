@@ -342,9 +342,9 @@ def learn(make_env, make_policy, *,
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
-        bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_harmonic)) * return_abs_max**4
+        bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_harmonic)) * return_abs_max**2
     elif bound == 'max-d2-arithmetic':
-        bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max**4
+        bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max**2
     else:
         raise NotImplementedError()
 
@@ -386,6 +386,14 @@ def learn(make_env, make_policy, *,
         hess_logprob = U.flatgrad(dot_product, var_list)
         compute_linear_operator = U.function([p, ob_, ac_, disc_rew_, mask_], [-hess_logprob])
     '''
+
+    assign_nu_eq_mu = U.function([], [], updates=[tf.assign(oldv, newv)
+                                                    for (oldv, newv) in
+                                                    zipsame(nu.get_variables(), pi.get_variables())])
+
+    assign_mu_eq_nu = U.function([], [], updates=[tf.assign(oldv, newv)
+                                                  for (oldv, newv) in
+                                                  zipsame(pi.get_variables(), nu.get_variables())])
 
     assert_ops = tf.group(*tf.get_collection('asserts'))
     print_ops = tf.group(*tf.get_collection('prints'))
@@ -431,7 +439,7 @@ def learn(make_env, make_policy, *,
 
         logger.log('********** Iteration %i ************' % iters_so_far)
 
-        nu = mu # to do like assign_old_eq_new, POIS 534 ?
+        assign_nu_eq_mu()
 
         iters_so_far_inner = 0
 
@@ -439,7 +447,11 @@ def learn(make_env, make_policy, *,
 
             iters_so_far_inner += 1 #index j
 
-            # Here stopping condition?
+            if iters_so_far_inner >= 100:
+                print('Inner loop finished...')
+                break
+
+            logger.log('********** Inner Iteration %i ************' % iters_so_far_inner)
 
             theta = get_parameter()
 
@@ -493,7 +505,7 @@ def learn(make_env, make_policy, *,
                 evaluate_natural_gradient = None
 
             with timed('summaries before'):
-                logger.record_tabular("Iteration", iters_so_far)
+                logger.record_tabular("Iteration", iters_so_far_inner)
                 logger.record_tabular("InitialBound", evaluate_loss())
                 logger.record_tabular("EpLenMean", np.mean(lenbuffer))
                 logger.record_tabular("EpRewMean", np.mean(rewbuffer))
@@ -532,10 +544,6 @@ def learn(make_env, make_policy, *,
 
             logger.dump_tabular()
 
-        mu = nu # assign_old_eq_new
-
-
-
-
+        assign_mu_eq_nu()
 
     env.close()
