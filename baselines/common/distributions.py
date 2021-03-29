@@ -262,6 +262,28 @@ class DiagGaussianPd(Pd):
                    tf.log(tf.reduce_prod(tf.square(self.std), axis=-1) + tol) * (1-alpha)
                                 - tf.log(tf.reduce_prod(tf.square(other.std), axis=-1) + tol) * alpha)
 
+    def compute_divergence(self, phi, nu):
+        assert isinstance(phi, DiagGaussianPd)
+        assert isinstance(nu, DiagGaussianPd)
+
+        mu_abs = tf.reduce_prod(tf.linalg.diag_part(tf.square(self.std)))
+        phi_abs = tf.reduce_prod(tf.linalg.diag_part(tf.square(phi.std)))
+        nu_abs = tf.reduce_prod(tf.linalg.diag_part(tf.square(nu.std)))
+
+        M = 4 * tf.matrix_inverse(tf.square(self.std)) - tf.matrix_inverse(tf.square(phi.std)) -2 * tf.matrix_inverse(tf.square(nu.std))
+
+        M_abs = tf.reduce_prod(tf.linalg.diag(M))
+
+        b = 4 * tf.matrix_inverse(tf.square(self.std)) * self.mean - tf.matrix_inverse(tf.square(phi.std)) * phi.mean \
+            -2 * tf.matrix_inverse(tf.square(nu.std)) * nu.mean
+
+        c = 4 * tf.transpose(self.mean) * tf.matrix_inverse(tf.square(self.std)) * self.mean \
+            - tf.transpose(phi.mean) * tf.matrix_inverse(tf.square(phi.std)) * phi.mean \
+            -2 * tf.transpose(nu.mean) * tf.matrix_inverse(tf.square(nu.std)) * nu.mean
+
+        return (tf.sqrt(phi_abs) * nu_abs * tf.sqrt(M_abs) / tf.square(mu_abs)) * tf.exp(0.5 * (tf.transpose(b) * tf.matrix_inverse(M) * b - c))
+
+
     @classmethod
     def fromflat(cls, flat):
         return cls(flat)
