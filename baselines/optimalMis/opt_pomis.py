@@ -269,6 +269,9 @@ def learn(make_env, make_policy, *,
     new_behavioural_log_pdf_split = tf.reshape(new_behavioural_log_pdf, [-1, horizon])
 
     divergence_split = tf.reshape(tf.stack([pi.pd.compute_divergence(bpi.pd, nu.pd) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
+    divergence_split_cum = tf.reduce_sum(divergence_split, axis=2)
+    divergence_mean = tf.reduce_mean(divergence_split_cum, axis=1)
+    divergence_harmonic = tf.reduce_sum(active_policies) / tf.reduce_sum(1 / divergence_mean)
 
     # Compute renyi divergencies and sum over time, then exponentiate
     emp_d2_split = tf.reshape(tf.stack([pi.pd.renyi(bpi.pd, 2) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
@@ -344,7 +347,7 @@ def learn(make_env, make_policy, *,
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
-        bound_ = - w_return_mean - tf.sqrt(1 / (delta * n_episodes**2) ) * return_abs_max**2 # add divergence
+        bound_ = - w_return_mean - tf.sqrt(1 / (delta * n_episodes) * divergence_harmonic) * return_abs_max**2
     elif bound == 'max-d2-arithmetic':
         bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max**2
     else:
