@@ -269,7 +269,7 @@ def learn(make_env, make_policy, *,
     new_behavioural_log_pdf_split = tf.reshape(new_behavioural_log_pdf, [-1, horizon])
 
     divergence_split = tf.reshape(tf.stack([pi.pd.compute_divergence(bpi.pd, nu.pd) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
-    divergence_split_cum = tf.reduce_sum(divergence_split, axis=2)
+    divergence_split_cum = tf.reduce_prod(divergence_split, axis=2)
     divergence_mean = tf.reduce_mean(divergence_split_cum, axis=1)
     divergence_harmonic = tf.reduce_sum(active_policies) / tf.reduce_sum(1 / divergence_mean)
 
