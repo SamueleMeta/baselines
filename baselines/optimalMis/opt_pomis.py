@@ -510,7 +510,8 @@ def learn(make_env, make_policy, *,
                 evaluate_natural_gradient = None
 
             with timed('summaries before'):
-                logger.record_tabular("Iteration", iters_so_far_inner)
+                logger.record_tabular("Iteration", iters_so_far)
+                logger.record_tabular("Inner Iteration", iters_so_far_inner)
                 logger.record_tabular("InitialBound", evaluate_loss())
                 logger.record_tabular("EpLenMean", np.mean(lenbuffer))
                 logger.record_tabular("EpRewMean", np.mean(rewbuffer))
