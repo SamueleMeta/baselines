@@ -326,6 +326,10 @@ def learn(make_env, make_policy, *,
         abc = tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1)
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
         iwn = iw / n_episodes
+        log_inverse_ratio_lb = behavioral_log_pdf_episode - target_log_pdf_episode
+        iw_lb = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio_lb) * tf.expand_dims(active_policies, -1), axis=0)
+        iwn_lb = iw_lb / n_episodes
+        w_return_mean_lb = tf.reduce_sum(ep_return**2 * iwn_lb)
 
         # Compute the J
         w_return_mean = tf.reduce_sum(ep_return**2 * iwn)
@@ -348,6 +352,7 @@ def learn(make_env, make_policy, *,
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
         bound_ = - w_return_mean - tf.sqrt(1 / (delta * n_episodes) * divergence_harmonic) * return_abs_max**2
+        lower_bound = - w_return_mean_lb + tf.sqrt((1 - delta) / (delta * ess_renyi_arithmetic)) * return_abs_max
     elif bound == 'max-d2-arithmetic':
         bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max**2
     else:
