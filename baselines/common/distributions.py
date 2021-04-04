@@ -258,11 +258,10 @@ class DiagGaussianPd(Pd):
         assert isinstance(other, DiagGaussianPd)
         var_alpha = alpha * tf.square(other.std) + (1. - alpha) * tf.square(self.std)
 
-        r = alpha/2. * tf.reduce_sum(tf.square(self.mean - other.mean) / (var_alpha + tol), axis=-1) - \
+        return alpha/2. * tf.reduce_sum(tf.square(self.mean - other.mean) / (var_alpha + tol), axis=-1) - \
                1./(2*(alpha - 1)) * (tf.log(tf.reduce_prod(var_alpha, axis=-1) + tol) -
                    tf.log(tf.reduce_prod(tf.square(self.std), axis=-1) + tol) * (1-alpha)
                                 - tf.log(tf.reduce_prod(tf.square(other.std), axis=-1) + tol) * alpha)
-        return r
 
     def compute_divergence(self, phi, nu):
         assert isinstance(phi, DiagGaussianPd)
@@ -272,25 +271,19 @@ class DiagGaussianPd(Pd):
         phi_abs = tf.reduce_prod(tf.square(phi.std), axis=-1)
         nu_abs = tf.reduce_prod(tf.square(nu.std), axis=-1)
 
-        mu_var_reciprocal = tf.reciprocal(tf.square(self.std))
-        mu_var_reciprocal = tf.where(tf.is_inf(mu_var_reciprocal), tf.zeros_like(mu_var_reciprocal), mu_var_reciprocal)
-        phi_var_reciprocal = tf.reciprocal(tf.square(phi.std))
-        phi_var_reciprocal = tf.where(tf.is_inf(phi_var_reciprocal), tf.zeros_like(phi_var_reciprocal), phi_var_reciprocal)
-        nu_var_reciprocal = tf.reciprocal(tf.square(nu.std))
-        nu_var_reciprocal = tf.where(tf.is_inf(nu_var_reciprocal), tf.zeros_like(nu_var_reciprocal), nu_var_reciprocal)
+        mu_var_reciprocal = 1/tf.square(self.std)
+        phi_var_reciprocal = 1/tf.square(phi.std)
+        nu_var_reciprocal = 1/tf.square(nu.std)
 
         M = 4 * mu_var_reciprocal - phi_var_reciprocal -2 * nu_var_reciprocal
-        M_reciprocal = tf.reciprocal(M)
-        M_reciprocal = tf.where(tf.is_inf(M_reciprocal), tf.zeros_like(M_reciprocal), M_reciprocal)
         M_abs = tf.reduce_prod(M, axis=-1)
 
         b = 4 * mu_var_reciprocal * self.mean - phi_var_reciprocal * phi.mean -2 * nu_var_reciprocal * nu.mean
 
-        c = 4 * self.mean * mu_var_reciprocal * self.mean - phi.mean * phi_var_reciprocal * phi.mean -2 * nu.mean * nu_var_reciprocal * nu.mean
+        c = 4 * tf.reduce_sum(self.mean * mu_var_reciprocal * self.mean, axis=-1) - tf.reduce_sum(phi.mean * phi_var_reciprocal * phi.mean, axis=-1) \
+            -2 * tf.reduce_sum(nu.mean * nu_var_reciprocal * nu.mean, axis=-1)
 
-        r = (tf.sqrt(phi_abs) * nu_abs * tf.sqrt(M_abs) / tf.square(mu_abs)) * tf.exp(0.5 * (b * M_reciprocal * b - c))
-
-        return M
+        return (tf.sqrt(phi_abs) * nu_abs * tf.sqrt(M_abs) / tf.square(mu_abs)) * tf.exp(0.5 * (tf.reduce_sum(b * (1/M) * b, axis=-1) - c))
 
 
     @classmethod
