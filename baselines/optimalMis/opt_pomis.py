@@ -232,10 +232,16 @@ def learn(make_env, make_policy, *,
     pi = make_policy('pi', ob_space, ac_space)
 
     nu = make_policy('nu', ob_space, ac_space)
+
     all_var_list = nu.get_trainable_variables()
     var_list = [v for v in all_var_list if v.name.split('/')[1].startswith('pol')]
     shapes = [U.intprod(var.get_shape().as_list()) for var in var_list]
     n_parameters = sum(shapes)
+
+
+    all_var_list_pi = pi.get_trainable_variables()
+    var_list_pi = [v for v in all_var_list_pi if v.name.split('/')[1].startswith('pol')]
+
 
     # Building a set of behavioral policies
     memory.build_policies(make_policy, nu)
@@ -268,8 +274,8 @@ def learn(make_env, make_policy, *,
     new_behavioural_log_pdf = nu.pd.logp(ac_) * mask_
     new_behavioural_log_pdf_split = tf.reshape(new_behavioural_log_pdf, [-1, horizon])
 
-    divergence_split = tf.reshape(tf.stack([pi.pd.compute_divergence(bpi.pd, nu.pd) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
-    divergence_split_cum = tf.reduce_prod(divergence_split, axis=2)
+    divergence_split = tf.reshape(tf.stack([tf.log(pi.pd.compute_divergence(bpi.pd, nu.pd)) * mask_ for bpi in memory.policies]), [memory.capacity, -1, horizon])
+    divergence_split_cum = tf.exp(tf.reduce_sum(divergence_split, axis=2))
     divergence_mean = tf.reduce_mean(divergence_split_cum, axis=1)
     divergence_harmonic = tf.reduce_sum(active_policies) / tf.reduce_sum(1 / divergence_mean)
 
@@ -307,6 +313,7 @@ def learn(make_env, make_policy, *,
                              (return_max, 'InitialReturnMax'),
                              (return_min, 'InitialReturnMin'),
                              (return_std, 'InitialReturnStd'),
+                             (divergence_harmonic, 'DivergenceHarmonic'),
                              (emp_d2_arithmetic, 'EmpiricalD2Arithmetic'),
                              (emp_d2_harmonic, 'EmpiricalD2Harmonic'),
                              (return_step_max, 'ReturnStepMax'),
@@ -322,7 +329,7 @@ def learn(make_env, make_policy, *,
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
         new_behavioural_log_pdf_episode = tf.reduce_sum(new_behavioural_log_pdf_split, axis=1)
         # To avoid numerical instability, compute the inversed ratio
-        log_inverse_ratio = behavioral_log_pdf_episode + new_behavioural_log_pdf_episode - target_log_pdf_episode
+        log_inverse_ratio = behavioral_log_pdf_episode + new_behavioural_log_pdf_episode - 2 * target_log_pdf_episode
         abc = tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1)
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
         iwn = iw / n_episodes
@@ -351,8 +358,8 @@ def learn(make_env, make_policy, *,
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
-        bound_ = - w_return_mean - tf.sqrt(1 / (delta * n_episodes) * divergence_harmonic) * return_abs_max**2
-        lower_bound = - w_return_mean_lb + tf.sqrt((1 - delta) / (delta * ess_renyi_arithmetic)) * return_abs_max
+        bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * n_episodes) * divergence_harmonic) * return_abs_max**2
+        lower_bound = - w_return_mean_lb + tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max**2
     elif bound == 'max-d2-arithmetic':
         bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max**2
     else:
@@ -418,6 +425,9 @@ def learn(make_env, make_policy, *,
     get_parameter = U.GetFlat(var_list)
     policy_reinit = tf.variables_initializer(var_list)
 
+
+    get_parameter_pi = U.GetFlat(var_list_pi)
+
     if sampler is None:
         seg_gen = traj_segment_generator(pi, env, n_episodes, horizon, stochastic=True)
         sampler = type("SequentialSampler", (object,), {"collect": lambda self, _: seg_gen.__next__()})()
@@ -451,6 +461,8 @@ def learn(make_env, make_policy, *,
 
         assign_nu_eq_mu()
 
+        #print(get_parameter(), get_parameter_pi())
+
         iters_so_far_inner = 0
 
         while True: #inner loop
@@ -464,6 +476,7 @@ def learn(make_env, make_policy, *,
             logger.log('********** Inner Iteration %i ************' % iters_so_far_inner)
 
             theta = get_parameter()
+            #print('old theta ', theta)
 
             with timed('sampling'):
                 seg = sampler.collect(theta)
@@ -531,8 +544,13 @@ def learn(make_env, make_policy, *,
                 file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
                 pickle.dump(theta, file)
 
+            #print(get_parameter(), get_parameter_pi())
+            #memory.print_parameters()
+
+            #print('check ', theta, get_parameter())
             if not warm_start or memory.get_current_load() == capacity:
                 # Optimize
+
                 with timed("offline optimization"):
                     theta, improvement = optimize_offline(theta,
                                                           set_parameter,
@@ -543,15 +561,17 @@ def learn(make_env, make_policy, *,
                                                           max_offline_ite=max_offline_iters)
 
                 set_parameter(theta)
-                print(theta)
+                #print('new theta ', theta)
+                #print(get_parameter_pi())
 
                 with timed('summaries after'):
                     meanlosses = np.array(compute_losses(*args))
                     for (lossname, lossval) in zip(loss_names, meanlosses):
                         logger.record_tabular(lossname, lossval)
             else:
+                pass
                 # Reinitialize the policy
-                tf.get_default_session().run(policy_reinit)
+                #tf.get_default_session().run(policy_reinit)
 
             logger.dump_tabular()
 
