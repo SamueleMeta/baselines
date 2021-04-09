@@ -504,7 +504,7 @@ def learn(make_env, make_policy, *,
             upper = compute_bound(*args)
             lower = compute_lw_bound(*args)
 
-            if upper < lower:
+            if upper > lower:
                 print("Lower bound > Upper Bound, stopping")
                 break
 
