@@ -110,28 +110,22 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
     '''
     bound_init = evaluate_loss()
     import scipy.optimize as opt
-
     def func(x):
         set_parameter(x)
         return -evaluate_loss()
-
     def grad(x):
         set_parameter(x)
         return -evaluate_gradient().astype(np.float64)
-
     theta, bound, d = opt.fmin_l_bfgs_b(func=func,
                                         fprime=grad,
                                 x0=theta_init.astype(np.float64),
                                 maxiter=100,
                                     )
     print(bound_init, bound)
-
     print(d)
-
     set_parameter(theta)
     improvement = bound_init + bound
     return theta, improvement
-
     '''
 
     fmtstr = '%6i %10.3g %10.3g %18i %18.3g %18.3g %18.3g'
@@ -258,7 +252,7 @@ def learn(make_env, make_policy, *,
     active_policies = tf.placeholder(dtype=tf.float32, shape=(capacity), name='active_policies')
     losses_with_name = []
 
-    # Total number of trajectories
+    # Total number of trajectories
     N_total = tf.reduce_sum(active_policies) * n_episodes
 
     # Split operations
@@ -304,7 +298,7 @@ def learn(make_env, make_policy, *,
     return_max = tf.reduce_max(ep_return)
     return_min = tf.reduce_min(ep_return)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
-    return_step_max = tf.reduce_max(tf.abs(rew_split)) # Max step reward
+    return_step_max = tf.reduce_max(tf.abs(rew_split)) # Max step reward
     return_step_mean = tf.abs(tf.reduce_mean(rew_split))
     positive_step_return_max = tf.maximum(0.0, tf.reduce_max(rew_split))
     negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
@@ -328,7 +322,7 @@ def learn(make_env, make_policy, *,
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdfs_split, axis=2)
         new_behavioural_log_pdf_episode = tf.reduce_sum(new_behavioural_log_pdf_split, axis=1)
-        # To avoid numerical instability, compute the inversed ratio
+        # To avoid numerical instability, compute the inversed ratio
         log_inverse_ratio = behavioral_log_pdf_episode + new_behavioural_log_pdf_episode - 2 * target_log_pdf_episode
         abc = tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1)
         iw = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio) * tf.expand_dims(active_policies, -1), axis=0)
@@ -369,7 +363,7 @@ def learn(make_env, make_policy, *,
     ent = pi.pd.entropy()
     meanent = tf.reduce_mean(ent)
     losses_with_name.append((meanent, 'MeanEntropy'))
-    # Add policy entropy bonus
+    # Add policy entropy bonus
     if entropy != 'none':
         scheme, v1, v2 = entropy.split(':')
         if scheme == 'step':
@@ -418,6 +412,7 @@ def learn(make_env, make_policy, *,
     compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [bound_, assert_ops, print_ops])
+    compute_lw_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [lower_bound, assert_ops, print_ops])
     compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], losses)
     #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [log_inverse_ratio, abc, iw])
 
@@ -469,10 +464,6 @@ def learn(make_env, make_policy, *,
 
             iters_so_far_inner += 1 #index j
 
-            if iters_so_far_inner >= 100:
-                print('Inner loop finished...')
-                break
-
             logger.log('********** Inner Iteration %i ************' % iters_so_far_inner)
 
             theta = get_parameter()
@@ -509,6 +500,13 @@ def learn(make_env, make_policy, *,
                                                                                                seg_with_memory['mask'],
                                                                                                iters_so_far,
                                                                                                memory.get_active_policies_mask())
+
+            upper = compute_bound(*args)
+            lower = compute_lw_bound(*args)
+
+            if upper > lower:
+                print("Lower bound > Upper Bound, stopping")
+                break
 
             def evaluate_loss():
                 loss = compute_bound(*args)
