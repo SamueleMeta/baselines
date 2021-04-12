@@ -283,7 +283,7 @@ class DiagGaussianPd(Pd):
         c = 4 * tf.reduce_sum(self.mean * mu_var_reciprocal * self.mean, axis=-1) - tf.reduce_sum(phi.mean * phi_var_reciprocal * phi.mean, axis=-1) \
             -2 * tf.reduce_sum(nu.mean * nu_var_reciprocal * nu.mean, axis=-1)
 
-        return (tf.sqrt(phi_abs) * nu_abs * tf.sqrt(M_abs) / tf.square(mu_abs)) * tf.exp(0.5 * (tf.reduce_sum(b * (1/M) * b, axis=-1) - c))
+        return (tf.sqrt(phi_abs) * nu_abs / (tf.sqrt(M_abs) * tf.square(mu_abs))) * tf.exp(0.5 * (tf.reduce_sum(b * (1/M) * b, axis=-1) - c))
 
 
     @classmethod
