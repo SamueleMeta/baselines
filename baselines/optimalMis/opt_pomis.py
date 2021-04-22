@@ -201,6 +201,7 @@ def learn(make_env, make_policy, *,
           positive_return=False,
           reward_clustering='none',
           capacity=10,
+          inner=10,
           warm_start=True):
 
     np.set_printoptions(precision=3)
@@ -334,9 +335,13 @@ def learn(make_env, make_policy, *,
 
         # Compute the J
         w_return_mean = tf.reduce_sum(ep_return**2 * iwn)
+
+
         # Empirical D2 of the mixture and relative ESS
         ess_renyi_arithmetic = N_total / emp_d2_arithmetic
         ess_renyi_harmonic = N_total / emp_d2_harmonic
+        ess_divergence_harmonic = N_total / divergence_harmonic
+
         # Log quantities
         losses_with_name.extend([(tf.reduce_max(iw), 'MaxIW'),
                                  (tf.reduce_min(iw), 'MinIW'),
@@ -352,7 +357,7 @@ def learn(make_env, make_policy, *,
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
-        bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * n_episodes) * divergence_harmonic) * return_abs_max**2
+        bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * return_abs_max**2
         lower_bound = - w_return_mean_lb + tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max**2
     elif bound == 'max-d2-arithmetic':
         bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max**2
@@ -412,9 +417,8 @@ def learn(make_env, make_policy, *,
     compute_lossandgrad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], losses + [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_grad = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [U.flatgrad(bound_, var_list), assert_ops, print_ops])
     compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [bound_, assert_ops, print_ops])
-    compute_lw_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [lower_bound, assert_ops, print_ops])
     compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], losses)
-    #compute_temp = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [log_inverse_ratio, abc, iw])
+    compute_w_return = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [w_return_mean, assert_ops, print_ops])
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
@@ -464,10 +468,13 @@ def learn(make_env, make_policy, *,
 
             iters_so_far_inner += 1 #index j
 
+            if iters_so_far_inner >= inner+1:
+                print('Inner loop finished...')
+                break
+
             logger.log('********** Inner Iteration %i ************' % iters_so_far_inner)
 
             theta = get_parameter()
-            #print('old theta ', theta)
 
             with timed('sampling'):
                 seg = sampler.collect(theta)
@@ -501,12 +508,6 @@ def learn(make_env, make_policy, *,
                                                                                                iters_so_far,
                                                                                                memory.get_active_policies_mask())
 
-            upper = compute_bound(*args)
-            lower = compute_lw_bound(*args)
-
-            if upper > lower:
-                print("Lower bound > Upper Bound, stopping")
-                break
 
             def evaluate_loss():
                 loss = compute_bound(*args)
@@ -535,6 +536,7 @@ def learn(make_env, make_policy, *,
                 logger.record_tabular("EpisodesSoFar", episodes_so_far)
                 logger.record_tabular("TimestepsSoFar", timesteps_so_far)
                 logger.record_tabular("TimeElapsed", time.time() - tstart)
+                logger.record_tabular("WReturnMean", compute_w_return(*args)[0])
 
             if save_weights > 0 and iters_so_far % save_weights == 0:
                 logger.record_tabular('Weights', str(get_parameter()))

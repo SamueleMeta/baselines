@@ -135,6 +135,7 @@ def main():
     parser.add_argument('--experiment_name', type=str, default='none')
     parser.add_argument('--save_weights', type=int, default=0)
     parser.add_argument('--capacity', type=int, default=10)
+    parser.add_argument('--inner', type=int, default=10)
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
@@ -162,6 +163,7 @@ def main():
           entropy=args.entropy,
           reward_clustering=args.reward_clustering,
           capacity=args.capacity,
+          inner=args.inner,
           warm_start=args.warm_start,
           )
 
