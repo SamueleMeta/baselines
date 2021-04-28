@@ -540,9 +540,9 @@ def learn(make_env, make_policy, *,
 
             if save_weights > 0 and iters_so_far % save_weights == 0:
                 logger.record_tabular('Weights', str(get_parameter()))
-                import pickle
-                file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
-                pickle.dump(theta, file)
+                #import pickle
+                #file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
+                #pickle.dump(theta, file)
 
             #print(get_parameter(), get_parameter_pi())
             #memory.print_parameters()
