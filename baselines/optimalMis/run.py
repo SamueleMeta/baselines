@@ -25,7 +25,8 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.optimalMis import opt_pomis
 
-def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, **alg_args):
+def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0,
+          learnable_variance=True, variance_init=1, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -79,7 +80,8 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
                              hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=use_bias, use_critic=False,
-                             hidden_W_init=policy_initializer, output_W_init=policy_initializer)
+                             hidden_W_init=policy_initializer, output_W_init=policy_initializer, learnable_variance=learnable_variance,
+                             variance_initializer=variance_init)
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
             return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
@@ -103,7 +105,7 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     gym.logger.setLevel(logging.DEBUG)
 
     opt_pomis.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
-                sampler=sampler, save_weights=save_weights, **alg_args)
+                sampler=sampler, save_weights=save_weights, learnable_variance=learnable_variance, variance_initializer=variance_init,  **alg_args)
 
     sampler.close()
 
@@ -136,6 +138,9 @@ def main():
     parser.add_argument('--save_weights', type=int, default=0)
     parser.add_argument('--capacity', type=int, default=10)
     parser.add_argument('--inner', type=int, default=10)
+    parser.add_argument('--learnable_variance', type=bool, default=False)
+    parser.add_argument('--variance_init', type=int, default=-1)
+    parser.add_argument('--penalization', type=bool, default=False)
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
@@ -165,6 +170,9 @@ def main():
           capacity=args.capacity,
           inner=args.inner,
           warm_start=args.warm_start,
+          learnable_variance=args.learnable_variance,
+          variance_init=args.variance_init,
+          penalization=args.penalization,
           )
 
 if __name__ == '__main__':

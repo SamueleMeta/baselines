@@ -202,6 +202,9 @@ def learn(make_env, make_policy, *,
           reward_clustering='none',
           capacity=10,
           inner=10,
+          penalization=True,
+          learnable_variance=True,
+          variance_initializer=-1,
           warm_start=True):
 
     np.set_printoptions(precision=3)
@@ -357,7 +360,10 @@ def learn(make_env, make_policy, *,
     if bound == 'J':
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
-        bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * return_abs_max**2
+        if penalization:
+            bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * return_abs_max**2
+        else:
+            bound_ = - w_return_mean
         lower_bound = - w_return_mean_lb + tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max**2
     elif bound == 'max-d2-arithmetic':
         bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max**2
@@ -537,6 +543,9 @@ def learn(make_env, make_policy, *,
                 logger.record_tabular("TimestepsSoFar", timesteps_so_far)
                 logger.record_tabular("TimeElapsed", time.time() - tstart)
                 logger.record_tabular("WReturnMean", compute_w_return(*args)[0])
+                logger.record_tabular("Penalization", penalization)
+                logger.record_tabular("LearnableVariance", learnable_variance)
+                logger.record_tabular("VarianceInitializer", variance_initializer)
 
             if save_weights > 0 and iters_so_far % save_weights == 0:
                 logger.record_tabular('Weights', str(get_parameter()))
