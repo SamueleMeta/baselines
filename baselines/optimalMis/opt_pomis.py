@@ -121,7 +121,7 @@ def line_search_constant(theta_init, alpha, natural_gradient, set_parameter, eva
 
     return theta, epsilon, delta_bound, 1
 
-def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
+def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, constant_step_size=1):
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
     set_parameter(theta)
@@ -181,8 +181,10 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
             print('stopping - gradient norm < gradient_tol')
             return theta, improvement
 
-        #alpha = 1. / gradient_norm ** 2
-        alpha = 1e-7
+        if constant_step_size != 1:
+            alpha = constant_step_size
+        else:
+            alpha = 1. / gradient_norm ** 2
 
         theta_old = theta
         improvement_old = improvement
@@ -210,7 +212,7 @@ def learn(make_env, make_policy, *,
           iw_method='is',
           iw_norm='none',
           bound='J',
-          line_search_type='constant',
+          line_search_type='parabola',
           save_weights=0,
           improvement_tol=0.,
           center_return=False,
@@ -226,6 +228,7 @@ def learn(make_env, make_policy, *,
           penalization=True,
           learnable_variance=True,
           variance_initializer=-1,
+          constant_step_size=1,
           warm_start=True):
 
     np.set_printoptions(precision=3)
@@ -235,10 +238,11 @@ def learn(make_env, make_policy, *,
         line_search = line_search_binary
     elif line_search_type == 'parabola':
         line_search = line_search_parabola
-    elif line_search_type == 'constant':
-        line_search = line_search_constant
     else:
         raise ValueError()
+
+    if constant_step_size != 1:
+        line_search = line_search_constant
 
     # Building the environment
     env = make_env()
@@ -590,7 +594,8 @@ def learn(make_env, make_policy, *,
                                                           evaluate_loss,
                                                           evaluate_gradient,
                                                           evaluate_natural_gradient,
-                                                          max_offline_ite=max_offline_iters)
+                                                          max_offline_ite=max_offline_iters,
+                                                          constant_step_size=constant_step_size)
 
                 set_parameter(theta)
                 #print('new theta ', theta)
