@@ -101,6 +101,26 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
 
     return theta_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
+def line_search_constant(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4, max_line_search_ite=1):
+    epsilon = 1
+    bound_init = evaluate_bound()
+
+    theta = theta_init + epsilon * natural_gradient * alpha
+    set_parameter(theta)
+
+    bound = evaluate_bound()
+
+    if np.isnan(bound):
+        warnings.warn('Got NaN bound value: rolling back!')
+        return theta_init, 0., -np.inf, 1
+
+    delta_bound = bound - bound_init
+
+    if delta_bound <= -np.inf + delta_bound_tol:
+        return theta_init, 0., 0., 1
+
+    return theta, epsilon, delta_bound, 1
+
 def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
@@ -161,7 +181,8 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
             print('stopping - gradient norm < gradient_tol')
             return theta, improvement
 
-        alpha = 1. / gradient_norm ** 2
+        #alpha = 1. / gradient_norm ** 2
+        alpha = 1e-7
 
         theta_old = theta
         improvement_old = improvement
@@ -189,7 +210,7 @@ def learn(make_env, make_policy, *,
           iw_method='is',
           iw_norm='none',
           bound='J',
-          line_search_type='parabola',
+          line_search_type='constant',
           save_weights=0,
           improvement_tol=0.,
           center_return=False,
@@ -214,6 +235,8 @@ def learn(make_env, make_policy, *,
         line_search = line_search_binary
     elif line_search_type == 'parabola':
         line_search = line_search_parabola
+    elif line_search_type == 'constant':
+        line_search = line_search_constant
     else:
         raise ValueError()
 
