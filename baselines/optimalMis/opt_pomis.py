@@ -104,20 +104,25 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
 def line_search_constant(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4, max_line_search_ite=1):
     epsilon = 1
     bound_init = evaluate_bound()
+    exit = False
 
-    theta = theta_init + epsilon * natural_gradient * alpha
-    set_parameter(theta)
+    while not exit:
 
-    bound = evaluate_bound()
+        theta = theta_init + epsilon * natural_gradient * alpha
+        set_parameter(theta)
 
-    if np.isnan(bound):
-        warnings.warn('Got NaN bound value: rolling back!')
-        return theta_init, 0., -np.inf, 1
+        bound = evaluate_bound()
 
-    delta_bound = bound - bound_init
+        if np.isnan(bound):
+            warnings.warn('Got NaN bound value: rolling back!')
+            return theta_init, 0., -np.inf, 1
 
-    if delta_bound <= -np.inf + delta_bound_tol:
-        return theta_init, 0., 0., 1
+        delta_bound = bound - bound_init
+
+        if delta_bound <= -np.inf + delta_bound_tol:
+            epsilon /= 2
+        else:
+            exit = True
 
     return theta, epsilon, delta_bound, 1
 
