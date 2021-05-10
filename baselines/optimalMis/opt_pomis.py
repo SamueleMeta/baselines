@@ -319,6 +319,7 @@ def learn(make_env, make_policy, *,
 
     # Return processing: clipping, centering, discounting
     ep_return = clustered_rew_ #tf.reduce_sum(mask_split * disc_rew_split, axis=1)
+    ep_return_optimization = ep_return - tf.reduce_min(ep_return)
     if clipping:
         rew_split = tf.clip_by_value(rew_split, -1, 1)
     if center_return:
@@ -330,11 +331,15 @@ def learn(make_env, make_policy, *,
 
     # Reward statistics
     return_mean = tf.reduce_mean(ep_return)
+    optimization_return_mean = tf.reduce_mean(ep_return_optimization)
     return_std = U.reduce_std(ep_return)
     return_max = tf.reduce_max(ep_return)
+    optimization_return_max = tf.reduce_max(ep_return_optimization)
     return_min = tf.reduce_min(ep_return)
+    optimization_return_min = tf.reduce_min(ep_return_optimization)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
-    return_step_max = tf.reduce_max(tf.abs(rew_split)) # Max step reward
+    optimization_return_abs_max = tf.reduce_max(tf.abs(ep_return_optimization))
+    return_step_max = tf.reduce_max(tf.abs(rew_split))  # Max step reward
     return_step_mean = tf.abs(tf.reduce_mean(rew_split))
     positive_step_return_max = tf.maximum(0.0, tf.reduce_max(rew_split))
     negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
@@ -342,6 +347,9 @@ def learn(make_env, make_policy, *,
     losses_with_name.extend([(return_mean, 'InitialReturnMean'),
                              (return_max, 'InitialReturnMax'),
                              (return_min, 'InitialReturnMin'),
+                             (optimization_return_mean, 'OptimizationReturnMean'),
+                             (optimization_return_max, 'OptimizationReturnMax'),
+                             (optimization_return_min, 'OptimizationReturnMin'),
                              (return_std, 'InitialReturnStd'),
                              (divergence_harmonic, 'DivergenceHarmonic'),
                              (emp_d2_arithmetic, 'EmpiricalD2Arithmetic'),
@@ -351,7 +359,7 @@ def learn(make_env, make_policy, *,
 
     # Add D2 statistics for each memory cell
     for i in range(capacity):
-        losses_with_name.extend([(tf.reduce_mean(emp_d2_split_cum, axis=1)[i], 'MeanD2-'+str(i))])
+        losses_with_name.extend([(tf.reduce_mean(emp_d2_split_cum, axis=1)[i], 'MeanD2-' + str(i))])
 
     if iw_method == 'is':
         # Sum the log prob over time. Shapes: target(Nep, H), behav (Cap, Nep, H)
@@ -366,11 +374,10 @@ def learn(make_env, make_policy, *,
         log_inverse_ratio_lb = behavioral_log_pdf_episode - target_log_pdf_episode
         iw_lb = 1 / tf.reduce_sum(tf.exp(log_inverse_ratio_lb) * tf.expand_dims(active_policies, -1), axis=0)
         iwn_lb = iw_lb / n_episodes
-        w_return_mean_lb = tf.reduce_sum(ep_return**2 * iwn_lb)
+        w_return_mean_lb = tf.reduce_sum(ep_return ** 2 * iwn_lb)
 
         # Compute the J
-        w_return_mean = tf.reduce_sum(ep_return**2 * iwn)
-
+        w_return_mean = tf.reduce_sum(ep_return_optimization ** 2 * iwn)
 
         # Empirical D2 of the mixture and relative ESS
         ess_renyi_arithmetic = N_total / emp_d2_arithmetic
@@ -382,6 +389,7 @@ def learn(make_env, make_policy, *,
                                  (tf.reduce_min(iw), 'MinIW'),
                                  (tf.reduce_mean(iw), 'MeanIW'),
                                  (U.reduce_std(iw), 'StdIW'),
+                                 (U.reduce_std(w_return_mean), 'StdWReturnMean'),
                                  (tf.reduce_min(target_log_pdf_episode), 'MinTargetPdf'),
                                  (tf.reduce_min(behavioral_log_pdf_episode), 'MinBehavPdf'),
                                  (ess_renyi_arithmetic, 'ESSRenyiArithmetic'),
@@ -393,12 +401,13 @@ def learn(make_env, make_policy, *,
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
         if penalization:
-            bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * return_abs_max**2
+            bound_ = - w_return_mean - tf.sqrt(
+                (1 - delta) / (delta * ess_divergence_harmonic)) * optimization_return_abs_max ** 2
         else:
             bound_ = - w_return_mean
-        lower_bound = - w_return_mean_lb + tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max**2
+        lower_bound = - w_return_mean_lb + tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max ** 2
     elif bound == 'max-d2-arithmetic':
-        bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max**2
+        bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max ** 2
     else:
         raise NotImplementedError()
 
