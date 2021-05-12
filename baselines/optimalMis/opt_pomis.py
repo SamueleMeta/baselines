@@ -114,8 +114,8 @@ def line_search_constant(theta_init, alpha, natural_gradient, set_parameter, eva
         bound = evaluate_bound()
 
         if np.isnan(bound):
-            warnings.warn('Got NaN bound value: rolling back!')
-            return theta_init, 0., -np.inf, 1
+            epsilon /= 2
+            continue
 
         delta_bound = bound - bound_init
 
