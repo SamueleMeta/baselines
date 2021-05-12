@@ -378,6 +378,7 @@ def learn(make_env, make_policy, *,
 
         # Compute the J
         w_return_mean = tf.reduce_sum(ep_return_optimization ** 2 * iwn)
+        control_variate = tf.reduce_sum(return_min ** 2 * iwn)
 
         # Empirical D2 of the mixture and relative ESS
         ess_renyi_arithmetic = N_total / emp_d2_arithmetic
@@ -401,10 +402,9 @@ def learn(make_env, make_policy, *,
         bound_ = w_return_mean
     elif bound == 'max-d2-harmonic':
         if penalization:
-            bound_ = - w_return_mean - tf.sqrt(
-                (1 - delta) / (delta * ess_divergence_harmonic)) * optimization_return_abs_max ** 2
+            bound_ = - w_return_mean - control_variate - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * optimization_return_abs_max ** 2
         else:
-            bound_ = - w_return_mean
+            bound_ = - w_return_mean - control_variate
         lower_bound = - w_return_mean_lb + tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max ** 2
     elif bound == 'max-d2-arithmetic':
         bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max ** 2
