@@ -139,6 +139,7 @@ def main():
     parser.add_argument('--learnable_variance', type=bool, default=False)
     parser.add_argument('--variance_init', type=float, default=-1)
     parser.add_argument('--constant_step_size', type=float, default=1)
+    parser.add_argument('--shift_return', type=bool, default=False)
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
@@ -167,7 +168,8 @@ def main():
           reward_clustering=args.reward_clustering,
           learnable_variance=args.learnable_variance,
           variance_init=args.variance_init,
-          constant_step_size=args.constant_step_size)
+          constant_step_size=args.constant_step_size,
+          shift_return=args.shift_return)
 
 if __name__ == '__main__':
     main()

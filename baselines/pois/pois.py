@@ -237,6 +237,7 @@ def learn(make_env, make_policy, *,
           reward_clustering='none',
           learnable_variance=True,
           constant_step_size=1,
+          shift_return=False,
           variance_init=-1):
 
     np.set_printoptions(precision=3)
@@ -428,7 +429,10 @@ def learn(make_env, make_policy, *,
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
         if iw_norm == 'none':
             iwn = iw / n_episodes
-            w_return_mean = tf.reduce_sum(iwn * ep_return_optimization)
+            if shift_return:
+                w_return_mean = tf.reduce_sum(iwn * ep_return_optimization)
+            else:
+                w_return_mean = tf.reduce_sum(iwn * ep_return)
             J_sample_variance = (1 / (n_episodes - 1)) * tf.reduce_sum(
                 tf.square(iw * ep_return_optimization - w_return_mean))
             losses_with_name.append((J_sample_variance, 'J_sample_variance'))
@@ -466,8 +470,7 @@ def learn(make_env, make_policy, *,
         behavioral_norm_log_pdf_episode = behavioral_log_pdf_episode - normalization_factor
         # Exponentiate
         target_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(target_norm_log_pdf_episode), tf.float64), 1e-300, 1e+300)
-        behavioral_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(behavioral_norm_log_pdf_episode), tf.float64), 1e-300,
-                                                  1e+300)
+        behavioral_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(behavioral_norm_log_pdf_episode), tf.float64), 1e-300,1e+300)
         tf.add_to_collection('asserts', tf.assert_positive(target_pdf_episode, name='target_pdf_positive'))
         tf.add_to_collection('asserts', tf.assert_positive(behavioral_pdf_episode, name='behavioral_pdf_positive'))
         # Compute the merging matrix (reward-clustering) and the number of clusters
@@ -475,21 +478,16 @@ def learn(make_env, make_policy, *,
         episode_clustering_matrix = tf.cast(tf.one_hot(reward_indexes, n_episodes), tf.float64)
         max_index = tf.reduce_max(reward_indexes) + 1
         trajectories_per_cluster = tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index]
-        tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index],
-                                                           name='clustering_matrix'))
+        tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
         # Get the clustered pdfs
-        clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][
-                               :max_index]
-        clustered_behavioral_pdf = tf.matmul(tf.reshape(behavioral_pdf_episode, (1, -1)), episode_clustering_matrix)[0][
-                                   :max_index]
+        clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
+        clustered_behavioral_pdf = tf.matmul(tf.reshape(behavioral_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
         tf.add_to_collection('asserts', tf.assert_positive(clustered_target_pdf, name='clust_target_pdf_positive'))
-        tf.add_to_collection('asserts',
-                             tf.assert_positive(clustered_behavioral_pdf, name='clust_behavioral_pdf_positive'))
+        tf.add_to_collection('asserts', tf.assert_positive(clustered_behavioral_pdf, name='clust_behavioral_pdf_positive'))
         # Compute the J
         ratio_clustered = clustered_target_pdf / clustered_behavioral_pdf
         # ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique                                                  # ---- No cluster cardinality
-        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique * tf.cast(trajectories_per_cluster,
-                                                                                      tf.float32)  # ---- Cluster cardinality
+        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique * tf.cast(trajectories_per_cluster, tf.float32)  # ---- Cluster cardinality
         # w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)                                         # ---- No cluster cardinality
         w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(n_episodes, tf.float32)  # ---- Cluster cardinality
         # Divergences
@@ -512,8 +510,10 @@ def learn(make_env, make_policy, *,
     elif bound == 'std-d2':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_std
     elif bound == 'max-d2':
-        var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * optimization_return_abs_max
-        bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
+        if shift_return:
+            bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * optimization_return_abs_max
+        else:
+            bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
     elif bound == 'max-ess':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
     elif bound == 'std-ess':
