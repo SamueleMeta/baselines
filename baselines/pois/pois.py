@@ -100,7 +100,34 @@ def line_search_binary(theta_init, alpha, natural_gradient, set_parameter, evalu
 
     return theta_opt, epsilon_opt, delta_bound_opt, i_opt+1
 
-def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100):
+
+def line_search_constant(theta_init, alpha, natural_gradient, set_parameter, evaluate_bound, delta_bound_tol=1e-4,
+                         max_line_search_ite=1):
+    epsilon = 1
+    bound_init = evaluate_bound()
+    exit = False
+
+    while not exit:
+
+        theta = theta_init + epsilon * natural_gradient * alpha
+        set_parameter(theta)
+
+        bound = evaluate_bound()
+
+        if np.isnan(bound):
+            epsilon /= 2
+            continue
+
+        delta_bound = bound - bound_init
+
+        if delta_bound <= -np.inf + delta_bound_tol:
+            epsilon /= 2
+        else:
+            exit = True
+
+    return theta, epsilon, delta_bound, 1
+
+def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, constant_step_size=1):
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
     set_parameter(theta)
@@ -166,7 +193,10 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
             print('stopping - gradient norm < gradient_tol')
             return theta, improvement
 
-        alpha = 1. / gradient_norm ** 2
+        if constant_step_size != 1:
+            alpha = constant_step_size
+        else:
+            alpha = 1. / gradient_norm ** 2
 
         theta_old = theta
         improvement_old = improvement
@@ -204,7 +234,10 @@ def learn(make_env, make_policy, *,
           clipping=False,
           entropy='none',
           positive_return=False,
-          reward_clustering='none'):
+          reward_clustering='none',
+          learnable_variance=True,
+          constant_step_size=1,
+          variance_init=-1):
 
     np.set_printoptions(precision=3)
     max_samples = horizon * n_episodes
@@ -215,6 +248,9 @@ def learn(make_env, make_policy, *,
         line_search = line_search_parabola
     else:
         raise ValueError()
+
+    if constant_step_size != 1:
+        line_search = line_search_constant
 
     # Building the environment
     env = make_env()
@@ -262,6 +298,9 @@ def learn(make_env, make_policy, *,
 
     # Return
     ep_return = tf.reduce_sum(mask_split * disc_rew_split, axis=1)
+
+    ep_return_optimization = ep_return - tf.reduce_min(ep_return)
+
     if clipping:
         rew_split = tf.clip_by_value(rew_split, -1, 1)
 
@@ -316,11 +355,15 @@ def learn(make_env, make_policy, *,
     '''
 
     return_mean = tf.reduce_mean(ep_return)
+    optimization_return_mean = tf.reduce_mean(ep_return_optimization)
     return_std = U.reduce_std(ep_return)
     return_max = tf.reduce_max(ep_return)
+    optimization_return_max = tf.reduce_max(ep_return_optimization)
     return_min = tf.reduce_min(ep_return)
+    optimization_return_min = tf.reduce_min(ep_return_optimization)
     return_abs_max = tf.reduce_max(tf.abs(ep_return))
-    return_step_max = tf.reduce_max(tf.abs(rew_split)) # Max step reward
+    optimization_return_abs_max = tf.reduce_max(tf.abs(ep_return_optimization))
+    return_step_max = tf.reduce_max(tf.abs(rew_split))  #  Max step reward
     return_step_mean = tf.abs(tf.reduce_mean(rew_split))
     positive_step_return_max = tf.maximum(0.0, tf.reduce_max(rew_split))
     negative_step_return_max = tf.maximum(0.0, tf.reduce_max(-rew_split))
@@ -329,6 +372,9 @@ def learn(make_env, make_policy, *,
     losses_with_name.extend([(return_mean, 'InitialReturnMean'),
                              (return_max, 'InitialReturnMax'),
                              (return_min, 'InitialReturnMin'),
+                             (optimization_return_mean, 'OptimizationReturnMean'),
+                             (optimization_return_max, 'OptimizationReturnMax'),
+                             (optimization_return_min, 'OptimizationReturnMin'),
                              (return_std, 'InitialReturnStd'),
                              (empirical_d2, 'EmpiricalD2'),
                              (return_step_max, 'ReturnStepMax'),
@@ -337,19 +383,19 @@ def learn(make_env, make_policy, *,
     if iw_method == 'pdis':
         # log_ratio_split cumulative sum
         log_ratio_cumsum = tf.cumsum(log_ratio_split, axis=1)
-        # Exponentiate
+        #  Exponentiate
         ratio_cumsum = tf.exp(log_ratio_cumsum)
         # Multiply by the step-wise reward (not episode)
         ratio_reward = ratio_cumsum * disc_rew_split
-        # Average on episodes
+        #  Average on episodes
         ratio_reward_per_episode = tf.reduce_sum(ratio_reward, axis=1)
         w_return_mean = tf.reduce_sum(ratio_reward_per_episode, axis=0) / n_episodes
-        # Get d2(w0:t) with mask
-        d2_w_0t = tf.exp(tf.cumsum(emp_d2_split, axis=1)) * mask_split # LEAVE THIS OUTSIDE
-        # Sum d2(w0:t) over timesteps
+        #  Get d2(w0:t) with mask
+        d2_w_0t = tf.exp(tf.cumsum(emp_d2_split, axis=1)) * mask_split  # LEAVE THIS OUTSIDE
+        #  Sum d2(w0:t) over timesteps
         episode_d2_0t = tf.reduce_sum(d2_w_0t, axis=1)
         # Sample variance
-        J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(ratio_reward_per_episode - w_return_mean))
+        J_sample_variance = (1 / (n_episodes - 1)) * tf.reduce_sum(tf.square(ratio_reward_per_episode - w_return_mean))
         losses_with_name.append((J_sample_variance, 'J_sample_variance'))
         losses_with_name.extend([(tf.reduce_max(ratio_cumsum), 'MaxIW'),
                                  (tf.reduce_min(ratio_cumsum), 'MinIW'),
@@ -382,14 +428,15 @@ def learn(make_env, make_policy, *,
         iw = tf.exp(tf.reduce_sum(log_ratio_split, axis=1))
         if iw_norm == 'none':
             iwn = iw / n_episodes
-            w_return_mean = tf.reduce_sum(iwn * ep_return)
-            J_sample_variance = (1/(n_episodes-1)) * tf.reduce_sum(tf.square(iw * ep_return - w_return_mean))
+            w_return_mean = tf.reduce_sum(iwn * ep_return_optimization)
+            J_sample_variance = (1 / (n_episodes - 1)) * tf.reduce_sum(
+                tf.square(iw * ep_return_optimization - w_return_mean))
             losses_with_name.append((J_sample_variance, 'J_sample_variance'))
         elif iw_norm == 'sn':
             iwn = iw / tf.reduce_sum(iw)
             w_return_mean = tf.reduce_sum(iwn * ep_return)
         elif iw_norm == 'regression':
-            # Get optimized beta
+            #  Get optimized beta
             mean_iw = tf.reduce_mean(iw)
             beta = tf.reduce_sum((iw - mean_iw) * ep_return * iw) / (tf.reduce_sum((iw - mean_iw) ** 2) + 1e-24)
             # Get the estimator
@@ -410,7 +457,7 @@ def learn(make_env, make_policy, *,
                                  (ess_classic, 'ESSClassic'),
                                  (ess_renyi, 'ESSRenyi')])
     elif iw_method == 'rbis':
-        # Get pdfs for episodes
+        #  Get pdfs for episodes
         target_log_pdf_episode = tf.reduce_sum(target_log_pdf_split, axis=1)
         behavioral_log_pdf_episode = tf.reduce_sum(behavioral_log_pdf_split, axis=1)
         # Normalize log_proba (avoid as overflows as possible)
@@ -419,7 +466,8 @@ def learn(make_env, make_policy, *,
         behavioral_norm_log_pdf_episode = behavioral_log_pdf_episode - normalization_factor
         # Exponentiate
         target_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(target_norm_log_pdf_episode), tf.float64), 1e-300, 1e+300)
-        behavioral_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(behavioral_norm_log_pdf_episode), tf.float64), 1e-300, 1e+300)
+        behavioral_pdf_episode = tf.clip_by_value(tf.cast(tf.exp(behavioral_norm_log_pdf_episode), tf.float64), 1e-300,
+                                                  1e+300)
         tf.add_to_collection('asserts', tf.assert_positive(target_pdf_episode, name='target_pdf_positive'))
         tf.add_to_collection('asserts', tf.assert_positive(behavioral_pdf_episode, name='behavioral_pdf_positive'))
         # Compute the merging matrix (reward-clustering) and the number of clusters
@@ -427,18 +475,23 @@ def learn(make_env, make_policy, *,
         episode_clustering_matrix = tf.cast(tf.one_hot(reward_indexes, n_episodes), tf.float64)
         max_index = tf.reduce_max(reward_indexes) + 1
         trajectories_per_cluster = tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index]
-        tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index], name='clustering_matrix'))
+        tf.add_to_collection('asserts', tf.assert_positive(tf.reduce_sum(episode_clustering_matrix, axis=0)[:max_index],
+                                                           name='clustering_matrix'))
         # Get the clustered pdfs
-        clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
-        clustered_behavioral_pdf = tf.matmul(tf.reshape(behavioral_pdf_episode, (1, -1)), episode_clustering_matrix)[0][:max_index]
+        clustered_target_pdf = tf.matmul(tf.reshape(target_pdf_episode, (1, -1)), episode_clustering_matrix)[0][
+                               :max_index]
+        clustered_behavioral_pdf = tf.matmul(tf.reshape(behavioral_pdf_episode, (1, -1)), episode_clustering_matrix)[0][
+                                   :max_index]
         tf.add_to_collection('asserts', tf.assert_positive(clustered_target_pdf, name='clust_target_pdf_positive'))
-        tf.add_to_collection('asserts', tf.assert_positive(clustered_behavioral_pdf, name='clust_behavioral_pdf_positive'))
+        tf.add_to_collection('asserts',
+                             tf.assert_positive(clustered_behavioral_pdf, name='clust_behavioral_pdf_positive'))
         # Compute the J
         ratio_clustered = clustered_target_pdf / clustered_behavioral_pdf
-        #ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique                                                  # ---- No cluster cardinality
-        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique * tf.cast(trajectories_per_cluster, tf.float32)   # ---- Cluster cardinality
-        #w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)                                         # ---- No cluster cardinality
-        w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(n_episodes, tf.float32)                                         # ---- Cluster cardinality
+        # ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique                                                  # ---- No cluster cardinality
+        ratio_reward = tf.cast(ratio_clustered, tf.float32) * reward_unique * tf.cast(trajectories_per_cluster,
+                                                                                      tf.float32)  # ---- Cluster cardinality
+        # w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(max_index, tf.float32)                                         # ---- No cluster cardinality
+        w_return_mean = tf.reduce_sum(ratio_reward) / tf.cast(n_episodes, tf.float32)  # ---- Cluster cardinality
         # Divergences
         ess_classic = tf.linalg.norm(ratio_reward, 1) ** 2 / tf.linalg.norm(ratio_reward, 2) ** 2
         sqrt_ess_classic = tf.linalg.norm(ratio_reward, 1) / tf.linalg.norm(ratio_reward, 2)
@@ -448,7 +501,7 @@ def learn(make_env, make_policy, *,
                                  (tf.reduce_min(ratio_clustered), 'MinIW'),
                                  (tf.reduce_mean(ratio_clustered), 'MeanIW'),
                                  (U.reduce_std(ratio_clustered), 'StdIW'),
-                                 (1-(max_index / n_episodes), 'RewardCompression'),
+                                 (1 - (max_index / n_episodes), 'RewardCompression'),
                                  (ess_classic, 'ESSClassic'),
                                  (ess_renyi, 'ESSRenyi')])
     else:
@@ -459,38 +512,40 @@ def learn(make_env, make_policy, *,
     elif bound == 'std-d2':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_std
     elif bound == 'max-d2':
-        var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
+        var_estimate = tf.sqrt((1 - delta) / (delta * ess_renyi)) * optimization_return_abs_max
         bound_ = w_return_mean - tf.sqrt((1 - delta) / (delta * ess_renyi)) * return_abs_max
     elif bound == 'max-ess':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_abs_max
     elif bound == 'std-ess':
         bound_ = w_return_mean - tf.sqrt((1 - delta) / delta) / sqrt_ess_classic * return_std
     elif bound == 'pdis-max-d2':
-        # Discount factor
+        #  Discount factor
         if gamma >= 1:
-            discounter = [float(1+2*(horizon-t-1)) for t in range(0, horizon)]
+            discounter = [float(1 + 2 * (horizon - t - 1)) for t in range(0, horizon)]
         else:
             def f(t):
-                return pow(gamma, t) * (pow(gamma, t) + pow(gamma, t+1) - 2*pow(gamma, horizon)) / (1-gamma)
+                return pow(gamma, t) * (pow(gamma, t) + pow(gamma, t + 1) - 2 * pow(gamma, horizon)) / (1 - gamma)
+
             discounter = [f(t) for t in range(0, horizon)]
         discounter_tf = tf.constant(discounter)
         mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
-        discounted_d2 = mean_episode_d2 * discounter_tf # Discounted d2
-        discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0) # Sum over time
-        bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*n_episodes)) * return_step_max
+        discounted_d2 = mean_episode_d2 * discounter_tf  #  Discounted d2
+        discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0)  #  Sum over time
+        bound_ = w_return_mean - tf.sqrt((1 - delta) * discounted_total_d2 / (delta * n_episodes)) * return_step_max
     elif bound == 'pdis-mean-d2':
-        # Discount factor
+        #  Discount factor
         if gamma >= 1:
-            discounter = [float(1+2*(horizon-t-1)) for t in range(0, horizon)]
+            discounter = [float(1 + 2 * (horizon - t - 1)) for t in range(0, horizon)]
         else:
             def f(t):
-                return pow(gamma, t) * (pow(gamma, t) + pow(gamma, t+1) - 2*pow(gamma, horizon)) / (1-gamma)
+                return pow(gamma, t) * (pow(gamma, t) + pow(gamma, t + 1) - 2 * pow(gamma, horizon)) / (1 - gamma)
+
             discounter = [f(t) for t in range(0, horizon)]
         discounter_tf = tf.constant(discounter)
         mean_episode_d2 = tf.reduce_sum(d2_w_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
-        discounted_d2 = mean_episode_d2 * discounter_tf # Discounted d2
-        discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0) # Sum over time
-        bound_ = w_return_mean - tf.sqrt((1-delta) * discounted_total_d2 / (delta*n_episodes)) * return_step_mean
+        discounted_d2 = mean_episode_d2 * discounter_tf  #  Discounted d2
+        discounted_total_d2 = tf.reduce_sum(discounted_d2, axis=0)  #  Sum over time
+        bound_ = w_return_mean - tf.sqrt((1 - delta) * discounted_total_d2 / (delta * n_episodes)) * return_step_mean
     else:
         raise NotImplementedError()
 
@@ -631,12 +686,14 @@ def learn(make_env, make_policy, *,
             logger.record_tabular("EpisodesSoFar", episodes_so_far)
             logger.record_tabular("TimestepsSoFar", timesteps_so_far)
             logger.record_tabular("TimeElapsed", time.time() - tstart)
+            logger.record_tabular("LearnableVariance", learnable_variance)
+            logger.record_tabular("VarianceInit", variance_init)
 
         if save_weights > 0 and iters_so_far % save_weights == 0:
             logger.record_tabular('Weights', str(get_parameter()))
-            import pickle
-            file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
-            pickle.dump(theta, file)
+            # import pickle
+            # file = open('checkpoint' + str(iters_so_far) + '.pkl', 'wb')
+            # pickle.dump(theta, file)
 
         with timed("offline optimization"):
             theta, improvement = optimize_offline(theta,
@@ -645,7 +702,8 @@ def learn(make_env, make_policy, *,
                                                   evaluate_loss,
                                                   evaluate_gradient,
                                                   evaluate_natural_gradient,
-                                                  max_offline_ite=max_offline_iters)
+                                                  max_offline_ite=max_offline_iters,
+                                                  constant_step_size=constant_step_size)
 
         set_parameter(theta)
         print(theta)

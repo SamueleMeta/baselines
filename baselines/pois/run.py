@@ -25,7 +25,7 @@ from baselines.policy.mlp_policy import MlpPolicy
 from baselines.policy.cnn_policy import CnnPolicy
 from baselines.pois import pois
 
-def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, **alg_args):
+def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_weights=0, learnable_variance=True, variance_init=1, **alg_args):
 
     if env.startswith('rllab.'):
         # Get env name and class
@@ -78,8 +78,10 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     if policy == 'linear' or policy == 'nn' or policy == 'simple-nn':
         def make_policy(name, ob_space, ac_space):
             return MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True, use_bias=use_bias, use_critic=False,
-                             hidden_W_init=policy_initializer, output_W_init=policy_initializer)
+                             hid_size=hid_size, num_hid_layers=num_hid_layers, gaussian_fixed_var=True,
+                             use_bias=use_bias, use_critic=False,
+                             hidden_W_init=policy_initializer, output_W_init=policy_initializer,
+                             learnable_variance=learnable_variance, variance_initializer=variance_init)
     elif policy == 'cnn':
         def make_policy(name, ob_space, ac_space):
             return CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
@@ -103,7 +105,8 @@ def train(env, policy, policy_init, n_episodes, horizon, seed, njobs=1, save_wei
     gym.logger.setLevel(logging.DEBUG)
 
     pois.learn(make_env, make_policy, n_episodes=n_episodes, horizon=horizon,
-                sampler=sampler, save_weights=save_weights, **alg_args)
+               sampler=sampler, save_weights=save_weights, learnable_variance=learnable_variance,
+               variance_init=variance_init, **alg_args)
 
     sampler.close()
 
@@ -133,6 +136,9 @@ def main():
     parser.add_argument('--reward_clustering', type=str, default='none')
     parser.add_argument('--experiment_name', type=str, default='none')
     parser.add_argument('--save_weights', type=int, default=0)
+    parser.add_argument('--learnable_variance', type=bool, default=False)
+    parser.add_argument('--variance_init', type=float, default=-1)
+    parser.add_argument('--constant_step_size', type=float, default=1)
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
@@ -158,7 +164,10 @@ def main():
           center_return=args.center,
           clipping=args.clipping,
           entropy=args.entropy,
-          reward_clustering=args.reward_clustering,)
+          reward_clustering=args.reward_clustering,
+          learnable_variance=args.learnable_variance,
+          variance_init=args.variance_init,
+          constant_step_size=args.constant_step_size)
 
 if __name__ == '__main__':
     main()
