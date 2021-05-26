@@ -126,7 +126,7 @@ def line_search_constant(theta_init, alpha, natural_gradient, set_parameter, eva
 
     return theta, epsilon, delta_bound, 1
 
-def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, constant_step_size=1):
+def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, evaluate_gradient, evaluate_natural_gradient=None, gradient_tol=1e-4, bound_tol=1e-4, max_offline_ite=100, constant_step_size=0):
     theta = theta_old = theta_init
     improvement = improvement_old = 0.
     set_parameter(theta)
@@ -186,8 +186,8 @@ def optimize_offline(theta_init, set_parameter, line_search, evaluate_loss, eval
             print('stopping - gradient norm < gradient_tol')
             return theta, improvement
 
-        if constant_step_size != 1:
-            alpha = constant_step_size
+        if constant_step_size != 0:
+            alpha = constant_step_size / gradient_norm
         else:
             alpha = 1. / gradient_norm ** 2
 
@@ -233,8 +233,9 @@ def learn(make_env, make_policy, *,
           penalization=True,
           learnable_variance=True,
           variance_initializer=-1,
-          constant_step_size=1,
+          constant_step_size=0,
           shift_return=False,
+          power=1,
           warm_start=True):
 
     np.set_printoptions(precision=3)
@@ -247,7 +248,7 @@ def learn(make_env, make_policy, *,
     else:
         raise ValueError()
 
-    if constant_step_size != 1:
+    if constant_step_size != 0:
         line_search = line_search_constant
 
     # Building the environment
@@ -320,7 +321,7 @@ def learn(make_env, make_policy, *,
 
     # Return processing: clipping, centering, discounting
     ep_return = clustered_rew_ #tf.reduce_sum(mask_split * disc_rew_split, axis=1)
-    ep_return_optimization = ep_return - tf.reduce_min(ep_return)
+    ep_return_optimization = (ep_return - tf.reduce_min(ep_return)) ** power
     if clipping:
         rew_split = tf.clip_by_value(rew_split, -1, 1)
     if center_return:
@@ -408,11 +409,11 @@ def learn(make_env, make_policy, *,
     elif bound == 'max-d2-harmonic':
         if penalization:
             if shift_return:
-                bound_ = - w_return_mean - control_variate - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * optimization_return_abs_max ** 2
+                bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * optimization_return_abs_max ** 2
             else:
-                bound_ = - w_return_mean - control_variate - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * return_abs_max ** 2
+                bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * return_abs_max ** 2
         else:
-            bound_ = - w_return_mean - control_variate
+            bound_ = - w_return_mean
         lower_bound = - w_return_mean_lb + tf.sqrt((1 - delta) / (delta * ess_renyi_harmonic)) * return_abs_max ** 2
     elif bound == 'max-d2-arithmetic':
         bound_ = - w_return_mean - tf.sqrt(1 / (delta * ess_renyi_arithmetic)) * return_abs_max ** 2
@@ -595,6 +596,7 @@ def learn(make_env, make_policy, *,
                 logger.record_tabular("Penalization", penalization)
                 logger.record_tabular("LearnableVariance", learnable_variance)
                 logger.record_tabular("VarianceInitializer", variance_initializer)
+                logger.record_tabular("Epsilon", constant_step_size)
 
             if save_weights > 0 and iters_so_far % save_weights == 0:
                 logger.record_tabular('Weights', str(get_parameter()))

@@ -141,8 +141,9 @@ def main():
     parser.add_argument('--learnable_variance', type=bool, default=False)
     parser.add_argument('--variance_init', type=float, default=-1)
     parser.add_argument('--penalization', type=bool, default=False)
-    parser.add_argument('--constant_step_size', type=float, default=1)
+    parser.add_argument('--constant_step_size', type=float, default=0)
     parser.add_argument('--shift_return', type=bool, default=False)
+    parser.add_argument('--power', type=float, default=1)
     args = parser.parse_args()
     if args.file_name == 'progress':
         file_name = '%s_delta=%s_seed=%s_%s' % (args.env.upper(), args.delta, args.seed, time.time())
@@ -176,7 +177,8 @@ def main():
           variance_init=args.variance_init,
           penalization=args.penalization,
           constant_step_size=args.constant_step_size,
-          shift_return=args.shift_return
+          shift_return=args.shift_return,
+          power=args.power
           )
 
 if __name__ == '__main__':
