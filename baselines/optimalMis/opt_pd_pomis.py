@@ -407,12 +407,11 @@ def learn(make_env, make_policy, *,
         new_behavioural_log_pdf_episode = tf.cumsum(new_behavioural_log_pdf_split, axis=1)
         log_inverse_ratio = behavioral_log_pdf_episode + new_behavioural_log_pdf_episode - 2 * target_log_pdf_episode
         ratio_cumsum = tf.exp(log_inverse_ratio)
-        ratio_reward = ratio_cumsum * disc_rew_split
+        ratio_reward = ratio_cumsum * disc_rew_split ** 2
         ratio_reward_per_espisode = tf.reduce_sum(ratio_reward, axis=1)
         w_return_mean = tf.reduce_sum(ratio_reward_per_espisode, axis=0) / n_episodes
 
-        divergence_0t = tf.exp(tf.cumsum(divergence_split, axis=1)) * mask_split # ???
-        episode_divergence_0t = tf.reduce_sum(divergence_0t, axis=1) # ???
+        divergence_0t = tf.exp(tf.cumsum(divergence_split, axis=2))
 
         losses_with_name.extend([(tf.reduce_max(ratio_cumsum), 'MaxIW'),
                                  (tf.reduce_min(ratio_cumsum), 'MinIW'),
@@ -449,12 +448,17 @@ def learn(make_env, make_policy, *,
 
                 discounter = [f(t) for t in range(0, horizon)]
             discounter_tf = tf.constant(discounter)
-            mean_episode_divergence = tf.reduce_sum(divergence_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
+            mean_episode_divergence = tf.reduce_sum(divergence_0t, axis=1) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
             discounted_divergence = mean_episode_divergence * discounter_tf
             discounted_total_divergence = tf.reduce_sum(discounted_divergence, axis=0)
-            bound_ = w_return_mean - tf.sqrt((1 - delta) * discounted_total_divergence / (delta * n_episodes)) * return_step_max
+
+            ess_renyi_arithmetic = N_total / emp_d2_arithmetic
+            ess_renyi_harmonic = N_total / emp_d2_harmonic
+            ess_divergence_harmonic = N_total / divergence_harmonic
+
+            bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * return_abs_max ** 2
         else:
-            bound_ = w_return_mean
+            bound_ = - w_return_mean
     else:
         raise NotImplementedError()
 
