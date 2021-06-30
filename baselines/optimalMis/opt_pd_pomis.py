@@ -403,7 +403,7 @@ def learn(make_env, make_policy, *,
                                  (ess_renyi_harmonic, 'ESSRenyiHarmonic')])
     elif iw_method == 'pdis':
         target_log_pdf_episode = tf.cumsum(target_log_pdf_split, axis=1)
-        behavioral_log_pdf_episode = tf.cumsum(behavioral_log_pdfs_split, axis=2)
+        behavioral_log_pdf_episode = tf.squeeze(tf.cumsum(behavioral_log_pdfs_split, axis=2))
         new_behavioural_log_pdf_episode = tf.cumsum(new_behavioural_log_pdf_split, axis=1)
         log_inverse_ratio = behavioral_log_pdf_episode + new_behavioural_log_pdf_episode - 2 * target_log_pdf_episode
         ratio_cumsum = tf.exp(log_inverse_ratio)
@@ -411,7 +411,7 @@ def learn(make_env, make_policy, *,
         ratio_reward_per_espisode = tf.reduce_sum(ratio_reward, axis=1)
         w_return_mean = tf.reduce_sum(ratio_reward_per_espisode, axis=0) / n_episodes
 
-        divergence_0t = tf.exp(tf.cumsum(divergence_split, axis=2))
+        divergence_0t = tf.squeeze(tf.exp(tf.cumsum(divergence_split, axis=2)))
 
         losses_with_name.extend([(tf.reduce_max(ratio_cumsum), 'MaxIW'),
                                  (tf.reduce_min(ratio_cumsum), 'MinIW'),
@@ -448,15 +448,11 @@ def learn(make_env, make_policy, *,
 
                 discounter = [f(t) for t in range(0, horizon)]
             discounter_tf = tf.constant(discounter)
-            mean_episode_divergence = tf.reduce_sum(divergence_0t, axis=1) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
+            mean_episode_divergence = tf.reduce_sum(divergence_0t, axis=0) / (tf.reduce_sum(mask_split, axis=0) + 1e-24)
             discounted_divergence = mean_episode_divergence * discounter_tf
             discounted_total_divergence = tf.reduce_sum(discounted_divergence, axis=0)
 
-            ess_renyi_arithmetic = N_total / emp_d2_arithmetic
-            ess_renyi_harmonic = N_total / emp_d2_harmonic
-            ess_divergence_harmonic = N_total / divergence_harmonic
-
-            bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * ess_divergence_harmonic)) * return_abs_max ** 2
+            bound_ = - w_return_mean - tf.sqrt((1 - delta) / (delta * discounted_total_divergence)) * return_step_max ** 2
         else:
             bound_ = - w_return_mean
     else:
@@ -517,6 +513,8 @@ def learn(make_env, make_policy, *,
     compute_bound = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [bound_, assert_ops, print_ops])
     compute_losses = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], losses)
     compute_w_return = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [w_return_mean, assert_ops, print_ops])
+    compute_new = U.function([ob_, ac_, rew_, disc_rew_, clustered_rew_, mask_, iter_number_, active_policies], [mask_split, assert_ops, print_ops])
+
 
     set_parameter = U.SetFromFlat(var_list)
     get_parameter = U.GetFlat(var_list)
